@@ -41,7 +41,7 @@ Option Explicit
 'instead of " ", the following separators are also accepted: ",;-+"
 'Accepts any combination of the above formattings
 'e.g. "0x610062006300" will be converted to "abc"
-Function HexToString(ByVal hexStr As String) As String
+Public Function HexStringToString(ByVal hexStr As String) As String
     Dim s As String, mask As String, b() As Byte, i As Long
     s = " " & Replace(Replace(Replace(Replace(Replace(LCase(hexStr), _
             "0x", " "), ",", " "), ";", " "), "-", " "), "+", " ") & " "
@@ -60,15 +60,15 @@ Function HexToString(ByVal hexStr As String) As String
     
     ReDim b(0 To Len(s) \ 2 - 1)
     For i = LBound(b) To UBound(b): b(i) = "&H" & Mid$(s, i * 2 + 1, 2): Next i
-    HexToString = b
+    HexStringToString = b
 End Function
 #End If
 
 'Converts the input string into a string of hex literals.
 'e.g. "abc" will be turned into "0x610062006300" (UTF-16LE)
-Function StringToHexString(ByVal str As String) As String
+Public Function StringToHexString(ByVal str As String) As String
     Dim i As Long, b() As Byte, hexStr As String
-    b = str: hexStr = "0x" & Space(Len(str) * 4)
+    b = str: hexStr = "0x" & Space(Len(str) * 4 + 2)
     For i = 1 To UBound(b) + 1
         Mid(hexStr, i * 2 + 1, 2) = Right$("0" & Hex$(b(i - 1)), 2)
     Next i
@@ -82,7 +82,7 @@ End Function
 '&#dddd;       (1 to 6 dec digits) (d = 0-9)
 'e.g., the string "abc &#97 u+62 \U63" will be transformed to "abc a b c"
 'Depends on: ChrU
-Function ReplaceUnicodeLiterals(ByVal str As String) As String
+Public Function ReplaceUnicodeLiterals(ByVal str As String) As String
     Const PATTERN_UNICODE_LITERAL As String = "(\\u|u\+)[0-9a-f]{4,8}|&#\d{1,6};"
     Dim mc As Object, match As Variant, mv As String
     With CreateObject("VBScript.RegExp")
@@ -100,9 +100,9 @@ End Function
 #End If
 
 'Returns the given unicode codepoint as standard VBA UTF-16LE string
- Function ChrU(ByVal codePoint As Long, _
-      Optional ByVal allowSingleSurrogates As Boolean = False) _
-               As String
+ Public Function ChrU(ByVal codePoint As Long, _
+             Optional ByVal allowSingleSurrogates As Boolean = False) _
+                      As String
     Const methodName As String = "ChrU"
     If codePoint < 0 Then codePoint = codePoint And &HFFFF& 'Incase of uInt input
     If codePoint < &HD800& Then
@@ -123,7 +123,7 @@ End Function
 'Returns a given characters unicode codepoint as long.
 'Note: One unicode character can consist of two VBA "characters", a so-called
 '      "surrogate pair" (input string of length 2, so Len(char) = 2!)
-Function AscU(ByVal char As String) As Long
+Public Function AscU(ByVal char As String) As Long
     Dim s As String, lo As Long, hi As Long
     If Len(char) = 1 Then
         AscU = AscW(char) And &HFFFF&
@@ -137,7 +137,7 @@ Function AscU(ByVal char As String) As Long
 End Function
 
 'Function transcoding an ANSI encoded string to the VBA-native UTF-16LE
-Function DecodeANSI(ByVal ansiStr As String) As String
+Public Function DecodeANSI(ByVal ansiStr As String) As String
     Dim i As Long, j As Long, ansi() As Byte, utf16le() As Byte
     ansi = ansiStr: j = 0
     ReDim utf16le(0 To LenB(ansiStr) * 2 - 1)
@@ -150,7 +150,7 @@ End Function
 
 'Function transcoding a VBA-native UTF-16LE encoded string to an ANSI string
 'Note: Information will be lost for codepoints > 255!
-Function EncodeANSI(ByVal utf16leStr As String) As String
+Public Function EncodeANSI(ByVal utf16leStr As String) As String
     Dim i As Long, j As Long, ansi() As Byte, utf16le() As Byte
     utf16le = utf16leStr: j = 0
     ReDim ansi(1 To Len(utf16leStr))
@@ -164,7 +164,7 @@ Function EncodeANSI(ByVal utf16leStr As String) As String
 End Function
 
 'Slower but shorter version
-Function EncodeANSI_2(ByVal utf16leStr As String) As String
+Public Function EncodeANSI_2(ByVal utf16leStr As String) As String
     Dim i As Long, ansi() As Byte
     ReDim ansi(1 To Len(utf16leStr))
     For i = 1 To UBound(ansi): ansi(i) = Asc(Mid(utf16leStr, i, 1)): Next i
@@ -172,8 +172,8 @@ Function EncodeANSI_2(ByVal utf16leStr As String) As String
 End Function
 
 'Function transcoding an VBA-native UTF-16LE encoded string to UTF-8
-Function EncodeUTF8(ByVal utf16leStr As String, _
-           Optional ByVal raiseErrors As Boolean = True) As String
+Public Function EncodeUTF8(ByVal utf16leStr As String, _
+                  Optional ByVal raiseErrors As Boolean = True) As String
     Const methodName As String = "EncodeUTF8"
     Dim utf8() As Byte, codePoint As Long, i As Long, j As Long
     Dim lowSurrogate As Long
@@ -231,7 +231,7 @@ End Function
 #If Mac = 0 Then
 'Alternative for transcoding an VBA-native UTF-16LE encoded string to UTF-8
 'Much faster than EncodeUTF8, but only available on Windows
-Function EncodeUTF8_2(ByVal vbaStr As String) As String
+Public Function EncodeUTF8_2(ByVal vbaStr As String) As String
     With CreateObject("ADODB.Stream")
         .Type = 2 ' adTypeText
         .Charset = "utf-8"
@@ -247,8 +247,8 @@ End Function
 #End If
 
 'Function transcoding an UTF-8 encoded string to the VBA-native UTF-16LE
-Function DecodeUTF8(ByVal utf8str As String, _
-           Optional ByVal raiseErrors As Boolean = False) As String
+Public Function DecodeUTF8(ByVal utf8str As String, _
+                  Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "DecodeUTF8"
     Dim i As Long, j As Long, k As Long, numBytesOfCodePoint As Byte
     Static numBytesOfCodePoints(0 To 255) As Byte
@@ -330,6 +330,7 @@ Function DecodeUTF8(ByVal utf8str As String, _
                     Err.Raise 5, methodName, _
                         "Codepoint outside of valid Unicode range"
 insertErrChar:  utf16(j) = &HFD: utf16(j + 1) = &HFF: j = j + 2
+                If numBytesOfCodePoint = 0 Then numBytesOfCodePoint = 1
             End If
         End If
 nextCp: i = i + numBytesOfCodePoint 'Move to the next UTF-8 codepoint
@@ -341,7 +342,7 @@ End Function
 'Alternative for transcoding an UTF-8 encoded string to the VBA-native UTF-16LE
 'Faster than EncodeUTF8 for medium length strings but only available on Windows
 'Warning: This function performs extremely slow for strings > ~5MB
-Function DecodeUTF8_2(ByVal utf8str As String) As String
+Public Function DecodeUTF8_2(ByVal utf8str As String) As String
     Dim b() As Byte: b = utf8str
     With CreateObject("ADODB.Stream")
         .Type = 1 ' adTypeBinary
@@ -350,15 +351,15 @@ Function DecodeUTF8_2(ByVal utf8str As String) As String
         .Position = 0
         .Type = 2 ' adTypeText
         .Charset = "utf-8"
-        DecodeUTF82 = .ReadText
+        DecodeUTF8_2 = .ReadText
         .Close
     End With
 End Function
 #End If
 
 'Function transcoding an VBA-native UTF-16LE encoded string to UTF-32
-Function EncodeUTF32(ByVal utf16leStr As String, _
-            Optional ByVal raiseErrors As Boolean = False) As String
+Public Function EncodeUTF32(ByVal utf16leStr As String, _
+                   Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "EncodeUTF32"
     Dim utf32() As Byte, codePoint As Long, i As Long, j As Long
     Dim lowSurrogate As Long
@@ -400,8 +401,8 @@ End Function
 
 
 'Function transcoding an UTF-32 encoded string to the VBA-native UTF-16LE
-Function DecodeUTF32(ByVal utf32str As String, _
-            Optional ByVal raiseErrors As Boolean = False) As String
+Public Function DecodeUTF32(ByVal utf32str As String, _
+                   Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "DecodeUTF32"
     Dim utf32() As Byte, utf16() As Byte, codePoint As Long, n As Long
     Dim highSurrogate As Long, lowSurrogate As Long
@@ -451,7 +452,7 @@ End Function
 
 'Function returning a string containing all alphanumeric characters equally
 'distributed. (0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ)
-Function RandomStringAlphanumeric(ByVal Length As Long) As String
+Public Function RandomStringAlphanumeric(ByVal Length As Long) As String
     Dim b() As Byte, i As Long, char As Long: Randomize
     If Length < 1 Then Exit Function
     ReDim b(0 To Length * 2 - 1)
@@ -468,7 +469,7 @@ End Function
 
 'Alternative function returning a string containing all alphanumeric characters
 'equally, randomly distributed.
-Function RandomStringAlphanumeric2(ByVal Length As Long) As String
+Public Function RandomStringAlphanumeric2(ByVal Length As Long) As String
     Dim a As Variant
     If IsEmpty(a) Then
         a = Array("A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", _
@@ -486,7 +487,7 @@ End Function
 'Function returning a string containing all characters from the BMP
 '(Basic Multilingual Plane, all 2 byte UTF-16 chars) equally, randomly
 'distributed. Excludes surrogate range and BOM.
-Function RandomStringBMP(ByVal Length As Long) As String
+Public Function RandomStringBMP(ByVal Length As Long) As String
     Const MAX_UINT As Long = &HFFFF&
     Dim b() As Byte, i As Long, char As Long: Randomize
     If Length < 1 Then Exit Function
@@ -502,7 +503,7 @@ End Function
 
 'Function returning a string containing all valid unicode characters equally,
 'randomly distributed. Excludes surrogate range and BOM.
-Function RandomStringUnicode(ByVal Length As Long) As String
+Public Function RandomStringUnicode(ByVal Length As Long) As String
     'Length in UTF-16 codepoints, not unicode codepoints!
     Const MAX_UNICODE As Long = &H10FFFF
     Dim b() As Byte, s As String, i As Long, m As Long, char As Long
@@ -536,7 +537,7 @@ End Function
 
 'Function returning a string containing all ASCII characters equally,
 'randomly distributed.
-Function RandomStringASCII(Length As Long) As String
+Public Function RandomStringASCII(Length As Long) As String
     Const MAX_ASC As Long = &H7F&
     Dim b() As Byte, i As Long, char As Integer: Randomize
     ReDim b(0 To Length * 2 - 1)
@@ -565,7 +566,7 @@ End Function
 #If Mac = 0 Then
 'Removes all non-numeric characters from a string.
 'Only keeps codepoints U+0030 - U+0039
-Function RegExNumOnly(s As String) As String
+Public Function RegExNumOnly(s As String) As String
     With CreateObject("VBScript.RegExp")
         .Global = True
         .MultiLine = True
@@ -596,9 +597,9 @@ End Function
 'Insert("abcd", "ff", 3) = "abcffd"
 'Insert("abcd", "ff", 4) = "abcdff"
 'Insert("abcd", "ff", 9) = "abcdff"
-Function Insert(str As String, _
-                strToInsert As String, _
-                afterPos As Long) As String
+Public Function Insert(str As String, _
+                       strToInsert As String, _
+                       afterPos As Long) As String
     If afterPos < 0 Then afterPos = 0
     Insert = Mid(str, 1, afterPos) & strToInsert & Mid(str, afterPos + 1)
 End Function
@@ -614,8 +615,8 @@ End Function
 '               and:
 '                      "Goodbye World"
 Public Function SplitUnlessInQuotes(ByVal str As String, _
-                    Optional ByVal delim As String = " ", _
-                    Optional limit As Long = -1) As Variant
+                           Optional ByVal delim As String = " ", _
+                           Optional limit As Long = -1) As Variant
     
     Dim i As Long, ub As Long, doSplit As Boolean, s As String, parts As Variant
     ReDim parts(0 To 0)

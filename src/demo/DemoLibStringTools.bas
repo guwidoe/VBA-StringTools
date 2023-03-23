@@ -41,6 +41,29 @@ Option Explicit
 #End If                                                             '|
 '--------------------------------------------------------------------|
 
+Sub DemonstrateHexString()
+    Dim utf16leTestHexString As String
+    utf16leTestHexString = "0x3DD800DE3DD869DC0D203DD869DC3ED8B2DD3DD869DC3DD869DC0D203DD869DC0D203DD867DC0D203DD866DC3ED8B2DD0D203DD869DC0D203DD867DC0D203DD866DC3ED8B2DD0D203DD867DC0D203DD866DC55006E00690063006F006400650053007500700070006F007200740000D800DC6500730074003DD800DE0D203DD869DC3DD869DC0D203DD869DC0D203DD867DC0D203DD866DC3DD881DC3CD8FCDF0D2040260FFE3ED8D4DD3CD8FBDF0D2042260FFE3DD869DC0D2064270FFE0D203DD868DC3CD8C3DF3CD8FBDF0D2040260FFE"
+    
+    Dim s As String
+    s = HexStringToString(utf16leTestHexString)
+
+    'Write the string full of emojis to the worksheet "Sheet1"
+    ThisWorkbook.Worksheets("Sheet1").Cells(1, 1) = s
+ 
+    'convert the UTF16 hex representation to UTF-8:
+    s = EncodeUTF8(HexStringToString(utf16leTestHexString))
+    
+    'Look at the UTF8 bytes in the immediate window
+    s = StringToHexString(s)
+    Debug.Print s
+    
+    'convert UTF-8 hex string to regular vba string (UTF-16LE)
+    s = DecodeUTF8(HexStringToString(s))
+    
+    'Check if it is still the same as before:
+    Debug.Print s = ThisWorkbook.Worksheets("Sheet1").Cells(1, 1)
+End Sub
 
 Sub TestEncodersAndDecoders()
     Const STR_LENGTH As Long = 5000000
@@ -66,87 +89,201 @@ Sub TestEncodersAndDecoders()
         IIf(DecodeANSI(EncodeANSI(utf16AsciiOnly)) = utf16AsciiOnly, "passed", "failed")
 End Sub
 
-Sub TestEncodersAndDecodersPerformance()
-    Dim startTime As Currency
-    Dim endTime As Currency
-    Dim perSecond As Currency
-    Dim timeElapsed As Double
-                                
+Sub TestUTF8EncodersPerformance()
+    Dim startTime As Currency, endTime As Currency
+    Dim perSecond As Currency, timeElapsed As Double
     getFrequency perSecond
+    Application.EnableCancelKey = xlInterrupt
     
-    Const NUM_REPETITIONS_SHORT_STRING As Long = 1000000
-    Const STR_LENGTH_SHORT_STRING As Long = 100
+    Dim numRepetitions As Variant, strLengths As Variant
+    numRepetitions = VBA.Array(100000, 1000, 10)
+    strLengths = VBA.Array(100, 1000, 1000000)
     
-    Const NUM_REPETITIONS_MEDIUM_STRING As Long = 1000
-    Const STR_LENGTH_MEDIUM_STRING As Long = 10000
+    Dim description As String, s As String
+    Dim numReps As Long, strLength As Long, i As Long, j As Long
+    For i = LBound(numRepetitions) To UBound(numRepetitions)
+        numReps = numRepetitions(i)
+        strLength = strLengths(i)
     
-    Const NUM_REPETITIONS_LONG_STRING As Long = 1
-    Const STR_LENGTH_SHORT_STRING As Long = 10000000
-    
-    Dim fullUnicode As String
-    Dim bmpUnicode As String '(Basic Multilingual Plane)
-    Dim utf16AsciiOnly As String
-    fullUnicode = RandomStringUnicode(STR_LENGTH)
-    bmpUnicode = RandomStringBMP(STR_LENGTH)
-    utf16AsciiOnly = RandomStringASCII(STR_LENGTH)
-    
-    'UTF-8 Encoder:
-    getTime startTime
-    For i = 1 To NUM_REPETITIONS
-        s2 = DecodeUTF8(s)
+        s = RandomStringUnicode(strLength)
+        's = RandomStringBMP(strLength)
+        's = RandomStringASCII(strLength)
+        
+        description = " seconds to encode a string of length " & _
+                      strLength & " " & numReps & " times."
+                      
+        'VBA Native UTF-8 Encoder:
+        getTime startTime
+        For j = 1 To numReps
+            EncodeUTF8 s
+        Next j
+        getTime endTime
+        timeElapsed = (endTime - startTime) / perSecond
+        Debug.Print "EncodeUTF8 took: " & timeElapsed & description
+        
+        #If Mac = 0 Then
+            'ADODB.Stream UTF-8 Encoder:
+            getTime startTime
+            For j = 1 To numReps
+                EncodeUTF8_2 s
+            Next j
+            getTime endTime
+            timeElapsed = (endTime - startTime) / perSecond
+            Debug.Print "EncodeUTF8_2 took: " & timeElapsed & description
+        #End If
+        DoEvents
     Next i
-    getTime endTime
-    timeElapsed = (endTime - startTime) / perSecond
-    Debug.Print "Code 1 took: " & timeElapsed & " Seconds"
-
-    getTime startTime
-    For i = 1 To NUM_REPETITIONS
-        Debug.Print s2 = DecodeUTF82(s)
-    Next i
-    getTime endTime
-    timeElapsed = (endTime - startTime) / perSecond
-    Debug.Print "Code 2 took: " & timeElapsed & " Seconds"
-    
-    getTime startTime
-    For i = 1 To NUM_REPETITIONS
-        s = ChrU(i, True)
-    Next i
-    getTime endTime
-    timeElapsed = (endTime - startTime) / perSecond
-    Debug.Print "Code 3 took: " & timeElapsed & " Seconds"
-    Debug.Print " "
 End Sub
 
 
+Sub TestUTF8DecodersPerformance()
+    Dim startTime As Currency, endTime As Currency
+    Dim perSecond As Currency, timeElapsed As Double
+    getFrequency perSecond
+    Application.EnableCancelKey = xlInterrupt
+    
+    Dim numRepetitions As Variant, strLengths As Variant
+    numRepetitions = VBA.Array(100000, 1000, 10)
+    strLengths = VBA.Array(100, 1000, 1000000)
+    
+    Dim description As String, s As String
+    Dim numReps As Long, strLength As Long, i As Long, j As Long
+    For i = LBound(numRepetitions) To UBound(numRepetitions)
+        numReps = numRepetitions(i)
+        strLength = strLengths(i)
+    
+        s = RandomStringUnicode(strLength)
+        's = RandomStringBMP(strLength)
+        's = RandomStringASCII(strLength)
+        
+        s = EncodeUTF8(s)
+        description = " seconds to encode a string of length " & _
+                      strLength & " " & numReps & " times."
+                      
+        'VBA Native UTF-8 Decoder:
+        getTime startTime
+        For j = 1 To numReps
+            DecodeUTF8 s
+        Next j
+        getTime endTime
+        timeElapsed = (endTime - startTime) / perSecond
+        Debug.Print "DecodeUTF8 took: " & timeElapsed & description
+        
+        #If Mac = 0 Then
+            'ADODB.Stream UTF-8 Decoder:
+            getTime startTime
+            For j = 1 To numReps
+                DecodeUTF8_2 s
+            Next j
+            getTime endTime
+            timeElapsed = (endTime - startTime) / perSecond
+            Debug.Print "DecodeUTF8_2 took: " & timeElapsed & description
+        #End If
+        DoEvents
+    Next i
+End Sub
 
-Sub test()
-    Dim testFilePath As String
-    testFilePath = CreateObject("WScript.Shell").SpecialFolders("Desktop") & Application.PathSeparator
-    Dim testFileFullName As String
-    testFileFullName = testFilePath & "UnicodeTest.txt"
+Sub TestUTF32EncodersAndDecodersPerformance()
+    Dim startTime As Currency, endTime As Currency
+    Dim perSecond As Currency, timeElapsed As Double
+    getFrequency perSecond
+    Application.EnableCancelKey = xlInterrupt
     
-    Dim utf16leTestString As String
-    utf16leTestString = "0x3DD800DE3DD869DC0D203DD869DC3ED8B2DD3DD869DC3DD869DC0D203DD869DC0D203DD867DC0D203DD866DC3ED8B2DD0D203DD869DC0D203DD867DC0D203DD866DC3ED8B2DD0D203DD867DC0D203DD866DC55006E00690063006F006400650053007500700070006F007200740000D800DC6500730074003DD800DE0D203DD869DC3DD869DC0D203DD869DC0D203DD867DC0D203DD866DC3DD881DC3CD8FCDF0D2040260FFE3ED8D4DD3CD8FBDF0D2042260FFE3DD869DC0D2064270FFE0D203DD868DC3CD8C3DF3CD8FBDF0D2040260FFE"
+    Dim numRepetitions As Variant, strLengths As Variant
+    numRepetitions = VBA.Array(100000, 1000, 10)
+    strLengths = VBA.Array(100, 1000, 1000000)
     
-    Dim s As String
-    s = Utf16LeHexToString(utf16leTestString)
-    Dim s2 As String
-    s2 = s
-    s = RandomStringFullUnicode(1000000)
-    Debug.Print DecodeUTF32(EncodeUTF32(s)) = s
+    Dim description As String, s As String, s2 As String
+    Dim numReps As Long, strLength As Long, i As Long, j As Long
+    For i = LBound(numRepetitions) To UBound(numRepetitions)
+        numReps = numRepetitions(i)
+        strLength = strLengths(i)
     
-    'PutBytes(testFileFullName) = EncodeUTF82(ChrU(&HFFFD))
+        s = RandomStringUnicode(strLength)
+        's = RandomStringBMP(strLength)
+        's = RandomStringASCII(strLength)
+        
+        s2 = EncodeUTF32(s)
+        description = " seconds to encode a string of length " & _
+                      strLength & " " & numReps & " times."
+                      
+        'VBA Native UTF-32 Encoder:
+        getTime startTime
+        For j = 1 To numReps
+            EncodeUTF32 s
+        Next j
+        getTime endTime
+        timeElapsed = (endTime - startTime) / perSecond
+        Debug.Print "EncodeUTF32 took: " & timeElapsed & description
+        
+
+        'VBA Native UTF-32 Decoder:
+        getTime startTime
+        For j = 1 To numReps
+            DecodeUTF32 s2
+        Next j
+        getTime endTime
+        timeElapsed = (endTime - startTime) / perSecond
+        Debug.Print "DecodeUTF32 took: " & timeElapsed & description
+
+        DoEvents
+    Next i
+End Sub
+
+Sub TestANSIEncodersAndDecodersPerformance()
+    Dim startTime As Currency, endTime As Currency
+    Dim perSecond As Currency, timeElapsed As Double
+    getFrequency perSecond
+    Application.EnableCancelKey = xlInterrupt
     
- 'ThisWorkbook.Worksheets("Sheet1").Cells(1, 1) = Utf16LeHexToString(testStr)
- 
+    Dim numRepetitions As Variant, strLengths As Variant
+    numRepetitions = VBA.Array(100000, 1000, 10)
+    strLengths = VBA.Array(100, 1000, 1000000)
+    
+    Dim description As String, s As String, s2 As String
+    Dim numReps As Long, strLength As Long, i As Long, j As Long
+    For i = LBound(numRepetitions) To UBound(numRepetitions)
+        numReps = numRepetitions(i)
+        strLength = strLengths(i)
+    
+        s = RandomStringUnicode(strLength)
+        's = RandomStringBMP(strLength)
+        's = RandomStringASCII(strLength)
+        
+        s2 = EncodeANSI(s)
+        description = " seconds to encode a string of length " & _
+                      strLength & " " & numReps & " times."
+                      
+        'VBA Native UTF-32 Encoder:
+        getTime startTime
+        For j = 1 To numReps
+            EncodeANSI s
+        Next j
+        getTime endTime
+        timeElapsed = (endTime - startTime) / perSecond
+        Debug.Print "EncodeANSI took: " & timeElapsed & description
+        
+
+        'VBA Native UTF-32 Decoder:
+        getTime startTime
+        For j = 1 To numReps
+            DecodeANSI s2
+        Next j
+        getTime endTime
+        timeElapsed = (endTime - startTime) / perSecond
+        Debug.Print "DecodeANSI took: " & timeElapsed & description
+
+        DoEvents
+    Next i
 End Sub
 
 Sub TestDifferentWaysOfGettingNumericalValuesFromStrings()
     Dim t As Single
     Dim str As String
     t = Timer()
-    str = RandomStringAlphanumeric2(5000000)
-    'str = RandomStringAlphanumeric(5000000)
+    
+    str = RandomStringAlphanumeric(5000000)
+    'str = RandomStringAlphanumeric2(5000000)
     
     Debug.Print "Creating string took " & Timer - t & " seconds"
     
