@@ -83,7 +83,7 @@ End Function
 'e.g., the string "abc &#97 u+62 \U63" will be transformed to "abc a b c"
 'Depends on: ChrU
 Public Function ReplaceUnicodeLiterals(ByVal str As String) As String
-    Const PATTERN_UNICODE_LITERAL As String = "(\\u|u\+)[0-9a-f]{4,8}|&#\d{1,6};"
+    Const PATTERN_UNICODE_LITERAL As String = "\\u[0-9a-f]{4}|\\u000[0-9a-f]{5}|u\+[0-9a-f]{4,5}|&#\d{1,6};"
     Dim mc As Object, match As Variant, mv As String
     With CreateObject("VBScript.RegExp")
         .Global = True: .MultiLine = True: .IgnoreCase = True
