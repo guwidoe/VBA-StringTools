@@ -1,33 +1,33 @@
 Attribute VB_Name = "LibStringTools"
 Option Explicit
 
-'''=============================================================================
-''' VBA StringTools
-''' ------------------------------------------
-''' https://github.com/guwidoe/VBA-StringTools
-''' ------------------------------------------
-''' MIT License
-'''
-''' Copyright (c) 2023 Guido Witt-Döring
-'''
-''' Permission is hereby granted, free of charge, to any person obtaining a copy
-''' of this software and associated documentation files (the "Software"), to
-''' deal in the Software without restriction, including without limitation the
-''' rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
-''' sell copies of the Software, and to permit persons to whom the Software is
-''' furnished to do so, subject to the following conditions:
-'''
-''' The above copyright notice and this permission notice shall be included in
-''' all copies or substantial portions of the Software.
-'''
-''' THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-''' IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-''' FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-''' AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-''' LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-''' FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-''' IN THE SOFTWARE.
-'''=============================================================================
+'===============================================================================
+' VBA StringTools
+' ------------------------------------------
+' https://github.com/guwidoe/VBA-StringTools
+' ------------------------------------------
+' MIT License
+'
+' Copyright (c) 2023 Guido Witt-Döring
+'
+' Permission is hereby granted, free of charge, to any person obtaining a copy
+' of this software and associated documentation files (the "Software"), to
+' deal in the Software without restriction, including without limitation the
+' rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+' sell copies of the Software, and to permit persons to whom the Software is
+' furnished to do so, subject to the following conditions:
+'
+' The above copyright notice and this permission notice shall be included in
+' all copies or substantial portions of the Software.
+'
+' THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+' IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+' FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+' AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+' LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+' FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+' IN THE SOFTWARE.
+'===============================================================================
 
 'TODO:
 'Make HexToString and ReplaceUnicodeLiterals Mac compatible by removing Regex
@@ -40,8 +40,9 @@ Option Explicit
 'X XX XX X XX (Xes separated by " ", X = 0-9 or a-f, not case sensitive)
 'instead of " ", the following separators are also accepted: ",;-+"
 'Accepts any combination of the above formattings
-'e.g. "0x610062006300" will be converted to "abc"
-Public Function HexStringToString(ByVal hexStr As String) As String
+'e.g.: "0x610062006300" will be converted to "abc"
+Public Function HexToString(ByVal hexStr As String) As String
+    Const methodName As String = "HexToString"
     Dim s As String, mask As String, b() As Byte, i As Long
     s = " " & Replace(Replace(Replace(Replace(Replace(LCase(hexStr), _
             "0x", " "), ",", " "), ";", " "), "-", " "), "+", " ") & " "
@@ -53,44 +54,50 @@ Public Function HexStringToString(ByVal hexStr As String) As String
     End With
     
     s = Replace(s, " ", "")
+    If Len(s) And 1 Then Err.Raise vbObjectError + 9, methodName, _
+            "Invalid Hex string literal. (Length is not even)"
+    
     mask = Replace(Space(Len(s)), " ", "[a-f0-9]")
-    If Not s Like mask Then _
-        Err.Raise vbObjectError + 9, "Utf16LeHexToString", _
-            "Invalid Hex string literal passed to 'Utf16LeHexToString'"
+    If Not s Like mask Then Err.Raise vbObjectError + 10, methodName, _
+        "Invalid Hex string literal. (Contains characters other than a-f & 0-9)"
     
     ReDim b(0 To Len(s) \ 2 - 1)
     For i = LBound(b) To UBound(b): b(i) = "&H" & Mid$(s, i * 2 + 1, 2): Next i
-    HexStringToString = b
+    HexToString = b
 End Function
 #End If
 
 'Converts the input string into a string of hex literals.
-'e.g. "abc" will be turned into "0x610062006300" (UTF-16LE)
-Public Function StringToHexString(ByVal str As String) As String
+'e.g.: "abc" will be turned into "0x610062006300" (UTF-16LE)
+Public Function StringToHex(ByVal str As String) As String
     Dim i As Long, b() As Byte, hexStr As String
     b = str: hexStr = "0x" & Space(Len(str) * 4 + 2)
     For i = 1 To UBound(b) + 1
         Mid(hexStr, i * 2 + 1, 2) = Right$("0" & Hex$(b(i - 1)), 2)
     Next i
-    StringToHexString = hexStr
+    StringToHex = hexStr
 End Function
 
 #If Mac = 0 Then
 'Replaces all occurences of unicode literals of the following formattings:
-'\uXXXX \UXXXX (4 to 8 hex digits) (X = 0-9 or a-f)
-'u+XXXX U+XXXX (4 to 8 hex digits) (X = 0-9 or a-f)
+'\uXXXX \UXXXX (4 or 8 hex digits, 8 for chars outside BMP) (X = 0-9 or a-f)
+'u+XXXX U+XXXX (4 or 5 hex digits) (X = 0-9 or a-f)
 '&#dddd;       (1 to 6 dec digits) (d = 0-9)
-'e.g., the string "abc &#97 u+62 \U63" will be transformed to "abc a b c"
+'e.g.: the string "abc &#97 u+62 \U63" will be transformed to "abc a b c"
 'Depends on: ChrU
 Public Function ReplaceUnicodeLiterals(ByVal str As String) As String
-    Const PATTERN_UNICODE_LITERAL As String = "\\u[0-9a-f]{4}|\\u000[0-9a-f]{5}|u\+[0-9a-f]{4,5}|&#\d{1,6};"
+    Const PATTERN_UNICODE_LITERALS As String = _
+        "\\u000[0-9a-f]{5}|\\u[0-9a-f]{4}|u\+[0-9|a-f]{4,5}|&#\d{1,6}"
     Dim mc As Object, match As Variant, mv As String
+    
     With CreateObject("VBScript.RegExp")
         .Global = True: .MultiLine = True: .IgnoreCase = True
-        .Pattern = PATTERN_UNICODE_LITERAL
+        .Pattern = PATTERN_UNICODE_LITERALS
         Set mc = .Execute(str)
     End With
-    For Each match In mc: mv = match.Value
+    
+    For Each match In mc
+        mv = match.Value
         If Left(mv, 1) = "&" Then
             str = Replace(str, mv, ChrU(CLng(Mid(mv, 3, Len(mv) - 3))))
         Else: str = Replace(str, mv, ChrU(CLng("&H" & Mid(mv, 3)))): End If
@@ -98,6 +105,30 @@ Public Function ReplaceUnicodeLiterals(ByVal str As String) As String
     ReplaceUnicodeLiterals = str
 End Function
 #End If
+
+'Replaces all occurences of unicode characters outside the ANSI codePoint range
+'with literals of the following formatting:
+'\uXXXX (4 or 8 hex digits, 8 for chars outside BMP) (X = 0-9 or a-f)
+'e.g.: No example possible because VBE doesn't allow such characters
+'Depends on: AscU
+Public Function EncodeUnicodeCharacters(ByVal str As String) As String
+    Dim result() As String, i As Long, j As Long, codePoint As Long
+    ReDim result(1 To Len(str)): j = 1
+    For i = 1 To Len(str)
+        codePoint = AscW(Mid(str, i, 1)) And &HFFFF&
+        If codePoint >= &HD800& Then codePoint = AscU(Mid(str, i, 2))
+        If codePoint > &HFFFF& Then 'Outside BMP
+            result(j) = "\u" & "000" & Hex(codePoint)
+            i = i + 1
+        ElseIf codePoint > &HFF Then 'BMP
+            result(j) = "\u" & Right("00" & Hex(codePoint), 4)
+        Else
+            result(j) = Mid(str, i, 1)
+        End If
+        j = j + 1
+    Next i
+    EncodeUnicodeCharacters = Join(result, "")
+End Function
 
 'Returns the given unicode codepoint as standard VBA UTF-16LE string
  Public Function ChrU(ByVal codePoint As Long, _

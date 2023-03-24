@@ -46,23 +46,33 @@ Sub DemonstrateHexString()
     utf16leTestHexString = "0x3DD800DE3DD869DC0D203DD869DC3ED8B2DD3DD869DC3DD869DC0D203DD869DC0D203DD867DC0D203DD866DC3ED8B2DD0D203DD869DC0D203DD867DC0D203DD866DC3ED8B2DD0D203DD867DC0D203DD866DC55006E00690063006F006400650053007500700070006F007200740000D800DC6500730074003DD800DE0D203DD869DC3DD869DC0D203DD869DC0D203DD867DC0D203DD866DC3DD881DC3CD8FCDF0D2040260FFE3ED8D4DD3CD8FBDF0D2042260FFE3DD869DC0D2064270FFE0D203DD868DC3CD8C3DF3CD8FBDF0D2040260FFE"
     
     Dim s As String
-    s = HexStringToString(utf16leTestHexString)
+    s = HexToString(utf16leTestHexString)
 
     'Write the string full of emojis to the worksheet "Sheet1"
     ThisWorkbook.Worksheets("Sheet1").Cells(1, 1) = s
- 
-    'convert the UTF16 hex representation to UTF-8:
-    s = EncodeUTF8(HexStringToString(utf16leTestHexString))
-    
+
+    'Convert the UTF16 hex representation to UTF-8:
+    s = EncodeUTF8(HexToString(utf16leTestHexString))
+
     'Look at the UTF8 bytes in the immediate window
-    s = StringToHexString(s)
+    s = StringToHex(s)
+    Debug.Print s
+
+    'Convert UTF-8 hex string to regular vba string (UTF-16LE)
+    s = DecodeUTF8(HexToString(s))
+
+    'Confirm it is still the same as before:
+    Debug.Assert s = ThisWorkbook.Worksheets("Sheet1").Cells(1, 1)
+
+    'Convert all characters outside the ANSI range to Unicode literals:
+    s = EncodeUnicodeCharacters(s)
+    
+    'Print the encoded string
     Debug.Print s
     
-    'convert UTF-8 hex string to regular vba string (UTF-16LE)
-    s = DecodeUTF8(HexStringToString(s))
-    
-    'Check if it is still the same as before:
-    Debug.Print s = ThisWorkbook.Worksheets("Sheet1").Cells(1, 1)
+    'Convert back and check if it stayed the same
+    s = ReplaceUnicodeLiterals(s)
+    Debug.Assert s = ThisWorkbook.Worksheets("Sheet1").Cells(1, 1)
 End Sub
 
 Sub TestEncodersAndDecoders()
