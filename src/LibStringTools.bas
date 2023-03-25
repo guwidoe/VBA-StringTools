@@ -33,6 +33,16 @@ Option Explicit
 'Make HexToString and ReplaceUnicodeLiterals Mac compatible by removing Regex
 
 #If Mac = 0 Then
+    #If VBA7 Then
+        Private Declare PtrSafe Function MultiByteToWideChar Lib "kernel32" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long) As Long
+        Private Declare PtrSafe Function WideCharToMultiByte Lib "kernel32" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpDefaultChar As LongPtr, ByVal lpUsedDefaultChar As LongPtr) As Long
+    #Else
+        Private Declare Function MultiByteToWideChar Lib "kernel32" Alias "MultiByteToWideChar" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As Long, ByVal cchMultiByte As Long, ByVal lpWideCharStr As Long, ByVal cchWideChar As Long) As Long
+        Private Declare Function WideCharToMultiByte Lib "kernel32" Alias "WideCharToMultiByte" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As Long, ByVal cchWideChar As Long, ByVal lpMultiByteStr As Long, ByVal cchMultiByte As Long, ByVal lpDefaultChar As Long, ByVal lpUsedDefaultChar As Long) As Long
+    #End If
+#End If
+
+#If Mac = 0 Then
 'Returns strings defined as hex literal as string.
 'Accepts the following formattings:
 '0xXXXXXX (even number of Xes, X = 0-9 or a-f, not case sensitive)
@@ -259,26 +269,8 @@ Public Function EncodeUTF8(ByVal utf16leStr As String, _
     EncodeUTF8 = MidB$(utf8, 1, j)
 End Function
 
-#If Mac = 0 Then
-'Alternative for transcoding an VBA-native UTF-16LE encoded string to UTF-8
-'Much faster than EncodeUTF8, but only available on Windows
-Public Function EncodeUTF8_2(ByVal vbaStr As String) As String
-    With CreateObject("ADODB.Stream")
-        .Type = 2 ' adTypeText
-        .Charset = "utf-8"
-        .Open
-        .WriteText vbaStr
-        .Position = 0
-        .Type = 1 ' adTypeBinary
-        .Position = 3 ' Skip BOM (Byte Order Mark)
-        EncodeUTF8_2 = .Read
-        .Close
-    End With
-End Function
-#End If
-
 'Function transcoding an UTF-8 encoded string to the VBA-native UTF-16LE
-Public Function DecodeUTF8(ByVal utf8str As String, _
+Public Function DecodeUTF8(ByVal utf8Str As String, _
                   Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "DecodeUTF8"
     Dim i As Long, j As Long, k As Long, numBytesOfCodePoint As Byte
@@ -296,7 +288,7 @@ Public Function DecodeUTF8(ByVal utf8str As String, _
     End If
     
     Dim utf8() As Byte, utf16() As Byte, codePoint As Long, currByte As Byte
-    utf8 = utf8str
+    utf8 = utf8Str
     ReDim utf16(0 To (UBound(utf8) - LBound(utf8) + 1) * 2)
     
     i = LBound(utf8): j = 0
@@ -370,11 +362,27 @@ nextCp: i = i + numBytesOfCodePoint 'Move to the next UTF-8 codepoint
 End Function
 
 #If Mac = 0 Then
-'Alternative for transcoding an UTF-8 encoded string to the VBA-native UTF-16LE
+'Transcoding a VBA-native UTF-16LE encoded string to UTF-8 using ADODB.Stream
+'Much faster than EncodeUTF8, but only available on Windows
+Public Function EncodeUTF8_2(ByVal utf16leStr As String) As String
+    With CreateObject("ADODB.Stream")
+        .Type = 2 ' adTypeText
+        .Charset = "utf-8"
+        .Open
+        .WriteText utf16leStr
+        .Position = 0
+        .Type = 1 ' adTypeBinary
+        .Position = 3 ' Skip BOM (Byte Order Mark)
+        EncodeUTF8_2 = .Read
+        .Close
+    End With
+End Function
+
+'Transcoding an UTF-8 encoded string to VBA-native UTF-16LE using ADODB.Stream
 'Faster than EncodeUTF8 for medium length strings but only available on Windows
-'Warning: This function performs extremely slow for strings > ~5MB
-Public Function DecodeUTF8_2(ByVal utf8str As String) As String
-    Dim b() As Byte: b = utf8str
+'Warning: This function performs extremely slow for strings bigger than ~5MB
+Public Function DecodeUTF8_2(ByVal utf8Str As String) As String
+    Dim b() As Byte: b = utf8Str
     With CreateObject("ADODB.Stream")
         .Type = 1 ' adTypeBinary
         .Open
@@ -386,14 +394,44 @@ Public Function DecodeUTF8_2(ByVal utf8str As String) As String
         .Close
     End With
 End Function
+
+'Transcoding a VBA-native UTF-16LE encoded string to UTF-8 using the Windows API
+'Much faster than EncodeUTF8 and faster than EncodeUTF8_2, (Windows only)
+Public Function EncodeUTF8_3(ByVal utf16leStr As String) As String
+    Const CP_UTF8 As Long = 65001
+    Dim utf8Len As Long
+    Dim utf8() As Byte
+
+    utf8Len = _
+        WideCharToMultiByte(CP_UTF8, 0, StrPtr(utf16leStr), -1, 0, 0, 0, 0) - 1
+    If utf8Len <= 0 Then Exit Function
+    ReDim utf8(utf8Len - 1)
+    WideCharToMultiByte CP_UTF8, 0, StrPtr(utf16leStr), -1, VarPtr(utf8(0)), _
+                                                                   utf8Len, 0, 0
+    EncodeUTF8_3 = utf8
+End Function
+
+'Transcoding an UTF-8 encoded string to VBA-native UTF-16LE using the Windows API
+'Much faster than DecodeUTF8 and faster than DecodeUTF8_2, (Windows only)
+Public Function DecodeUTF8_3(ByVal utf8Str As String) As String
+    Const CP_UTF8 As Long = 65001
+    Dim utf8() As Byte, sLen As Long
+    utf8 = utf8Str
+    sLen = MultiByteToWideChar(CP_UTF8, 0, VarPtr(utf8(0)), LenB(utf8Str), 0, 0)
+    If sLen <= 0 Then Exit Function
+    DecodeUTF8_3 = String$(sLen, 0)
+    MultiByteToWideChar CP_UTF8, 0, VarPtr(utf8(0)), LenB(utf8Str), _
+                                                      StrPtr(DecodeUTF8_3), sLen
+End Function
 #End If
 
 'Function transcoding an VBA-native UTF-16LE encoded string to UTF-32
-Public Function EncodeUTF32(ByVal utf16leStr As String, _
-                   Optional ByVal raiseErrors As Boolean = False) As String
-    Const methodName As String = "EncodeUTF32"
+Public Function EncodeUTF32LE(ByVal utf16leStr As String, _
+                     Optional ByVal raiseErrors As Boolean = False) As String
+    Const methodName As String = "EncodeUTF32LE"
     Dim utf32() As Byte, codePoint As Long, i As Long, j As Long
     Dim lowSurrogate As Long
+    If utf16leStr = "" Then Exit Function
     ReDim utf32(Len(utf16leStr) * 4 - 1)
     i = 1: j = 0
     Do While i <= Len(utf16leStr)
@@ -405,8 +443,8 @@ Public Function EncodeUTF32(ByVal utf16leStr As String, _
                             (lowSurrogate - &HDC00&) + &H10000
                 i = i + 1
             Else
-                If raiseErrors Then Err.Raise 5, _
-                    "EncodeUTF32", _
+                If raiseErrors Then _
+                    Err.Raise 5, methodName, _
                     "Invalid Unicode codepoint. (Lonely high surrogate)"
                 codePoint = &HFFFD&
             End If
@@ -427,17 +465,17 @@ Public Function EncodeUTF32(ByVal utf16leStr As String, _
         utf32(j + 2) = (codePoint \ &H10000) And &HFF&
         i = i + 1: j = j + 4
     Loop
-    EncodeUTF32 = MidB$(utf32, 1, j)
+    EncodeUTF32LE = MidB$(utf32, 1, j)
 End Function
 
-
 'Function transcoding an UTF-32 encoded string to the VBA-native UTF-16LE
-Public Function DecodeUTF32(ByVal utf32str As String, _
-                   Optional ByVal raiseErrors As Boolean = False) As String
-    Const methodName As String = "DecodeUTF32"
+Public Function DecodeUTF32LE(ByVal utf32str As String, _
+                     Optional ByVal raiseErrors As Boolean = False) As String
+    Const methodName As String = "DecodeUTF32LE"
     Dim utf32() As Byte, utf16() As Byte, codePoint As Long, n As Long
     Dim highSurrogate As Long, lowSurrogate As Long
     Dim i As Long, j As Long
+    If utf32str = "" Then Exit Function
     utf32 = utf32str
     i = LBound(utf32): j = i
     ReDim utf16(LBound(utf32) To UBound(utf32))
@@ -478,7 +516,7 @@ Public Function DecodeUTF32(ByVal utf32str As String, _
         i = i + 4
     Loop
     ReDim Preserve utf16(LBound(utf16) To j - 1)
-    DecodeUTF32 = utf16
+    DecodeUTF32LE = utf16
 End Function
 
 'Function returning a string containing all alphanumeric characters equally

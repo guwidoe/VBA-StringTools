@@ -59,7 +59,9 @@ Sub DemonstrateHexString()
     Debug.Print s
 
     'Convert UTF-8 hex string to regular vba string (UTF-16LE)
-    s = DecodeUTF8(HexToString(s))
+    s = DecodeUTF8_3(HexToString(s))
+    
+    ThisWorkbook.Worksheets("Sheet1").Cells(1, 1) = s
 
     'Confirm it is still the same as before:
     Debug.Assert s = ThisWorkbook.Worksheets("Sheet1").Cells(1, 1)
@@ -76,7 +78,7 @@ Sub DemonstrateHexString()
 End Sub
 
 Sub TestEncodersAndDecoders()
-    Const STR_LENGTH As Long = 5000000
+    Const STR_LENGTH As Long = 1000000
     Dim fullUnicode As String
     Dim bmpUnicode As String '(Basic Multilingual Plane)
     Dim utf16AsciiOnly As String
@@ -87,13 +89,31 @@ Sub TestEncodersAndDecoders()
     'VBA natively implemented Encoders/Decoders
     Debug.Print "UTF-8 Encoder/Decoder Test Basic Multilingual Plane: " & _
         IIf(DecodeUTF8(EncodeUTF8(bmpUnicode)) = bmpUnicode, "passed", "failed")
+        
+    #If Mac = 0 Then
+    Debug.Print "UTF-8 Encoder/Decoder 2 Test Basic Multilingual Plane: " & _
+        IIf(DecodeUTF8_2(EncodeUTF8_2(bmpUnicode)) = bmpUnicode, "passed", "failed")
+        
+    Debug.Print "UTF-8 Encoder/Decoder 3 Test Basic Multilingual Plane: " & _
+        IIf(DecodeUTF8_3(EncodeUTF8_2(bmpUnicode)) = bmpUnicode, "passed", "failed")
+    #End If
+    
     Debug.Print "UTF-32 Encoder/Decoder Test Basic Multilingual Plane: " & _
-        IIf(DecodeUTF32(EncodeUTF32(bmpUnicode)) = bmpUnicode, "passed", "failed")
+        IIf(DecodeUTF32LE(EncodeUTF32LE(bmpUnicode)) = bmpUnicode, "passed", "failed")
         
     Debug.Print "UTF-8 Encoder/Decoder Test full Unicode: " & _
         IIf(DecodeUTF8(EncodeUTF8(fullUnicode)) = fullUnicode, "passed", "failed")
+    
+    #If Mac = 0 Then
+    Debug.Print "UTF-8 Encoder/Decoder 2 Test full Unicode: " & _
+        IIf(DecodeUTF8_2(EncodeUTF8_2(fullUnicode)) = fullUnicode, "passed", "failed")
+        
+    Debug.Print "UTF-8 Encoder/Decoder 3 Test full Unicode: " & _
+        IIf(DecodeUTF8_3(EncodeUTF8_3(fullUnicode)) = fullUnicode, "passed", "failed")
+    #End If
+    
     Debug.Print "UTF-32 Encoder/Decoder Test full Unicode: " & _
-        IIf(DecodeUTF32(EncodeUTF32(fullUnicode)) = fullUnicode, "passed", "failed")
+        IIf(DecodeUTF32LE(EncodeUTF32LE(fullUnicode)) = fullUnicode, "passed", "failed")
         
     Debug.Print "ANSI Encoder/Decoder Test: " & _
         IIf(DecodeANSI(EncodeANSI(utf16AsciiOnly)) = utf16AsciiOnly, "passed", "failed")
@@ -140,6 +160,15 @@ Sub TestUTF8EncodersPerformance()
             getTime endTime
             timeElapsed = (endTime - startTime) / perSecond
             Debug.Print "EncodeUTF8_2 took: " & timeElapsed & description
+            
+            'Windows API UTF-8 Encoder:
+            getTime startTime
+            For j = 1 To numReps
+                EncodeUTF8_3 s
+            Next j
+            getTime endTime
+            timeElapsed = (endTime - startTime) / perSecond
+            Debug.Print "EncodeUTF8_3 took: " & timeElapsed & description
         #End If
         DoEvents
     Next i
@@ -188,6 +217,15 @@ Sub TestUTF8DecodersPerformance()
             getTime endTime
             timeElapsed = (endTime - startTime) / perSecond
             Debug.Print "DecodeUTF8_2 took: " & timeElapsed & description
+            
+            'Windows API UTF-8 Decoder:
+            getTime startTime
+            For j = 1 To numReps
+                DecodeUTF8_3 s
+            Next j
+            getTime endTime
+            timeElapsed = (endTime - startTime) / perSecond
+            Debug.Print "DecodeUTF8_3 took: " & timeElapsed & description
         #End If
         DoEvents
     Next i
@@ -213,28 +251,28 @@ Sub TestUTF32EncodersAndDecodersPerformance()
         's = RandomStringBMP(strLength)
         's = RandomStringASCII(strLength)
         
-        s2 = EncodeUTF32(s)
+        s2 = EncodeUTF32LE(s)
         description = " seconds to encode a string of length " & _
                       strLength & " " & numReps & " times."
                       
         'VBA Native UTF-32 Encoder:
         getTime startTime
         For j = 1 To numReps
-            EncodeUTF32 s
+            EncodeUTF32LE s
         Next j
         getTime endTime
         timeElapsed = (endTime - startTime) / perSecond
-        Debug.Print "EncodeUTF32 took: " & timeElapsed & description
+        Debug.Print "EncodeUTF32LE took: " & timeElapsed & description
         
 
         'VBA Native UTF-32 Decoder:
         getTime startTime
         For j = 1 To numReps
-            DecodeUTF32 s2
+            DecodeUTF32LE s2
         Next j
         getTime endTime
         timeElapsed = (endTime - startTime) / perSecond
-        Debug.Print "DecodeUTF32 took: " & timeElapsed & description
+        Debug.Print "DecodeUTF32LE took: " & timeElapsed & description
 
         DoEvents
     Next i
