@@ -93,12 +93,14 @@ End Function
 '\uXXXX \UXXXX (4 or 8 hex digits, 8 for chars outside BMP) (X = 0-9 or a-f)
 'u+XXXX U+XXXX (4 or 5 hex digits) (X = 0-9 or a-f)
 '&#dddd;       (1 to 6 dec digits) (d = 0-9)
-'e.g.: the string "abc &#97 u+62 \U63" will be transformed to "abc a b c"
+'e.g.: the string "abc &#97 u+0062 \U0063" will be transformed to "abc a b c"
+'This function can be slow for very large amount of different literals and very
+'long input strings
 'Depends on: ChrU
 Public Function ReplaceUnicodeLiterals(ByVal str As String) As String
     Const PATTERN_UNICODE_LITERALS As String = _
         "\\u000[0-9a-f]{5}|\\u[0-9a-f]{4}|u\+[0-9|a-f]{4,5}|&#\d{1,6}"
-    Dim mc As Object, match As Variant, mv As String
+    Dim mc As Object, match As Variant, mv As String, codepoint As Long
     
     With CreateObject("VBScript.RegExp")
         .Global = True: .MultiLine = True: .IgnoreCase = True
@@ -109,8 +111,13 @@ Public Function ReplaceUnicodeLiterals(ByVal str As String) As String
     For Each match In mc
         mv = match.Value
         If Left(mv, 1) = "&" Then
-            str = Replace(str, mv, ChrU(CLng(Mid(mv, 3, Len(mv) - 3))))
-        Else: str = Replace(str, mv, ChrU(CLng("&H" & Mid(mv, 3)))): End If
+            codepoint = CLng(Mid(mv, 3, Len(mv) - 3))
+        Else: codepoint = CLng("&H" & Mid(mv, 3))
+        End If
+        If codepoint < &H110000 Then
+            If codepoint < &HD800& Or codepoint >= &HE000& Then _
+                str = Replace(str, mv, ChrU(codepoint))
+        End If
     Next match
     ReplaceUnicodeLiterals = str
 End Function
@@ -122,16 +129,16 @@ End Function
 'e.g.: No example possible because VBE doesn't allow such characters
 'Depends on: AscU
 Public Function EncodeUnicodeCharacters(ByVal str As String) As String
-    Dim result() As String, i As Long, j As Long, codePoint As Long
+    Dim result() As String, i As Long, j As Long, codepoint As Long
     ReDim result(1 To Len(str)): j = 1
     For i = 1 To Len(str)
-        codePoint = AscW(Mid(str, i, 1)) And &HFFFF&
-        If codePoint >= &HD800& Then codePoint = AscU(Mid(str, i, 2))
-        If codePoint > &HFFFF& Then 'Outside BMP
-            result(j) = "\u" & "000" & Hex(codePoint)
+        codepoint = AscW(Mid(str, i, 1)) And &HFFFF&
+        If codepoint >= &HD800& Then codepoint = AscU(Mid(str, i, 2))
+        If codepoint > &HFFFF& Then 'Outside BMP
+            result(j) = "\u" & "000" & Hex(codepoint)
             i = i + 1
-        ElseIf codePoint > &HFF Then 'BMP
-            result(j) = "\u" & Right("00" & Hex(codePoint), 4)
+        ElseIf codepoint > &HFF Then 'BMP
+            result(j) = "\u" & Right("00" & Hex(codepoint), 4)
         Else
             result(j) = Mid(str, i, 1)
         End If
@@ -141,22 +148,22 @@ Public Function EncodeUnicodeCharacters(ByVal str As String) As String
 End Function
 
 'Returns the given unicode codepoint as standard VBA UTF-16LE string
- Public Function ChrU(ByVal codePoint As Long, _
+ Public Function ChrU(ByVal codepoint As Long, _
              Optional ByVal allowSingleSurrogates As Boolean = False) _
                       As String
     Const methodName As String = "ChrU"
-    If codePoint < 0 Then codePoint = codePoint And &HFFFF& 'Incase of uInt input
-    If codePoint < &HD800& Then
-        ChrU = ChrW$(codePoint)
-    ElseIf codePoint < &HE000& And Not allowSingleSurrogates Then _
+    If codepoint < 0 Then codepoint = codepoint And &HFFFF& 'Incase of uInt input
+    If codepoint < &HD800& Then
+        ChrU = ChrW$(codepoint)
+    ElseIf codepoint < &HE000& And Not allowSingleSurrogates Then _
         Err.Raise 5, methodName, _
             "Invalid Unicode codepoint. (Range reserved for surrogate pairs)"
-    ElseIf codePoint < &H10000 Then
-        ChrU = ChrW$(codePoint)
-    ElseIf codePoint < &H110000 Then
-        codePoint = codePoint - &H10000
-        ChrU = ChrW$(&HD800& Or (codePoint \ &H400&)) & _
-               ChrW$(&HDC00& Or (codePoint And &H3FF&))
+    ElseIf codepoint < &H10000 Then
+        ChrU = ChrW$(codepoint)
+    ElseIf codepoint < &H110000 Then
+        codepoint = codepoint - &H10000
+        ChrU = ChrW$(&HD800& Or (codepoint \ &H400&)) & _
+               ChrW$(&HDC00& Or (codepoint And &H3FF&))
     Else: Err.Raise 5, methodName, "Codepoint outside of valid Unicode range."
     End If
 End Function
@@ -216,52 +223,52 @@ End Function
 Public Function EncodeUTF8(ByVal utf16leStr As String, _
                   Optional ByVal raiseErrors As Boolean = True) As String
     Const methodName As String = "EncodeUTF8"
-    Dim utf8() As Byte, codePoint As Long, i As Long, j As Long
+    Dim utf8() As Byte, codepoint As Long, i As Long, j As Long
     Dim lowSurrogate As Long
     ReDim utf8(Len(utf16leStr) * 4 - 1)
     i = 1: j = 0
     Do While i <= Len(utf16leStr)
-        codePoint = AscW(Mid(utf16leStr, i, 1)) And &HFFFF&
-        If codePoint >= &HD800& And codePoint <= &HDBFF& Then 'high surrogate
+        codepoint = AscW(Mid(utf16leStr, i, 1)) And &HFFFF&
+        If codepoint >= &HD800& And codepoint <= &HDBFF& Then 'high surrogate
             lowSurrogate = AscW(Mid(utf16leStr, i + 1, 1)) And &HFFFF&
             If &HDC00& <= lowSurrogate And lowSurrogate <= &HDFFF& Then
-                codePoint = (codePoint - &HD800&) * &H400& + _
+                codepoint = (codepoint - &HD800&) * &H400& + _
                             (lowSurrogate - &HDC00&) + &H10000
                 i = i + 1
             Else
                 If raiseErrors Then _
                     Err.Raise 5, methodName, _
                         "Invalid Unicode codepoint. (Lonely high surrogate)"
-                codePoint = &HFFFD&
+                codepoint = &HFFFD&
             End If
         End If
-        If codePoint < &H80& Then
-            utf8(j) = codePoint
+        If codepoint < &H80& Then
+            utf8(j) = codepoint
             j = j + 1
-        ElseIf codePoint < &H800& Then
-            utf8(j) = &HC0& Or ((codePoint And &H7C0&) \ &H40&)
-            utf8(j + 1) = &H80& Or (codePoint And &H3F&)
+        ElseIf codepoint < &H800& Then
+            utf8(j) = &HC0& Or ((codepoint And &H7C0&) \ &H40&)
+            utf8(j + 1) = &H80& Or (codepoint And &H3F&)
             j = j + 2
-        ElseIf codePoint < &HDC00 Then
-            utf8(j) = &HE0& Or ((codePoint And &HF000&) \ &H1000&)
-            utf8(j + 1) = &H80& Or ((codePoint And &HFC0&) \ &H40&)
-            utf8(j + 2) = &H80& Or (codePoint And &H3F&)
+        ElseIf codepoint < &HDC00 Then
+            utf8(j) = &HE0& Or ((codepoint And &HF000&) \ &H1000&)
+            utf8(j + 1) = &H80& Or ((codepoint And &HFC0&) \ &H40&)
+            utf8(j + 2) = &H80& Or (codepoint And &H3F&)
             j = j + 3
-        ElseIf codePoint < &HE000 Then
+        ElseIf codepoint < &HE000 Then
             If raiseErrors Then _
                 Err.Raise 5, methodName, _
                     "Invalid Unicode codepoint. (Lonely low surrogate)"
-            codePoint = &HFFFD&
-        ElseIf codePoint < &H10000 Then
-            utf8(j) = &HE0& Or ((codePoint And &HF000&) \ &H1000&)
-            utf8(j + 1) = &H80& Or ((codePoint And &HFC0&) \ &H40&)
-            utf8(j + 2) = &H80& Or (codePoint And &H3F&)
+            codepoint = &HFFFD&
+        ElseIf codepoint < &H10000 Then
+            utf8(j) = &HE0& Or ((codepoint And &HF000&) \ &H1000&)
+            utf8(j + 1) = &H80& Or ((codepoint And &HFC0&) \ &H40&)
+            utf8(j + 2) = &H80& Or (codepoint And &H3F&)
             j = j + 3
         Else
-            utf8(j) = &HF0& Or ((codePoint And &H1C0000) \ &H40000)
-            utf8(j + 1) = &H80& Or ((codePoint And &H3F000) \ &H1000&)
-            utf8(j + 2) = &H80& Or ((codePoint And &HFC0&) \ &H40&)
-            utf8(j + 3) = &H80& Or (codePoint And &H3F&)
+            utf8(j) = &HF0& Or ((codepoint And &H1C0000) \ &H40000)
+            utf8(j + 1) = &H80& Or ((codepoint And &H3F000) \ &H1000&)
+            utf8(j + 2) = &H80& Or ((codepoint And &HFC0&) \ &H40&)
+            utf8(j + 3) = &H80& Or (codepoint And &H3F&)
             j = j + 4
         End If
         i = i + 1
@@ -287,20 +294,20 @@ Public Function DecodeUTF8(ByVal utf8Str As String, _
         minCp(2) = &H80&: minCp(3) = &H800&: minCp(4) = &H10000
     End If
     
-    Dim utf8() As Byte, utf16() As Byte, codePoint As Long, currByte As Byte
+    Dim utf8() As Byte, utf16() As Byte, codepoint As Long, currByte As Byte
     utf8 = utf8Str
     ReDim utf16(0 To (UBound(utf8) - LBound(utf8) + 1) * 2)
     
     i = LBound(utf8): j = 0
     Do While i <= UBound(utf8)
-        codePoint = utf8(i)
-        numBytesOfCodePoint = numBytesOfCodePoints(codePoint)
+        codepoint = utf8(i)
+        numBytesOfCodePoint = numBytesOfCodePoints(codepoint)
         
         If numBytesOfCodePoint = 0 Then
             If raiseErrors Then Err.Raise 5, methodName, "Invalid byte"
             GoTo insertErrChar
         ElseIf numBytesOfCodePoint = 1 Then
-            utf16(j) = codePoint
+            utf16(j) = codepoint
             j = j + 2
         ElseIf i + numBytesOfCodePoint - 1 > UBound(utf8) Then
             If raiseErrors Then _
@@ -308,11 +315,11 @@ Public Function DecodeUTF8(ByVal utf8Str As String, _
                     "Incomplete UTF-8 codepoint at end of string."
             GoTo insertErrChar
         Else
-            codePoint = utf8(i) And mask(numBytesOfCodePoint)
+            codepoint = utf8(i) And mask(numBytesOfCodePoint)
             For k = 1 To numBytesOfCodePoint - 1
                 currByte = utf8(i + k)
                 If (currByte And &HC0&) = &H80& Then
-                    codePoint = (codePoint * &H40&) + (currByte And &H3F)
+                    codepoint = (codepoint * &H40&) + (currByte And &H3F)
                 Else
                     If raiseErrors Then _
                         Err.Raise 5, methodName, "Invalid continuation byte"
@@ -320,27 +327,27 @@ Public Function DecodeUTF8(ByVal utf8Str As String, _
                 End If
             Next k
             'Convert the Unicode codepoint to UTF-16LE bytes
-            If codePoint < minCp(numBytesOfCodePoint) Then
+            If codepoint < minCp(numBytesOfCodePoint) Then
                 If raiseErrors Then _
                     Err.Raise 5, methodName, "Overlong encoding"
                 GoTo insertErrChar
-            ElseIf codePoint < &HD800& Then
-                utf16(j) = CByte(codePoint And &HFF&)
-                utf16(j + 1) = CByte(codePoint \ &H100&)
+            ElseIf codepoint < &HD800& Then
+                utf16(j) = CByte(codepoint And &HFF&)
+                utf16(j + 1) = CByte(codepoint \ &H100&)
                 j = j + 2
-            ElseIf codePoint < &HE000& Then
+            ElseIf codepoint < &HE000& Then
                 If raiseErrors Then _
                     Err.Raise 5, methodName, _
                 "Invalid Unicode codepoint.(Range reserved for surrogate pairs)"
                 GoTo insertErrChar
-            ElseIf codePoint < &H10000 Then
-                If codePoint = &HFEFF& Then GoTo nextCp '(BOM - will be ignored)
-                utf16(j) = codePoint And &HFF&
-                utf16(j + 1) = codePoint \ &H100&
+            ElseIf codepoint < &H10000 Then
+                If codepoint = &HFEFF& Then GoTo nextCp '(BOM - will be ignored)
+                utf16(j) = codepoint And &HFF&
+                utf16(j + 1) = codepoint \ &H100&
                 j = j + 2
-            ElseIf codePoint < &H110000 Then 'Calculate surrogate pair
+            ElseIf codepoint < &H110000 Then 'Calculate surrogate pair
                 Dim m As Long, lowSurrogate As Long, highSurrogate As Long
-                m = codePoint - &H10000 '(m \ &H400&) =most sign. 10 bits of m
+                m = codepoint - &H10000 '(m \ &H400&) =most sign. 10 bits of m
                 highSurrogate = &HD800& Or (m \ &H400&)
                 lowSurrogate = &HDC00& Or (m And &H3FF) 'least sig. 10 bits of m
                 utf16(j) = highSurrogate And &HFF&
@@ -429,40 +436,40 @@ End Function
 Public Function EncodeUTF32LE(ByVal utf16leStr As String, _
                      Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "EncodeUTF32LE"
-    Dim utf32() As Byte, codePoint As Long, i As Long, j As Long
+    Dim utf32() As Byte, codepoint As Long, i As Long, j As Long
     Dim lowSurrogate As Long
     If utf16leStr = "" Then Exit Function
     ReDim utf32(Len(utf16leStr) * 4 - 1)
     i = 1: j = 0
     Do While i <= Len(utf16leStr)
-        codePoint = AscW(Mid(utf16leStr, i, 1)) And &HFFFF&
-        If codePoint >= &HD800& And codePoint <= &HDBFF& Then 'high surrogate
+        codepoint = AscW(Mid(utf16leStr, i, 1)) And &HFFFF&
+        If codepoint >= &HD800& And codepoint <= &HDBFF& Then 'high surrogate
             lowSurrogate = AscW(Mid(utf16leStr, i + 1, 1)) And &HFFFF&
             If &HDC00& <= lowSurrogate And lowSurrogate <= &HDFFF& Then
-                codePoint = (codePoint - &HD800&) * &H400& + _
+                codepoint = (codepoint - &HD800&) * &H400& + _
                             (lowSurrogate - &HDC00&) + &H10000
                 i = i + 1
             Else
                 If raiseErrors Then _
                     Err.Raise 5, methodName, _
                     "Invalid Unicode codepoint. (Lonely high surrogate)"
-                codePoint = &HFFFD&
+                codepoint = &HFFFD&
             End If
         End If
-        If codePoint >= &HD800& And codePoint < &HE000& Then
+        If codepoint >= &HD800& And codepoint < &HE000& Then
             If raiseErrors Then _
                 Err.Raise 5, methodName, _
                 "Invalid Unicode codepoint. (Lonely low surrogate)"
-            codePoint = &HFFFD&
-        ElseIf codePoint > &H10FFFF Then
+            codepoint = &HFFFD&
+        ElseIf codepoint > &H10FFFF Then
             If raiseErrors Then _
                 Err.Raise 5, methodName, _
                 "Codepoint outside of valid Unicode range"
-            codePoint = &HFFFD&
+            codepoint = &HFFFD&
         End If
-        utf32(j) = codePoint And &HFF&
-        utf32(j + 1) = (codePoint \ &H100&) And &HFF&
-        utf32(j + 2) = (codePoint \ &H10000) And &HFF&
+        utf32(j) = codepoint And &HFF&
+        utf32(j + 1) = (codepoint \ &H100&) And &HFF&
+        utf32(j + 2) = (codepoint \ &H10000) And &HFF&
         i = i + 1: j = j + 4
     Loop
     EncodeUTF32LE = MidB$(utf32, 1, j)
@@ -472,7 +479,7 @@ End Function
 Public Function DecodeUTF32LE(ByVal utf32str As String, _
                      Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "DecodeUTF32LE"
-    Dim utf32() As Byte, utf16() As Byte, codePoint As Long, n As Long
+    Dim utf32() As Byte, utf16() As Byte, codepoint As Long, n As Long
     Dim highSurrogate As Long, lowSurrogate As Long
     Dim i As Long, j As Long
     If utf32str = "" Then Exit Function
@@ -487,24 +494,24 @@ Public Function DecodeUTF32LE(ByVal utf32str As String, _
                 If raiseErrors Then _
                     Err.Raise 5, methodName, _
                     "Codepoint outside of valid Unicode range"
-                codePoint = &HFFFD&
+                codepoint = &HFFFD&
             Else
-                codePoint = utf32(i + 2) * &H10000 + _
+                codepoint = utf32(i + 2) * &H10000 + _
                             utf32(i + 1) * &H100& + utf32(i)
-                If codePoint >= &HD800& And codePoint < &HE000& Then
+                If codepoint >= &HD800& And codepoint < &HE000& Then
                     If raiseErrors Then _
                         Err.Raise 5, methodName, _
                         "Invalid Unicode codepoint. " & _
                         "(Range reserved for surrogate pairs)"
-                    codePoint = &HFFFD&
-                ElseIf codePoint > &H10FFFF Then
+                    codepoint = &HFFFD&
+                ElseIf codepoint > &H10FFFF Then
                     If raiseErrors Then _
                         Err.Raise 5, methodName, _
                         "Codepoint outside of valid Unicode range"
-                    codePoint = &HFFFD&
+                    codepoint = &HFFFD&
                 End If
             End If
-            n = codePoint - &H10000
+            n = codepoint - &H10000
             highSurrogate = &HD800& Or (n \ &H400&)
             lowSurrogate = &HDC00& Or (n And &H3FF)
             utf16(j) = highSurrogate And &HFF&
@@ -531,7 +538,7 @@ Public Function RandomStringAlphanumeric(ByVal Length As Long) As String
             Case Is < 0.83871: Do: char = 25 * Rnd + 97: Loop Until char <> 0
             Case Else: Do: char = 9 * Rnd + 48: Loop Until char <> 0
         End Select
-        b(2 * i) = (Int(char)) And 255
+        b(2 * i) = (Int(char)) And &HFF
     Next i
     RandomStringAlphanumeric = b
 End Function
