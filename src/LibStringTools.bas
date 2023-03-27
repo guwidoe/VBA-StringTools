@@ -274,8 +274,8 @@ End Function
 
 Public Function EncodeUTF8(ByVal utf16leStr As String, _
                   Optional ByVal raiseErrors As Boolean = False) As String
-    If raiseErrors Then
-        EncodeUTF8 = EncodeUTF8native(utf16leStr, True)
+    If raiseErrors Or Len(utf16leStr) < 50 Then
+        EncodeUTF8 = EncodeUTF8native(utf16leStr, raiseErrors)
     Else
         #If Mac Then
             EncodeUTF8 = EncodeUTF8native(utf16leStr, False)
@@ -287,8 +287,8 @@ End Function
 
 Public Function DecodeUTF8(ByVal utf8Str As String, _
                   Optional ByVal raiseErrors As Boolean = False) As String
-    If raiseErrors Then
-        DecodeUTF8 = DecodeUTF8native(utf8Str, True)
+    If raiseErrors Or Len(utf8Str) < 50 Then
+        DecodeUTF8 = DecodeUTF8native(utf8Str, raiseErrors)
     Else
         #If Mac Then
             DecodeUTF8 = DecodeUTF8native(utf8Str, False)
