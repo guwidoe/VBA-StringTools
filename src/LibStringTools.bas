@@ -54,6 +54,7 @@ Option Explicit
 Public Function HexToString(ByVal hexStr As String) As String
     Const methodName As String = "HexToString"
     Dim s As String
+    
     s = " " & Replace(Replace(Replace(Replace(Replace(LCase(hexStr), _
             "0x", " "), ",", " "), ";", " "), "-", " "), "+", " ") & " "
             
@@ -70,12 +71,13 @@ Public Function HexToString(ByVal hexStr As String) As String
             "Invalid Hex string literal. (Length is not even)"
     
     Dim mask As String: mask = Replace(Space(Len(s)), " ", "[a-f0-9]")
+    
     If Not s Like mask Then Err.Raise 5, methodName, _
         "Invalid Hex string literal. (Contains characters other than a-f & 0-9)"
     
     Dim i As Long
-    Dim b() As Byte
-    ReDim b(0 To Len(s) \ 2 - 1)
+    Dim b() As Byte: ReDim b(0 To Len(s) \ 2 - 1)
+    
     For i = LBound(b) To UBound(b)
         b(i) = "&H" & Mid$(s, i * 2 + 1, 2)
     Next i
@@ -109,6 +111,7 @@ Public Function ReplaceUnicodeLiterals(ByVal str As String) As String
     Const PATTERN_UNICODE_LITERALS As String = _
         "\\u000[0-9a-f]{5}|\\u[0-9a-f]{4}|u\+[0-9|a-f]{4,5}|&#\d{1,6}"
     Dim mc As Object
+    
     With CreateObject("VBScript.RegExp")
         .Global = True
         .MultiLine = True
@@ -120,6 +123,7 @@ Public Function ReplaceUnicodeLiterals(ByVal str As String) As String
     Dim match As Variant
     Dim mv As String
     Dim codepoint As Long
+    
     For Each match In mc
         mv = match.Value
         If Left(mv, 1) = "&" Then
@@ -142,10 +146,11 @@ End Function
 'e.g.: No example possible because VBE doesn't allow such characters
 'Depends on: AscU
 Public Function EncodeUnicodeCharacters(ByVal str As String) As String
+    Dim codepoint As Long
     Dim i As Long
     Dim j As Long:          j = 1
     Dim result() As String: ReDim result(1 To Len(str))
-    Dim codepoint As Long
+    
     
     For i = 1 To Len(str)
         codepoint = AscW(Mid(str, i, 1)) And &HFFFF&
@@ -193,7 +198,10 @@ End Function
 'Note: One unicode character can consist of two VBA "characters", a so-called
 '      "surrogate pair" (input string of length 2, so Len(char) = 2!)
 Public Function AscU(ByVal char As String) As Long
-    Dim s As String, lo As Long, hi As Long
+    Dim s As String
+    Dim lo As Long
+    Dim hi As Long
+    
     If Len(char) = 1 Then
         AscU = AscW(char) And &HFFFF&
     Else
@@ -211,9 +219,11 @@ End Function
 
 'Function transcoding an ANSI encoded string to the VBA-native UTF-16LE
 Public Function DecodeANSI(ByVal ansiStr As String) As String
-    Dim i As Long, j As Long, ansi() As Byte, utf16le() As Byte
-    ansi = ansiStr: j = 0
-    ReDim utf16le(0 To LenB(ansiStr) * 2 - 1)
+    Dim i As Long
+    Dim j As Long:         j = 0
+    Dim ansi() As Byte:    ansi = ansiStr
+    Dim utf16le() As Byte: ReDim utf16le(0 To LenB(ansiStr) * 2 - 1)
+    
     For i = LBound(ansi) To UBound(ansi)
         utf16le(j) = ansi(i)
         j = j + 2
@@ -265,6 +275,7 @@ Public Function EncodeUTF8(ByVal utf16leStr As String, _
     
     Do While i <= Len(utf16leStr)
         codepoint = AscW(Mid(utf16leStr, i, 1)) And &HFFFF&
+        
         If codepoint >= &HD800& And codepoint <= &HDBFF& Then 'high surrogate
             lowSurrogate = AscW(Mid(utf16leStr, i + 1, 1)) And &HFFFF&
             
@@ -279,18 +290,22 @@ Public Function EncodeUTF8(ByVal utf16leStr As String, _
                 codepoint = &HFFFD&
             End If
         End If
+        
         If codepoint < &H80& Then
             utf8(j) = codepoint
             j = j + 1
+            
         ElseIf codepoint < &H800& Then
             utf8(j) = &HC0& Or ((codepoint And &H7C0&) \ &H40&)
             utf8(j + 1) = &H80& Or (codepoint And &H3F&)
             j = j + 2
+            
         ElseIf codepoint < &HDC00 Then
             utf8(j) = &HE0& Or ((codepoint And &HF000&) \ &H1000&)
             utf8(j + 1) = &H80& Or ((codepoint And &HFC0&) \ &H40&)
             utf8(j + 2) = &H80& Or (codepoint And &H3F&)
             j = j + 3
+            
         ElseIf codepoint < &HE000 Then
             If raiseErrors Then _
                 Err.Raise 5, methodName, _
@@ -301,6 +316,7 @@ Public Function EncodeUTF8(ByVal utf16leStr As String, _
             utf8(j + 1) = &H80& Or ((codepoint And &HFC0&) \ &H40&)
             utf8(j + 2) = &H80& Or (codepoint And &H3F&)
             j = j + 3
+            
         Else
             utf8(j) = &HF0& Or ((codepoint And &H1C0000) \ &H40000)
             utf8(j + 1) = &H80& Or ((codepoint And &H3F000) \ &H1000&)
@@ -308,6 +324,7 @@ Public Function EncodeUTF8(ByVal utf16leStr As String, _
             utf8(j + 3) = &H80& Or (codepoint And &H3F&)
             j = j + 4
         End If
+        
         i = i + 1
     Loop
     EncodeUTF8 = MidB$(utf8, 1, j)
@@ -512,6 +529,7 @@ Public Function EncodeUTF32LE(ByVal utf16leStr As String, _
                 codepoint = &HFFFD&
             End If
         End If
+        
         If codepoint >= &HD800& And codepoint < &HE000& Then
             If raiseErrors Then Err.Raise 5, methodName, _
                 "Invalid Unicode codepoint. (Lonely low surrogate)"
@@ -569,6 +587,7 @@ Public Function DecodeUTF32LE(ByVal utf32str As String, _
                     codepoint = &HFFFD&
                 End If
             End If
+            
             Dim n As Long:             n = codepoint - &H10000
             Dim highSurrogate As Long: highSurrogate = &HD800& Or (n \ &H400&)
             Dim lowSurrogate As Long:  lowSurrogate = &HDC00& Or (n And &H3FF)
