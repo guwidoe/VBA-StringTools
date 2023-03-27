@@ -40,6 +40,15 @@ Option Explicit
         Private Declare Function MultiByteToWideChar Lib "kernel32" Alias "MultiByteToWideChar" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As Long, ByVal cchMultiByte As Long, ByVal lpWideCharStr As Long, ByVal cchWideChar As Long) As Long
         Private Declare Function WideCharToMultiByte Lib "kernel32" Alias "WideCharToMultiByte" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As Long, ByVal cchWideChar As Long, ByVal lpMultiByteStr As Long, ByVal cchMultiByte As Long, ByVal lpDefaultChar As Long, ByVal lpUsedDefaultChar As Long) As Long
     #End If
+    
+    'For the unit tests:
+    #If VBA7 Then
+        Private Declare PtrSafe Function getFrequency Lib "kernel32" Alias "QueryPerformanceFrequency" (ByRef Frequency As Currency) As LongPtr
+        Private Declare PtrSafe Function getTime Lib "kernel32" Alias "QueryPerformanceCounter" (ByRef counter As Currency) As LongPtr
+    #Else
+        Private Declare Function getFrequency Lib "kernel32" Alias "QueryPerformanceFrequency" (ByRef Frequency As Currency) As Long
+        Private Declare Function getTime Lib "kernel32" Alias "QueryPerformanceCounter" (ByRef Counter As Currency) As Long
+    #End If
 #End If
 
 #If Mac = 0 Then
@@ -252,21 +261,48 @@ Public Function EncodeANSI(ByVal utf16leStr As String) As String
     EncodeANSI = ansi
 End Function
 
-'Slower but shorter version
-Public Function EncodeANSI_2(ByVal utf16leStr As String) As String
-    Dim i As Long
-    Dim ansi() As Byte: ReDim ansi(1 To Len(utf16leStr))
-    
-    For i = 1 To UBound(ansi)
-        ansi(i) = Asc(Mid(utf16leStr, i, 1))
-    Next i
-    EncodeANSI_2 = ansi
+''Slower but shorter version
+'Public Function EncodeANSI_2(ByVal utf16leStr As String) As String
+'    Dim i As Long
+'    Dim ansi() As Byte: ReDim ansi(1 To Len(utf16leStr))
+'
+'    For i = 1 To UBound(ansi)
+'        ansi(i) = Asc(Mid(utf16leStr, i, 1))
+'    Next i
+'    EncodeANSI_2 = ansi
+'End Function
+
+Public Function EncodeUTF8(ByVal utf16leStr As String, _
+                  Optional ByVal raiseErrors As Boolean = False) As String
+    If raiseErrors Then
+        EncodeUTF8 = EncodeUTF8native(utf16leStr, True)
+    Else
+        #If Mac Then
+            EncodeUTF8 = EncodeUTF8native(utf16leStr, False)
+        #Else
+            EncodeUTF8 = EncodeUTF8usingWinAPI(utf16leStr)
+        #End If
+    End If
+End Function
+
+Public Function DecodeUTF8(ByVal utf8Str As String, _
+                  Optional ByVal raiseErrors As Boolean = False) As String
+    If raiseErrors Then
+        DecodeUTF8 = DecodeUTF8native(utf16leStr, True)
+    Else
+        #If Mac Then
+            DecodeUTF8 = DecodeUTF8native(utf16leStr, False)
+        #Else
+            DecodeUTF8 = DecodeUTF8usingWinAPI(utf16leStr)
+        #End If
+    End If
 End Function
 
 'Function transcoding an VBA-native UTF-16LE encoded string to UTF-8
-Public Function EncodeUTF8(ByVal utf16leStr As String, _
-                  Optional ByVal raiseErrors As Boolean = True) As String
-    Const methodName As String = "EncodeUTF8"
+Private Function EncodeUTF8native(ByVal utf16leStr As String, _
+                         Optional ByVal raiseErrors As Boolean = False) _
+                                  As String
+    Const methodName As String = "EncodeUTF8native"
     Dim codepoint As Long
     Dim lowSurrogate As Long
     Dim i As Long:            i = 1
@@ -327,13 +363,13 @@ Public Function EncodeUTF8(ByVal utf16leStr As String, _
         
         i = i + 1
     Loop
-    EncodeUTF8 = MidB$(utf8, 1, j)
+    EncodeUTF8native = MidB$(utf8, 1, j)
 End Function
 
 'Function transcoding an UTF-8 encoded string to the VBA-native UTF-16LE
-Public Function DecodeUTF8(ByVal utf8Str As String, _
-                  Optional ByVal raiseErrors As Boolean = False) As String
-    Const methodName As String = "DecodeUTF8"
+Private Function DecodeUTF8native(ByVal utf8Str As String, _
+                   Optional ByVal raiseErrors As Boolean = False) As String
+    Const methodName As String = "DecodeUTF8native"
     Dim i As Long
     Dim numBytesOfCodePoint As Byte
     
@@ -431,13 +467,14 @@ insertErrChar:  utf16(j) = &HFD
         End If
 nextCp: i = i + numBytesOfCodePoint 'Move to the next UTF-8 codepoint
     Loop
-    DecodeUTF8 = MidB$(utf16, 1, j)
+    DecodeUTF8native = MidB$(utf16, 1, j)
 End Function
 
 #If Mac = 0 Then
 'Transcoding a VBA-native UTF-16LE encoded string to UTF-8 using ADODB.Stream
-'Much faster than EncodeUTF8, but only available on Windows
-Public Function EncodeUTF8_2(ByVal utf16leStr As String) As String
+'Much faster than EncodeUTF8native, but only available on Windows
+Private Function EncodeUTF8usingAdodbStream(ByVal utf16leStr As String) _
+                                            As String
     With CreateObject("ADODB.Stream")
         .Type = 2 ' adTypeText
         .Charset = "utf-8"
@@ -446,15 +483,15 @@ Public Function EncodeUTF8_2(ByVal utf16leStr As String) As String
         .Position = 0
         .Type = 1 ' adTypeBinary
         .Position = 3 ' Skip BOM (Byte Order Mark)
-        EncodeUTF8_2 = .Read
+        EncodeUTF8usingAdodbStream = .Read
         .Close
     End With
 End Function
 
 'Transcoding an UTF-8 encoded string to VBA-native UTF-16LE using ADODB.Stream
-'Faster than EncodeUTF8 for medium length strings but only available on Windows
+'Faster than DeocdeUTF8native for some strings but only available on Windows
 'Warning: This function performs extremely slow for strings bigger than ~5MB
-Public Function DecodeUTF8_2(ByVal utf8Str As String) As String
+Private Function DecodeUTF8usingAdodbStream(ByVal utf8Str As String) As String
     Dim b() As Byte: b = utf8Str
     With CreateObject("ADODB.Stream")
         .Type = 1 ' adTypeBinary
@@ -463,14 +500,14 @@ Public Function DecodeUTF8_2(ByVal utf8Str As String) As String
         .Position = 0
         .Type = 2 ' adTypeText
         .Charset = "utf-8"
-        DecodeUTF8_2 = .ReadText
+        DecodeUTF8usingAdodbStream = .ReadText
         .Close
     End With
 End Function
 
 'Transcoding a VBA-native UTF-16LE encoded string to UTF-8 using the Windows API
-'Much faster than EncodeUTF8 and faster than EncodeUTF8_2, (Windows only)
-Public Function EncodeUTF8_3(ByVal utf16leStr As String) As String
+'Even faster than EncodeUTF8usingAdodbStream, (Windows only)
+Private Function EncodeUTF8usingWinAPI(ByVal utf16leStr As String) As String
     Const CP_UTF8 As Long = 65001
     Dim utf8Len As Long
     Dim utf8() As Byte
@@ -481,12 +518,12 @@ Public Function EncodeUTF8_3(ByVal utf16leStr As String) As String
     ReDim utf8(utf8Len - 1)
     WideCharToMultiByte CP_UTF8, 0, StrPtr(utf16leStr), -1, VarPtr(utf8(0)), _
                                                                    utf8Len, 0, 0
-    EncodeUTF8_3 = utf8
+    EncodeUTF8usingWinAPI = utf8
 End Function
 
 'Transcoding an UTF-8 encoded string to VBA-native UTF-16LE using the Windows API
-'Much faster than DecodeUTF8 and faster than DecodeUTF8_2, (Windows only)
-Public Function DecodeUTF8_3(ByVal utf8Str As String) As String
+'Even faster than DecodeUTF8usingAdodbStream, (Windows only)
+Private Function DecodeUTF8usingWinAPI(ByVal utf8Str As String) As String
     Const CP_UTF8 As Long = 65001
     Dim sLen As Long
     Dim utf8() As Byte: utf8 = utf8Str
@@ -494,9 +531,9 @@ Public Function DecodeUTF8_3(ByVal utf8Str As String) As String
     sLen = MultiByteToWideChar(CP_UTF8, 0, VarPtr(utf8(0)), LenB(utf8Str), 0, 0)
     If sLen <= 0 Then Exit Function
     
-    DecodeUTF8_3 = String$(sLen, 0)
+    DecodeUTF8usingWinAPI = String$(sLen, 0)
     MultiByteToWideChar CP_UTF8, 0, VarPtr(utf8(0)), LenB(utf8Str), _
-                                                      StrPtr(DecodeUTF8_3), sLen
+                                             StrPtr(DecodeUTF8usingWinAPI), sLen
 End Function
 #End If
 
@@ -861,3 +898,306 @@ Public Function ReDimPreserveString(str As String, _
         ReDimPreserveString = Left(str, Length)
     End If
 End Function
+
+
+'###############################################################################
+'#########################        UNIT TESTS      ##############################
+'###############################################################################
+Public Sub RunAllTests()
+    TestEncodersAndDecoders
+    TestUTF8EncodersPerformance
+    TestUTF8DecodersPerformance
+    TestUTF32EncodersAndDecodersPerformance
+    TestANSIEncodersAndDecodersPerformance
+    TestDifferentWaysOfGettingNumericalValuesFromStrings
+End Sub
+
+Private Sub TestEncodersAndDecoders()
+    Const STR_LENGTH As Long = 1000000
+    
+    Dim fullUnicode As String:    fullUnicode = RandomStringUnicode(STR_LENGTH)
+    Dim bmpUnicode As String:     bmpUnicode = RandomStringBMP(STR_LENGTH)
+    Dim utf16AsciiOnly As String: utf16AsciiOnly = RandomStringASCII(STR_LENGTH)
+    
+    'VBA natively implemented Encoders/Decoders
+    Debug.Print "UTF-8 Encoder/Decoder Test Basic Multilingual Plane: " & _
+        IIf(DecodeUTF8native(EncodeUTF8native(bmpUnicode)) = bmpUnicode, "passed", "failed")
+        
+    #If Mac = 0 Then
+    Debug.Print "UTF-8 Encoder/Decoder 2 Test Basic Multilingual Plane: " & _
+        IIf(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(bmpUnicode)) = bmpUnicode, "passed", "failed")
+        
+    Debug.Print "UTF-8 Encoder/Decoder 3 Test Basic Multilingual Plane: " & _
+        IIf(DecodeUTF8usingWinAPI(EncodeUTF8usingAdodbStream(bmpUnicode)) = bmpUnicode, "passed", "failed")
+    #End If
+    
+    Debug.Print "UTF-32 Encoder/Decoder Test Basic Multilingual Plane: " & _
+        IIf(DecodeUTF32LE(EncodeUTF32LE(bmpUnicode)) = bmpUnicode, "passed", "failed")
+        
+    Debug.Print "UTF-8 Encoder/Decoder Test full Unicode: " & _
+        IIf(DecodeUTF8native(EncodeUTF8native(fullUnicode)) = fullUnicode, "passed", "failed")
+    
+    #If Mac = 0 Then
+    Debug.Print "UTF-8 Encoder/Decoder 2 Test full Unicode: " & _
+        IIf(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(fullUnicode)) = fullUnicode, "passed", "failed")
+        
+    Debug.Print "UTF-8 Encoder/Decoder 3 Test full Unicode: " & _
+        IIf(DecodeUTF8usingWinAPI(EncodeUTF8usingWinAPI(fullUnicode)) = fullUnicode, "passed", "failed")
+    #End If
+    
+    Debug.Print "UTF-32 Encoder/Decoder Test full Unicode: " & _
+        IIf(DecodeUTF32LE(EncodeUTF32LE(fullUnicode)) = fullUnicode, "passed", "failed")
+        
+    Debug.Print "ANSI Encoder/Decoder Test: " & _
+        IIf(DecodeANSI(EncodeANSI(utf16AsciiOnly)) = utf16AsciiOnly, "passed", "failed")
+End Sub
+
+Private Sub TestUTF8EncodersPerformance()
+    Dim startTime As Currency
+    Dim endTime As Currency
+    Dim perSecond As Currency
+    Dim timeElapsed As Double
+    getFrequency perSecond
+    Application.EnableCancelKey = xlInterrupt
+    
+    Dim numRepetitions As Variant: numRepetitions = VBA.Array(100000, 1000, 10)
+    Dim strLengths As Variant:     strLengths = VBA.Array(100, 1000, 1000000)
+    
+    Dim description As String
+    Dim s As String
+    Dim numReps As Long
+    Dim strLength As Long
+    Dim i As Long
+    Dim j As Long
+    
+    For i = LBound(numRepetitions) To UBound(numRepetitions)
+        numReps = numRepetitions(i)
+        strLength = strLengths(i)
+    
+        s = RandomStringUnicode(strLength)
+        's = RandomStringBMP(strLength)
+        's = RandomStringASCII(strLength)
+        
+        description = " seconds to encode a string of length " & _
+                      strLength & " " & numReps & " times."
+                      
+        'VBA Native UTF-8 Encoder:
+        getTime startTime
+        For j = 1 To numReps
+            EncodeUTF8native s
+        Next j
+        getTime endTime
+        timeElapsed = (endTime - startTime) / perSecond
+        Debug.Print "EncodeUTF8native took: " & timeElapsed & description
+        
+        #If Mac = 0 Then
+            'ADODB.Stream UTF-8 Encoder:
+            getTime startTime
+            For j = 1 To numReps
+                EncodeUTF8usingAdodbStream s
+            Next j
+            getTime endTime
+            timeElapsed = (endTime - startTime) / perSecond
+            Debug.Print "EncodeUTF8usingAdodbStream took: " & timeElapsed & description
+            
+            'Windows API UTF-8 Encoder:
+            getTime startTime
+            For j = 1 To numReps
+                EncodeUTF8usingWinAPI s
+            Next j
+            getTime endTime
+            timeElapsed = (endTime - startTime) / perSecond
+            Debug.Print "EncodeUTF8usingWinAPI took: " & timeElapsed & description
+        #End If
+        DoEvents
+    Next i
+End Sub
+
+
+Private Sub TestUTF8DecodersPerformance()
+    Dim startTime As Currency
+    Dim endTime As Currency
+    Dim perSecond As Currency
+    Dim timeElapsed As Double
+    getFrequency perSecond
+    Application.EnableCancelKey = xlInterrupt
+    
+    Dim numRepetitions As Variant: numRepetitions = VBA.Array(100000, 1000, 10)
+    Dim strLengths As Variant:     strLengths = VBA.Array(100, 1000, 1000000)
+    
+    Dim description As String
+    Dim s As String
+    Dim numReps As Long
+    Dim strLength As Long
+    Dim i As Long
+    Dim j As Long
+    
+    For i = LBound(numRepetitions) To UBound(numRepetitions)
+        numReps = numRepetitions(i)
+        strLength = strLengths(i)
+    
+        s = RandomStringUnicode(strLength)
+        's = RandomStringBMP(strLength)
+        's = RandomStringASCII(strLength)
+        
+        s = EncodeUTF8native(s)
+        description = " seconds to encode a string of length " & _
+                      strLength & " " & numReps & " times."
+                      
+        'VBA Native UTF-8 Decoder:
+        getTime startTime
+        For j = 1 To numReps
+            DecodeUTF8native s
+        Next j
+        getTime endTime
+        timeElapsed = (endTime - startTime) / perSecond
+        Debug.Print "DecodeUTF8native took: " & timeElapsed & description
+        
+        #If Mac = 0 Then
+            'ADODB.Stream UTF-8 Decoder:
+            getTime startTime
+            For j = 1 To numReps
+                DecodeUTF8usingAdodbStream s
+            Next j
+            getTime endTime
+            timeElapsed = (endTime - startTime) / perSecond
+            Debug.Print "DecodeUTF8usingAdodbStream took: " & timeElapsed & description
+            
+            'Windows API UTF-8 Decoder:
+            getTime startTime
+            For j = 1 To numReps
+                DecodeUTF8usingWinAPI s
+            Next j
+            getTime endTime
+            timeElapsed = (endTime - startTime) / perSecond
+            Debug.Print "DecodeUTF8usingWinAPI took: " & timeElapsed & description
+        #End If
+        DoEvents
+    Next i
+End Sub
+
+Private Sub TestUTF32EncodersAndDecodersPerformance()
+    Dim startTime As Currency
+    Dim endTime As Currency
+    Dim perSecond As Currency
+    Dim timeElapsed As Double
+    getFrequency perSecond
+    Application.EnableCancelKey = xlInterrupt
+    
+    Dim numRepetitions As Variant: numRepetitions = VBA.Array(100000, 1000, 10)
+    Dim strLengths As Variant:     strLengths = VBA.Array(100, 1000, 1000000)
+    
+    Dim description As String
+    Dim s As String
+    Dim s2 As String
+    Dim numReps As Long
+    Dim strLength As Long
+    Dim i As Long
+    Dim j As Long
+    
+    For i = LBound(numRepetitions) To UBound(numRepetitions)
+        numReps = numRepetitions(i)
+        strLength = strLengths(i)
+    
+        s = RandomStringUnicode(strLength)
+        's = RandomStringBMP(strLength)
+        's = RandomStringASCII(strLength)
+        
+        s2 = EncodeUTF32LE(s)
+        description = " seconds to encode a string of length " & _
+                      strLength & " " & numReps & " times."
+                      
+        'VBA Native UTF-32 Encoder:
+        getTime startTime
+        For j = 1 To numReps
+            EncodeUTF32LE s
+        Next j
+        getTime endTime
+        timeElapsed = (endTime - startTime) / perSecond
+        Debug.Print "EncodeUTF32LE took: " & timeElapsed & description
+        
+
+        'VBA Native UTF-32 Decoder:
+        getTime startTime
+        For j = 1 To numReps
+            DecodeUTF32LE s2
+        Next j
+        getTime endTime
+        timeElapsed = (endTime - startTime) / perSecond
+        Debug.Print "DecodeUTF32LE took: " & timeElapsed & description
+
+        DoEvents
+    Next i
+End Sub
+
+Private Sub TestANSIEncodersAndDecodersPerformance()
+    Dim startTime As Currency
+    Dim endTime As Currency
+    Dim perSecond As Currency
+    Dim timeElapsed As Double
+    getFrequency perSecond
+    Application.EnableCancelKey = xlInterrupt
+    
+    Dim numRepetitions As Variant: numRepetitions = VBA.Array(100000, 1000, 10)
+    Dim strLengths As Variant:     strLengths = VBA.Array(100, 1000, 1000000)
+    
+    Dim description As String
+    Dim s As String
+    Dim s2 As String
+    Dim numReps As Long
+    Dim strLength As Long
+    Dim i As Long
+    Dim j As Long
+    
+    For i = LBound(numRepetitions) To UBound(numRepetitions)
+        numReps = numRepetitions(i)
+        strLength = strLengths(i)
+    
+        s = RandomStringUnicode(strLength)
+        's = RandomStringBMP(strLength)
+        's = RandomStringASCII(strLength)
+        
+        s2 = EncodeANSI(s)
+        description = " seconds to encode a string of length " & _
+                      strLength & " " & numReps & " times."
+                      
+        'VBA Native UTF-32 Encoder:
+        getTime startTime
+        For j = 1 To numReps
+            EncodeANSI s
+        Next j
+        getTime endTime
+        timeElapsed = (endTime - startTime) / perSecond
+        Debug.Print "EncodeANSI took: " & timeElapsed & description
+        
+
+        'VBA Native UTF-32 Decoder:
+        getTime startTime
+        For j = 1 To numReps
+            DecodeANSI s2
+        Next j
+        getTime endTime
+        timeElapsed = (endTime - startTime) / perSecond
+        Debug.Print "DecodeANSI took: " & timeElapsed & description
+
+        DoEvents
+    Next i
+End Sub
+
+Private Sub TestDifferentWaysOfGettingNumericalValuesFromStrings()
+    Dim t As Single:   t = Timer()
+    Dim str As String: str = RandomStringAlphanumeric(5000000)
+
+    Debug.Print "Creating string took " & Timer - t & " seconds"
+    
+    t = Timer()
+    Debug.Print "RemoveNonNumeric took " & Timer - t & " seconds"
+
+    t = Timer()
+    Debug.Print "CleanString took " & Timer - t & " seconds"
+    
+    t = Timer()
+    Debug.Print "RegExNumOnly took " & Timer - t & " seconds"
+End Sub
+
+
