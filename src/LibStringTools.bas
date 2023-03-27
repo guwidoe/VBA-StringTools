@@ -924,11 +924,11 @@ Private Sub TestEncodersAndDecoders()
         IIf(DecodeUTF8native(EncodeUTF8native(bmpUnicode)) = bmpUnicode, "passed", "failed")
         
     #If Mac = 0 Then
-    Debug.Print "UTF-8 Encoder/Decoder 2 Test Basic Multilingual Plane: " & _
-        IIf(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(bmpUnicode)) = bmpUnicode, "passed", "failed")
-        
-    Debug.Print "UTF-8 Encoder/Decoder 3 Test Basic Multilingual Plane: " & _
-        IIf(DecodeUTF8usingWinAPI(EncodeUTF8usingAdodbStream(bmpUnicode)) = bmpUnicode, "passed", "failed")
+        Debug.Print "UTF-8 Encoder/Decoder 2 Test Basic Multilingual Plane: " & _
+            IIf(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(bmpUnicode)) = bmpUnicode, "passed", "failed")
+            
+        Debug.Print "UTF-8 Encoder/Decoder 3 Test Basic Multilingual Plane: " & _
+            IIf(DecodeUTF8usingWinAPI(EncodeUTF8usingAdodbStream(bmpUnicode)) = bmpUnicode, "passed", "failed")
     #End If
     
     Debug.Print "UTF-32 Encoder/Decoder Test Basic Multilingual Plane: " & _
@@ -938,11 +938,11 @@ Private Sub TestEncodersAndDecoders()
         IIf(DecodeUTF8native(EncodeUTF8native(fullUnicode)) = fullUnicode, "passed", "failed")
     
     #If Mac = 0 Then
-    Debug.Print "UTF-8 Encoder/Decoder 2 Test full Unicode: " & _
-        IIf(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(fullUnicode)) = fullUnicode, "passed", "failed")
-        
-    Debug.Print "UTF-8 Encoder/Decoder 3 Test full Unicode: " & _
-        IIf(DecodeUTF8usingWinAPI(EncodeUTF8usingWinAPI(fullUnicode)) = fullUnicode, "passed", "failed")
+        Debug.Print "UTF-8 Encoder/Decoder 2 Test full Unicode: " & _
+            IIf(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(fullUnicode)) = fullUnicode, "passed", "failed")
+            
+        Debug.Print "UTF-8 Encoder/Decoder 3 Test full Unicode: " & _
+            IIf(DecodeUTF8usingWinAPI(EncodeUTF8usingWinAPI(fullUnicode)) = fullUnicode, "passed", "failed")
     #End If
     
     Debug.Print "UTF-32 Encoder/Decoder Test full Unicode: " & _
@@ -1191,13 +1191,18 @@ Private Sub TestDifferentWaysOfGettingNumericalValuesFromStrings()
     Debug.Print "Creating string took " & Timer - t & " seconds"
     
     t = Timer()
+    RemoveNonNumeric str
     Debug.Print "RemoveNonNumeric took " & Timer - t & " seconds"
 
     t = Timer()
+    CleanString str, "0123456789"
     Debug.Print "CleanString took " & Timer - t & " seconds"
     
-    t = Timer()
-    Debug.Print "RegExNumOnly took " & Timer - t & " seconds"
+    #If Mac = 0 Then
+        t = Timer()
+        RegExNumOnly str
+        Debug.Print "RegExNumOnly took " & Timer - t & " seconds"
+    #End If
 End Sub
 
 

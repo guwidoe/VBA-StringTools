@@ -29,16 +29,6 @@ Option Explicit
 ''' IN THE SOFTWARE.
 '''=============================================================================
 
-'--------------------------------------------------------------------|
-#If VBA7 Then                                                       '|
-    Private Declare PtrSafe Function getFrequency Lib "kernel32" Alias "QueryPerformanceFrequency" (ByRef Frequency As Currency) As LongPtr                                                    '|
-    Private Declare PtrSafe Function getTime Lib "kernel32" Alias "QueryPerformanceCounter" (ByRef counter As Currency) As LongPtr                                                     '|  THESE API FUNCTIONS ARE
-#Else                                                               '|  FOR THE ACCURATE TIMER
-    Private Declare Function getFrequency Lib "kernel32" Alias "QueryPerformanceFrequency" (ByRef Frequency As Currency) As Long                                                       '|
-    Private Declare Function getTime Lib "kernel32" Alias "QueryPerformanceCounter" (ByRef Counter As Currency) As Long                                                       '|
-#End If                                                             '|
-'--------------------------------------------------------------------|
-
 Sub DemonstrateHexString()
     Dim utf16leTestHexString As String
     utf16leTestHexString = "0x3DD800DE3DD869DC0D203DD869DC3ED8B2DD3DD869DC3DD869DC0D203DD869DC0D203DD867DC0D203DD866DC3ED8B2DD0D203DD869DC0D203DD867DC0D203DD866DC3ED8B2DD0D203DD867DC0D203DD866DC55006E00690063006F006400650053007500700070006F007200740000D800DC6500730074003DD800DE0D203DD869DC3DD869DC0D203DD869DC0D203DD867DC0D203DD866DC3DD881DC3CD8FCDF0D2040260FFE3ED8D4DD3CD8FBDF0D2042260FFE3DD869DC0D2064270FFE0D203DD868DC3CD8C3DF3CD8FBDF0D2040260FFE"
