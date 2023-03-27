@@ -53,26 +53,32 @@ Option Explicit
 'e.g.: "0x610062006300" will be converted to "abc"
 Public Function HexToString(ByVal hexStr As String) As String
     Const methodName As String = "HexToString"
-    Dim s As String, mask As String, b() As Byte, i As Long
+    Dim s As String
     s = " " & Replace(Replace(Replace(Replace(Replace(LCase(hexStr), _
             "0x", " "), ",", " "), ";", " "), "-", " "), "+", " ") & " "
             
     With CreateObject("VBScript.RegExp")
-        .Global = True: .MultiLine = True: .IgnoreCase = False 'Already LCase()
+        .Global = True
+        .MultiLine = True
+        .IgnoreCase = False 'Already LCase()
         .Pattern = " ([a-f0-9]) "
         s = .Replace(s, "0$1 ")
     End With
     
     s = Replace(s, " ", "")
-    If Len(s) And 1 Then Err.Raise vbObjectError + 9, methodName, _
+    If Len(s) Mod 2 Then Err.Raise 5, methodName, _
             "Invalid Hex string literal. (Length is not even)"
     
-    mask = Replace(Space(Len(s)), " ", "[a-f0-9]")
-    If Not s Like mask Then Err.Raise vbObjectError + 10, methodName, _
+    Dim mask As String: mask = Replace(Space(Len(s)), " ", "[a-f0-9]")
+    If Not s Like mask Then Err.Raise 5, methodName, _
         "Invalid Hex string literal. (Contains characters other than a-f & 0-9)"
     
+    Dim i As Long
+    Dim b() As Byte
     ReDim b(0 To Len(s) \ 2 - 1)
-    For i = LBound(b) To UBound(b): b(i) = "&H" & Mid$(s, i * 2 + 1, 2): Next i
+    For i = LBound(b) To UBound(b)
+        b(i) = "&H" & Mid$(s, i * 2 + 1, 2)
+    Next i
     HexToString = b
 End Function
 #End If
@@ -80,8 +86,10 @@ End Function
 'Converts the input string into a string of hex literals.
 'e.g.: "abc" will be turned into "0x610062006300" (UTF-16LE)
 Public Function StringToHex(ByVal str As String) As String
-    Dim i As Long, b() As Byte, hexStr As String
-    b = str: hexStr = "0x" & Space(Len(str) * 4 + 2)
+    Dim i As Long
+    Dim b() As Byte:      b = str
+    Dim hexStr As String: hexStr = "0x" & Space(Len(str) * 4 + 2)
+
     For i = 1 To UBound(b) + 1
         Mid(hexStr, i * 2 + 1, 2) = Right$("0" & Hex$(b(i - 1)), 2)
     Next i
@@ -100,19 +108,24 @@ End Function
 Public Function ReplaceUnicodeLiterals(ByVal str As String) As String
     Const PATTERN_UNICODE_LITERALS As String = _
         "\\u000[0-9a-f]{5}|\\u[0-9a-f]{4}|u\+[0-9|a-f]{4,5}|&#\d{1,6}"
-    Dim mc As Object, match As Variant, mv As String, codepoint As Long
-    
+    Dim mc As Object
     With CreateObject("VBScript.RegExp")
-        .Global = True: .MultiLine = True: .IgnoreCase = True
+        .Global = True
+        .MultiLine = True
+        .IgnoreCase = True
         .Pattern = PATTERN_UNICODE_LITERALS
         Set mc = .Execute(str)
     End With
     
+    Dim match As Variant
+    Dim mv As String
+    Dim codepoint As Long
     For Each match In mc
         mv = match.Value
         If Left(mv, 1) = "&" Then
             codepoint = CLng(Mid(mv, 3, Len(mv) - 3))
-        Else: codepoint = CLng("&H" & Mid(mv, 3))
+        Else
+            codepoint = CLng("&H" & Mid(mv, 3))
         End If
         If codepoint < &H110000 Then
             If codepoint < &HD800& Or codepoint >= &HE000& Then _
@@ -129,11 +142,16 @@ End Function
 'e.g.: No example possible because VBE doesn't allow such characters
 'Depends on: AscU
 Public Function EncodeUnicodeCharacters(ByVal str As String) As String
-    Dim result() As String, i As Long, j As Long, codepoint As Long
-    ReDim result(1 To Len(str)): j = 1
+    Dim i As Long
+    Dim j As Long:          j = 1
+    Dim result() As String: ReDim result(1 To Len(str))
+    Dim codepoint As Long
+    
     For i = 1 To Len(str)
         codepoint = AscW(Mid(str, i, 1)) And &HFFFF&
+        
         If codepoint >= &HD800& Then codepoint = AscU(Mid(str, i, 2))
+        
         If codepoint > &HFFFF& Then 'Outside BMP
             result(j) = "\u" & "000" & Hex(codepoint)
             i = i + 1
@@ -152,10 +170,12 @@ End Function
              Optional ByVal allowSingleSurrogates As Boolean = False) _
                       As String
     Const methodName As String = "ChrU"
+    
     If codepoint < 0 Then codepoint = codepoint And &HFFFF& 'Incase of uInt input
+    
     If codepoint < &HD800& Then
         ChrU = ChrW$(codepoint)
-    ElseIf codepoint < &HE000& And Not allowSingleSurrogates Then _
+    ElseIf codepoint < &HE000& And Not allowSingleSurrogates Then
         Err.Raise 5, methodName, _
             "Invalid Unicode codepoint. (Range reserved for surrogate pairs)"
     ElseIf codepoint < &H10000 Then
@@ -164,7 +184,8 @@ End Function
         codepoint = codepoint - &H10000
         ChrU = ChrW$(&HD800& Or (codepoint \ &H400&)) & _
                ChrW$(&HDC00& Or (codepoint And &H3FF&))
-    Else: Err.Raise 5, methodName, "Codepoint outside of valid Unicode range."
+    Else
+        Err.Raise 5, methodName, "Codepoint outside of valid Unicode range."
     End If
 End Function
 
@@ -179,7 +200,11 @@ Public Function AscU(ByVal char As String) As Long
         s = Left(char, 2)
         hi = AscW(Mid(s, 1, 1)) And &HFFFF&
         lo = AscW(Mid(s, 2, 1)) And &HFFFF&
-        If &HDC00& > lo Or lo > &HDFFF& Then AscU = hi: Exit Function
+        
+        If &HDC00& > lo Or lo > &HDFFF& Then
+            AscU = hi
+            Exit Function
+        End If
         AscU = (hi - &HD800&) * &H400& + (lo - &HDC00&) + &H10000
     End If
 End Function
@@ -199,13 +224,19 @@ End Function
 'Function transcoding a VBA-native UTF-16LE encoded string to an ANSI string
 'Note: Information will be lost for codepoints > 255!
 Public Function EncodeANSI(ByVal utf16leStr As String) As String
-    Dim i As Long, j As Long, ansi() As Byte, utf16le() As Byte
-    utf16le = utf16leStr: j = 0
+    Dim i As Long
+    Dim j As Long:         j = 0
+    Dim utf16le() As Byte: utf16le = utf16leStr
+    Dim ansi() As Byte
+
     ReDim ansi(1 To Len(utf16leStr))
     For i = LBound(ansi) To UBound(ansi)
         If utf16le(j + 1) = 0 Then
-            ansi(i) = utf16le(j): j = j + 2
-        Else: ansi(i) = &H3F: j = j + 2 '&H3F = "?"
+            ansi(i) = utf16le(j)
+            j = j + 2
+        Else
+            ansi(i) = &H3F
+            j = j + 2 '&H3F = "?"
         End If
     Next i
     EncodeANSI = ansi
@@ -213,9 +244,12 @@ End Function
 
 'Slower but shorter version
 Public Function EncodeANSI_2(ByVal utf16leStr As String) As String
-    Dim i As Long, ansi() As Byte
-    ReDim ansi(1 To Len(utf16leStr))
-    For i = 1 To UBound(ansi): ansi(i) = Asc(Mid(utf16leStr, i, 1)): Next i
+    Dim i As Long
+    Dim ansi() As Byte: ReDim ansi(1 To Len(utf16leStr))
+    
+    For i = 1 To UBound(ansi)
+        ansi(i) = Asc(Mid(utf16leStr, i, 1))
+    Next i
     EncodeANSI_2 = ansi
 End Function
 
@@ -223,14 +257,17 @@ End Function
 Public Function EncodeUTF8(ByVal utf16leStr As String, _
                   Optional ByVal raiseErrors As Boolean = True) As String
     Const methodName As String = "EncodeUTF8"
-    Dim utf8() As Byte, codepoint As Long, i As Long, j As Long
+    Dim codepoint As Long
     Dim lowSurrogate As Long
-    ReDim utf8(Len(utf16leStr) * 4 - 1)
-    i = 1: j = 0
+    Dim i As Long:            i = 1
+    Dim j As Long:            j = 0
+    Dim utf8() As Byte:       ReDim utf8(Len(utf16leStr) * 4 - 1)
+    
     Do While i <= Len(utf16leStr)
         codepoint = AscW(Mid(utf16leStr, i, 1)) And &HFFFF&
         If codepoint >= &HD800& And codepoint <= &HDBFF& Then 'high surrogate
             lowSurrogate = AscW(Mid(utf16leStr, i + 1, 1)) And &HFFFF&
+            
             If &HDC00& <= lowSurrogate And lowSurrogate <= &HDFFF& Then
                 codepoint = (codepoint - &HD800&) * &H400& + _
                             (lowSurrogate - &HDC00&) + &H10000
@@ -280,9 +317,13 @@ End Function
 Public Function DecodeUTF8(ByVal utf8Str As String, _
                   Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "DecodeUTF8"
-    Dim i As Long, j As Long, k As Long, numBytesOfCodePoint As Byte
+    Dim i As Long
+    Dim numBytesOfCodePoint As Byte
+    
     Static numBytesOfCodePoints(0 To 255) As Byte
-    Static mask(2 To 4) As Long, minCp(2 To 4) As Long
+    Static mask(2 To 4) As Long
+    Static minCp(2 To 4) As Long
+    
     If numBytesOfCodePoints(0) = 0 Then
         For i = &H0& To &H7F&: numBytesOfCodePoints(i) = 1: Next i '0xxxxxxx
         '110xxxxx - C0 and C1 are invalid (overlong encoding)
@@ -294,11 +335,14 @@ Public Function DecodeUTF8(ByVal utf8Str As String, _
         minCp(2) = &H80&: minCp(3) = &H800&: minCp(4) = &H10000
     End If
     
-    Dim utf8() As Byte, utf16() As Byte, codepoint As Long, currByte As Byte
-    utf8 = utf8Str
-    ReDim utf16(0 To (UBound(utf8) - LBound(utf8) + 1) * 2)
-    
-    i = LBound(utf8): j = 0
+    Dim codepoint As Long
+    Dim currByte As Byte
+    Dim utf8() As Byte:  utf8 = utf8Str
+    Dim utf16() As Byte: ReDim utf16(0 To (UBound(utf8) - LBound(utf8) + 1) * 2)
+    Dim j As Long:       j = 0
+    Dim k As Long
+
+    i = LBound(utf8)
     Do While i <= UBound(utf8)
         codepoint = utf8(i)
         numBytesOfCodePoint = numBytesOfCodePoints(codepoint)
@@ -310,14 +354,15 @@ Public Function DecodeUTF8(ByVal utf8Str As String, _
             utf16(j) = codepoint
             j = j + 2
         ElseIf i + numBytesOfCodePoint - 1 > UBound(utf8) Then
-            If raiseErrors Then _
-                Err.Raise 5, methodName, _
+            If raiseErrors Then Err.Raise 5, methodName, _
                     "Incomplete UTF-8 codepoint at end of string."
             GoTo insertErrChar
         Else
             codepoint = utf8(i) And mask(numBytesOfCodePoint)
+            
             For k = 1 To numBytesOfCodePoint - 1
                 currByte = utf8(i + k)
+                
                 If (currByte And &HC0&) = &H80& Then
                     codepoint = (codepoint * &H40&) + (currByte And &H3F)
                 Else
@@ -328,38 +373,42 @@ Public Function DecodeUTF8(ByVal utf8Str As String, _
             Next k
             'Convert the Unicode codepoint to UTF-16LE bytes
             If codepoint < minCp(numBytesOfCodePoint) Then
-                If raiseErrors Then _
-                    Err.Raise 5, methodName, "Overlong encoding"
+                If raiseErrors Then Err.Raise 5, methodName, "Overlong encoding"
                 GoTo insertErrChar
+                
             ElseIf codepoint < &HD800& Then
                 utf16(j) = CByte(codepoint And &HFF&)
                 utf16(j + 1) = CByte(codepoint \ &H100&)
                 j = j + 2
+                
             ElseIf codepoint < &HE000& Then
-                If raiseErrors Then _
-                    Err.Raise 5, methodName, _
+                If raiseErrors Then Err.Raise 5, methodName, _
                 "Invalid Unicode codepoint.(Range reserved for surrogate pairs)"
                 GoTo insertErrChar
+                
             ElseIf codepoint < &H10000 Then
                 If codepoint = &HFEFF& Then GoTo nextCp '(BOM - will be ignored)
                 utf16(j) = codepoint And &HFF&
                 utf16(j + 1) = codepoint \ &H100&
                 j = j + 2
+                
             ElseIf codepoint < &H110000 Then 'Calculate surrogate pair
-                Dim m As Long, lowSurrogate As Long, highSurrogate As Long
-                m = codepoint - &H10000 '(m \ &H400&) =most sign. 10 bits of m
-                highSurrogate = &HD800& Or (m \ &H400&)
-                lowSurrogate = &HDC00& Or (m And &H3FF) 'least sig. 10 bits of m
-                utf16(j) = highSurrogate And &HFF&
-                utf16(j + 1) = highSurrogate \ &H100&
-                utf16(j + 2) = lowSurrogate And &HFF&
-                utf16(j + 3) = lowSurrogate \ &H100&
+                Dim m As Long:            m = codepoint - &H10000
+                Dim loSurrogate As Long:  loSurrogate = &HDC00& Or (m And &H3FF)
+                Dim hiSurrogate As Long:  hiSurrogate = &HD800& Or (m \ &H400&)
+                
+                utf16(j) = hiSurrogate And &HFF&
+                utf16(j + 1) = hiSurrogate \ &H100&
+                utf16(j + 2) = loSurrogate And &HFF&
+                utf16(j + 3) = loSurrogate \ &H100&
                 j = j + 4
             Else
-                If raiseErrors Then _
-                    Err.Raise 5, methodName, _
+                If raiseErrors Then Err.Raise 5, methodName, _
                         "Codepoint outside of valid Unicode range"
-insertErrChar:  utf16(j) = &HFD: utf16(j + 1) = &HFF: j = j + 2
+insertErrChar:  utf16(j) = &HFD
+                utf16(j + 1) = &HFF
+                j = j + 2
+                
                 If numBytesOfCodePoint = 0 Then numBytesOfCodePoint = 1
             End If
         End If
@@ -422,10 +471,12 @@ End Function
 'Much faster than DecodeUTF8 and faster than DecodeUTF8_2, (Windows only)
 Public Function DecodeUTF8_3(ByVal utf8Str As String) As String
     Const CP_UTF8 As Long = 65001
-    Dim utf8() As Byte, sLen As Long
-    utf8 = utf8Str
+    Dim sLen As Long
+    Dim utf8() As Byte: utf8 = utf8Str
+    
     sLen = MultiByteToWideChar(CP_UTF8, 0, VarPtr(utf8(0)), LenB(utf8Str), 0, 0)
     If sLen <= 0 Then Exit Function
+    
     DecodeUTF8_3 = String$(sLen, 0)
     MultiByteToWideChar CP_UTF8, 0, VarPtr(utf8(0)), LenB(utf8Str), _
                                                       StrPtr(DecodeUTF8_3), sLen
@@ -436,37 +487,42 @@ End Function
 Public Function EncodeUTF32LE(ByVal utf16leStr As String, _
                      Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "EncodeUTF32LE"
-    Dim utf32() As Byte, codepoint As Long, i As Long, j As Long
-    Dim lowSurrogate As Long
+    
     If utf16leStr = "" Then Exit Function
-    ReDim utf32(Len(utf16leStr) * 4 - 1)
-    i = 1: j = 0
+    
+    Dim codepoint As Long
+    Dim lowSurrogate As Long
+    Dim utf32() As Byte:      ReDim utf32(Len(utf16leStr) * 4 - 1)
+    Dim i As Long:            i = 1
+    Dim j As Long:            j = 0
+    
     Do While i <= Len(utf16leStr)
         codepoint = AscW(Mid(utf16leStr, i, 1)) And &HFFFF&
+        
         If codepoint >= &HD800& And codepoint <= &HDBFF& Then 'high surrogate
             lowSurrogate = AscW(Mid(utf16leStr, i + 1, 1)) And &HFFFF&
+            
             If &HDC00& <= lowSurrogate And lowSurrogate <= &HDFFF& Then
                 codepoint = (codepoint - &HD800&) * &H400& + _
                             (lowSurrogate - &HDC00&) + &H10000
                 i = i + 1
             Else
-                If raiseErrors Then _
-                    Err.Raise 5, methodName, _
+                If raiseErrors Then Err.Raise 5, methodName, _
                     "Invalid Unicode codepoint. (Lonely high surrogate)"
                 codepoint = &HFFFD&
             End If
         End If
         If codepoint >= &HD800& And codepoint < &HE000& Then
-            If raiseErrors Then _
-                Err.Raise 5, methodName, _
+            If raiseErrors Then Err.Raise 5, methodName, _
                 "Invalid Unicode codepoint. (Lonely low surrogate)"
             codepoint = &HFFFD&
+            
         ElseIf codepoint > &H10FFFF Then
-            If raiseErrors Then _
-                Err.Raise 5, methodName, _
+            If raiseErrors Then Err.Raise 5, methodName, _
                 "Codepoint outside of valid Unicode range"
             codepoint = &HFFFD&
         End If
+        
         utf32(j) = codepoint And &HFF&
         utf32(j + 1) = (codepoint \ &H100&) And &HFF&
         utf32(j + 2) = (codepoint \ &H10000) And &HFF&
@@ -479,13 +535,15 @@ End Function
 Public Function DecodeUTF32LE(ByVal utf32str As String, _
                      Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "DecodeUTF32LE"
-    Dim utf32() As Byte, utf16() As Byte, codepoint As Long, n As Long
-    Dim highSurrogate As Long, lowSurrogate As Long
-    Dim i As Long, j As Long
+    
     If utf32str = "" Then Exit Function
-    utf32 = utf32str
-    i = LBound(utf32): j = i
-    ReDim utf16(LBound(utf32) To UBound(utf32))
+    
+    Dim codepoint As Long
+    Dim utf32() As Byte:   utf32 = utf32str
+    Dim utf16() As Byte:   ReDim utf16(LBound(utf32) To UBound(utf32))
+    Dim i As Long: i = LBound(utf32)
+    Dim j As Long: j = i
+    
     Do While i < UBound(utf32)
         If utf32(i + 2) = 0 And utf32(i + 3) = 0 Then
             utf16(j) = utf32(i): utf16(j + 1) = utf32(i + 1): j = j + 2
@@ -511,9 +569,10 @@ Public Function DecodeUTF32LE(ByVal utf32str As String, _
                     codepoint = &HFFFD&
                 End If
             End If
-            n = codepoint - &H10000
-            highSurrogate = &HD800& Or (n \ &H400&)
-            lowSurrogate = &HDC00& Or (n And &H3FF)
+            Dim n As Long:             n = codepoint - &H10000
+            Dim highSurrogate As Long: highSurrogate = &HD800& Or (n \ &H400&)
+            Dim lowSurrogate As Long:  lowSurrogate = &HDC00& Or (n And &H3FF)
+            
             utf16(j) = highSurrogate And &HFF&
             utf16(j + 1) = highSurrogate \ &H100&
             utf16(j + 2) = lowSurrogate And &HFF&
@@ -529,15 +588,25 @@ End Function
 'Function returning a string containing all alphanumeric characters equally
 'distributed. (0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ)
 Public Function RandomStringAlphanumeric(ByVal Length As Long) As String
-    Dim b() As Byte, i As Long, char As Long: Randomize
     If Length < 1 Then Exit Function
-    ReDim b(0 To Length * 2 - 1)
+    
+    Dim i As Long
+    Dim char As Long
+    Dim b() As Byte: ReDim b(0 To Length * 2 - 1)
+    
+    Randomize
     For i = 0 To Length - 1
         Select Case Rnd
-            Case Is < 0.41935: Do: char = 25 * Rnd + 65: Loop Until char <> 0
-            Case Is < 0.83871: Do: char = 25 * Rnd + 97: Loop Until char <> 0
-            Case Else: Do: char = 9 * Rnd + 48: Loop Until char <> 0
+            Case Is < 0.41935
+                Do: char = 25 * Rnd + 65: Loop Until char <> 0
+                
+            Case Is < 0.83871
+                Do: char = 25 * Rnd + 97: Loop Until char <> 0
+                
+            Case Else
+                Do: char = 9 * Rnd + 48: Loop Until char <> 0
         End Select
+        
         b(2 * i) = (Int(char)) And &HFF
     Next i
     RandomStringAlphanumeric = b
@@ -555,8 +624,14 @@ Public Function RandomStringAlphanumeric2(ByVal Length As Long) As String
                   "w", "x", "y", "z", _
                   "0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
     End If
-    Dim result As String, i As Long: result = Space(Length): Randomize Timer
-    For i = 1 To Length: Mid(result, i, 1) = a(Int(Rnd() * 62)): Next i
+    
+    Dim i As Long
+    Dim result As String: result = Space(Length)
+    
+    Randomize
+    For i = 1 To Length
+        Mid(result, i, 1) = a(Int(Rnd() * 62))
+    Next i
     RandomStringAlphanumeric2 = result
 End Function
 
@@ -565,12 +640,21 @@ End Function
 'distributed. Excludes surrogate range and BOM.
 Public Function RandomStringBMP(ByVal Length As Long) As String
     Const MAX_UINT As Long = &HFFFF&
-    Dim b() As Byte, i As Long, char As Long: Randomize
+    
     If Length < 1 Then Exit Function
-    ReDim b(0 To Length * 2 - 1)
+    
+    Dim i As Long
+    Dim char As Long
+    Dim b() As Byte:  ReDim b(0 To Length * 2 - 1)
+    
+    Randomize
     For i = 0 To Length - 1
-        Do: char = MAX_UINT * Rnd: Loop Until (char <> 0) And _
-            (char < &HD800& Or char > &HDFFF&) And (char <> &HFEFF&)
+        Do
+            char = MAX_UINT * Rnd
+        Loop Until (char <> 0) _
+               And (char < &HD800& Or char > &HDFFF&) _
+               And (char <> &HFEFF&)
+               
         b(2 * i) = (Int(char)) And &HFF
         b(2 * i + 1) = (Int(char / (&H100))) And &HFF
     Next i
@@ -582,26 +666,37 @@ End Function
 Public Function RandomStringUnicode(ByVal Length As Long) As String
     'Length in UTF-16 codepoints, not unicode codepoints!
     Const MAX_UNICODE As Long = &H10FFFF
-    Dim b() As Byte, s As String, i As Long, m As Long, char As Long
-    Dim highSurrogate As Long, lowSurrogate As Long: Randomize
+    
     If Length < 1 Then Exit Function
-    ReDim b(0 To Length * 2 - 1)
+    
+    Dim s As String
+    Dim i As Long
+    
+    Dim char As Long
+    Dim b() As Byte: ReDim b(0 To Length * 2 - 1)
+    
+    Randomize
     If Length > 1 Then
         For i = 0 To Length - 2
-            Do: char = MAX_UNICODE * Rnd: Loop Until (char <> 0) And _
-                (char < &HD800& Or char > &HDFFF&) And (char <> &HFEFF&)
+            Do
+                char = MAX_UNICODE * Rnd
+            Loop Until (char <> 0) _
+                   And (char < &HD800& Or char > &HDFFF&) _
+                   And (char <> &HFEFF&)
+                   
             If char < &H10000 Then
                 b(2 * i) = (Int(char)) And &HFF
                 b(2 * i + 1) = (Int(char / (&H100))) And &HFF
             Else
-                m = char - &H10000
-                highSurrogate = &HD800& + (m \ &H400&)
-                lowSurrogate = &HDC00& + (m And &H3FF)
-                b(2 * i) = CByte(highSurrogate And &HFF&)
-                b(2 * i + 1) = CByte(highSurrogate \ &H100&)
+                Dim m As Long: m = char - &H10000
+                Dim highSurrogate As Long: highSurrogate = &HD800& + (m \ &H400&)
+                Dim lowSurrogate As Long: lowSurrogate = &HDC00& + (m And &H3FF)
+                
+                b(2 * i) = highSurrogate And &HFF&
+                b(2 * i + 1) = highSurrogate \ &H100&
                 i = i + 1
-                b(2 * i) = CByte(lowSurrogate And &HFF&)
-                b(2 * i + 1) = CByte(lowSurrogate \ &H100&)
+                b(2 * i) = lowSurrogate And &HFF&
+                b(2 * i + 1) = lowSurrogate \ &H100&
             End If
         Next i
     End If
@@ -615,8 +710,11 @@ End Function
 'randomly distributed.
 Public Function RandomStringASCII(Length As Long) As String
     Const MAX_ASC As Long = &H7F&
-    Dim b() As Byte, i As Long, char As Integer: Randomize
-    ReDim b(0 To Length * 2 - 1)
+    Dim i As Long
+    Dim char As Integer
+    Dim b() As Byte: ReDim b(0 To Length * 2 - 1)
+    
+    Randomize
     For i = 0 To Length - 1
         Do: char = MAX_ASC * Rnd: Loop Until char <> 0
         b(2 * i) = (char) And &HFF
@@ -630,13 +728,19 @@ Public Function CleanString(ByRef str As String, _
                    Optional ByVal inklChars As String = _
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890. ") _
                             As String
-    Dim sChr As String, i As Long, j As Long: j = 1
+    Dim sChr As String
+    Dim i As Long
+    Dim j As Long: j = 1
+    
     For i = 1 To Len(str)
         sChr = Mid(str, i, 1)
-        If InStr(1, inklChars, sChr, vbBinaryCompare) Then _
-            Mid(str, j, 1) = sChr: j = j + 1
+        
+        If InStr(1, inklChars, sChr, vbBinaryCompare) Then
+            Mid(str, j, 1) = sChr
+            j = j + 1
+        End If
     Next i
-    str = Left(str, j - 1): CleanString = str
+    CleanString = Left(str, j - 1)
 End Function
 
 #If Mac = 0 Then
@@ -657,13 +761,16 @@ End Function
 'Keeps only codepoints U+0030 - U+0039 AND ALSO
 'keeps the Unicode "Fullwidth Digits" (U+FF10 - U+FF19)!
 Public Function RemoveNonNumeric(ByVal str As String) As String
-    Dim sChr As String, i As Long, j As Long: j = 1
+    Dim sChr As String
+    Dim i As Long
+    Dim j As Long: j = 1
+    
     For i = 1 To Len(str)
         sChr = Mid(str, i, 1)
         If sChr Like "#" Then _
             Mid(str, j, 1) = sChr: j = j + 1
     Next i
-    str = Left(str, j - 1): RemoveNonNumeric = str
+    RemoveNonNumeric = Left(str, j - 1)
 End Function
 
 'Inserts a string into another string at a specified position
@@ -677,6 +784,7 @@ Public Function Insert(str As String, _
                        strToInsert As String, _
                        afterPos As Long) As String
     If afterPos < 0 Then afterPos = 0
+    
     Insert = Mid(str, 1, afterPos) & strToInsert & Mid(str, afterPos + 1)
 End Function
 
@@ -693,11 +801,12 @@ End Function
 Public Function SplitUnlessInQuotes(ByVal str As String, _
                            Optional ByVal delim As String = " ", _
                            Optional limit As Long = -1) As Variant
+    Dim i As Long
+    Dim s As String
+    Dim ub As Long:         ub = -1
+    Dim parts As Variant:   ReDim parts(0 To 0)
+    Dim doSplit As Boolean: doSplit = True
     
-    Dim i As Long, ub As Long, doSplit As Boolean, s As String, parts As Variant
-    ReDim parts(0 To 0)
-    ub = -1
-    doSplit = True
     For i = 1 To Len(str)
         If ub = limit - 2 Then
             ub = ub + 1
@@ -705,11 +814,12 @@ Public Function SplitUnlessInQuotes(ByVal str As String, _
             parts(ub) = Mid(str, i)
             Exit For
         End If
-        If Mid(str, i, 1) = """" Then
-            doSplit = Not doSplit
-        End If
+        
+        If Mid(str, i, 1) = """" Then doSplit = Not doSplit
+        
         If Mid(str, i, Len(delim)) = delim And doSplit Or i = Len(str) Then
             If i = Len(str) Then s = s & Mid(str, i, 1)
+            
             ub = ub + 1
             ReDim Preserve parts(0 To ub)
             parts(ub) = s

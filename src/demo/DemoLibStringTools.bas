@@ -79,12 +79,10 @@ End Sub
 
 Sub TestEncodersAndDecoders()
     Const STR_LENGTH As Long = 1000000
-    Dim fullUnicode As String
-    Dim bmpUnicode As String '(Basic Multilingual Plane)
-    Dim utf16AsciiOnly As String
-    fullUnicode = RandomStringUnicode(STR_LENGTH)
-    bmpUnicode = RandomStringBMP(STR_LENGTH)
-    utf16AsciiOnly = RandomStringASCII(STR_LENGTH)
+    
+    Dim fullUnicode As String:    fullUnicode = RandomStringUnicode(STR_LENGTH)
+    Dim bmpUnicode As String:     bmpUnicode = RandomStringBMP(STR_LENGTH)
+    Dim utf16AsciiOnly As String: utf16AsciiOnly = RandomStringASCII(STR_LENGTH)
     
     'VBA natively implemented Encoders/Decoders
     Debug.Print "UTF-8 Encoder/Decoder Test Basic Multilingual Plane: " & _
@@ -120,17 +118,23 @@ Sub TestEncodersAndDecoders()
 End Sub
 
 Sub TestUTF8EncodersPerformance()
-    Dim startTime As Currency, endTime As Currency
-    Dim perSecond As Currency, timeElapsed As Double
+    Dim startTime As Currency
+    Dim endTime As Currency
+    Dim perSecond As Currency
+    Dim timeElapsed As Double
     getFrequency perSecond
     Application.EnableCancelKey = xlInterrupt
     
-    Dim numRepetitions As Variant, strLengths As Variant
-    numRepetitions = VBA.Array(100000, 1000, 10)
-    strLengths = VBA.Array(100, 1000, 1000000)
+    Dim numRepetitions As Variant: numRepetitions = VBA.Array(100000, 1000, 10)
+    Dim strLengths As Variant:     strLengths = VBA.Array(100, 1000, 1000000)
     
-    Dim description As String, s As String
-    Dim numReps As Long, strLength As Long, i As Long, j As Long
+    Dim description As String
+    Dim s As String
+    Dim numReps As Long
+    Dim strLength As Long
+    Dim i As Long
+    Dim j As Long
+    
     For i = LBound(numRepetitions) To UBound(numRepetitions)
         numReps = numRepetitions(i)
         strLength = strLengths(i)
@@ -176,17 +180,23 @@ End Sub
 
 
 Sub TestUTF8DecodersPerformance()
-    Dim startTime As Currency, endTime As Currency
-    Dim perSecond As Currency, timeElapsed As Double
+    Dim startTime As Currency
+    Dim endTime As Currency
+    Dim perSecond As Currency
+    Dim timeElapsed As Double
     getFrequency perSecond
     Application.EnableCancelKey = xlInterrupt
     
-    Dim numRepetitions As Variant, strLengths As Variant
-    numRepetitions = VBA.Array(100000, 1000, 10)
-    strLengths = VBA.Array(100, 1000, 1000000)
+    Dim numRepetitions As Variant: numRepetitions = VBA.Array(100000, 1000, 10)
+    Dim strLengths As Variant:     strLengths = VBA.Array(100, 1000, 1000000)
     
-    Dim description As String, s As String
-    Dim numReps As Long, strLength As Long, i As Long, j As Long
+    Dim description As String
+    Dim s As String
+    Dim numReps As Long
+    Dim strLength As Long
+    Dim i As Long
+    Dim j As Long
+    
     For i = LBound(numRepetitions) To UBound(numRepetitions)
         numReps = numRepetitions(i)
         strLength = strLengths(i)
@@ -232,17 +242,24 @@ Sub TestUTF8DecodersPerformance()
 End Sub
 
 Sub TestUTF32EncodersAndDecodersPerformance()
-    Dim startTime As Currency, endTime As Currency
-    Dim perSecond As Currency, timeElapsed As Double
+    Dim startTime As Currency
+    Dim endTime As Currency
+    Dim perSecond As Currency
+    Dim timeElapsed As Double
     getFrequency perSecond
     Application.EnableCancelKey = xlInterrupt
     
-    Dim numRepetitions As Variant, strLengths As Variant
-    numRepetitions = VBA.Array(100000, 1000, 10)
-    strLengths = VBA.Array(100, 1000, 1000000)
+    Dim numRepetitions As Variant: numRepetitions = VBA.Array(100000, 1000, 10)
+    Dim strLengths As Variant:     strLengths = VBA.Array(100, 1000, 1000000)
     
-    Dim description As String, s As String, s2 As String
-    Dim numReps As Long, strLength As Long, i As Long, j As Long
+    Dim description As String
+    Dim s As String
+    Dim s2 As String
+    Dim numReps As Long
+    Dim strLength As Long
+    Dim i As Long
+    Dim j As Long
+    
     For i = LBound(numRepetitions) To UBound(numRepetitions)
         numReps = numRepetitions(i)
         strLength = strLengths(i)
@@ -279,17 +296,24 @@ Sub TestUTF32EncodersAndDecodersPerformance()
 End Sub
 
 Sub TestANSIEncodersAndDecodersPerformance()
-    Dim startTime As Currency, endTime As Currency
-    Dim perSecond As Currency, timeElapsed As Double
+    Dim startTime As Currency
+    Dim endTime As Currency
+    Dim perSecond As Currency
+    Dim timeElapsed As Double
     getFrequency perSecond
     Application.EnableCancelKey = xlInterrupt
     
-    Dim numRepetitions As Variant, strLengths As Variant
-    numRepetitions = VBA.Array(100000, 1000, 10)
-    strLengths = VBA.Array(100, 1000, 1000000)
+    Dim numRepetitions As Variant: numRepetitions = VBA.Array(100000, 1000, 10)
+    Dim strLengths As Variant:     strLengths = VBA.Array(100, 1000, 1000000)
     
-    Dim description As String, s As String, s2 As String
-    Dim numReps As Long, strLength As Long, i As Long, j As Long
+    Dim description As String
+    Dim s As String
+    Dim s2 As String
+    Dim numReps As Long
+    Dim strLength As Long
+    Dim i As Long
+    Dim j As Long
+    
     For i = LBound(numRepetitions) To UBound(numRepetitions)
         numReps = numRepetitions(i)
         strLength = strLengths(i)
@@ -326,13 +350,9 @@ Sub TestANSIEncodersAndDecodersPerformance()
 End Sub
 
 Sub TestDifferentWaysOfGettingNumericalValuesFromStrings()
-    Dim t As Single
-    Dim str As String
-    t = Timer()
-    
-    str = RandomStringAlphanumeric(5000000)
-    'str = RandomStringAlphanumeric2(5000000)
-    
+    Dim t As Single:   t = Timer()
+    Dim str As String: str = RandomStringAlphanumeric(5000000)
+
     Debug.Print "Creating string took " & Timer - t & " seconds"
     
     t = Timer()
