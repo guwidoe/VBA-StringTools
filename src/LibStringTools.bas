@@ -288,12 +288,12 @@ End Function
 Public Function DecodeUTF8(ByVal utf8Str As String, _
                   Optional ByVal raiseErrors As Boolean = False) As String
     If raiseErrors Then
-        DecodeUTF8 = DecodeUTF8native(utf16leStr, True)
+        DecodeUTF8 = DecodeUTF8native(utf8Str, True)
     Else
         #If Mac Then
-            DecodeUTF8 = DecodeUTF8native(utf16leStr, False)
+            DecodeUTF8 = DecodeUTF8native(utf8Str, False)
         #Else
-            DecodeUTF8 = DecodeUTF8usingWinAPI(utf16leStr)
+            DecodeUTF8 = DecodeUTF8usingWinAPI(utf8Str)
         #End If
     End If
 End Function

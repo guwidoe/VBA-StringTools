@@ -40,14 +40,14 @@ Sub DemonstrateHexString()
     ThisWorkbook.Worksheets("Sheet1").Cells(1, 1) = s
 
     'Convert the UTF16 hex representation to UTF-8:
-    s = EncodeUTF8native(HexToString(utf16leTestHexString))
+    s = EncodeUTF8(HexToString(utf16leTestHexString))
 
     'Look at the UTF8 bytes in the immediate window
     s = StringToHex(s)
     Debug.Print s
 
     'Convert UTF-8 hex string to regular vba string (UTF-16LE)
-    s = DecodeUTF8usingWinAPI(HexToString(s))
+    s = DecodeUTF8(HexToString(s))
     
     ThisWorkbook.Worksheets("Sheet1").Cells(1, 1) = s
 
