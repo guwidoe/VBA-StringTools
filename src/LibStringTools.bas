@@ -32,24 +32,574 @@ Option Explicit
 'TODO:
 'Make HexToString and ReplaceUnicodeLiterals Mac compatible by removing Regex
 
-#If Mac = 0 Then
+#If Mac Then
+    #If VBA7 Then 'https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/iconv.3.html
+        Declare PtrSafe Function iconv_open Lib "/usr/lib/libiconv.dylib" (ByVal toCode As LongPtr, ByVal fromCode As LongPtr) As LongPtr
+        Declare PtrSafe Function iconv_close Lib "/usr/lib/libiconv.dylib" (ByVal cd As LongPtr) As Long
+        Declare PtrSafe Function iconv Lib "/usr/lib/libiconv.dylib" (ByVal cd As LongPtr, ByRef inBuf As LongPtr, ByRef inBytesLeft As LongPtr, ByRef outBuf As LongPtr, ByRef outBytesLeft As LongPtr) As LongPtr
+    
+        Declare PtrSafe Function errno_location Lib "/usr/lib/libSystem.B.dylib" Alias "__error" () As LongPtr
+    #Else
+        Private Declare Function iconv Lib "/usr/lib/libiconv.dylib" (ByVal cd As Long, ByRef inBuf As Long, ByRef inBytesLeft As Long, ByRef outBuf As Long, ByRef outBytesLeft As Long) As Long
+        Private Declare Function iconv_open Lib "/usr/lib/libiconv.dylib" (ByVal toCode As Long, ByVal fromCode As Long) As Long
+        Private Declare Function iconv_close Lib "/usr/lib/libiconv.dylib" (ByVal cd As Long) As Long
+        
+        Declare Function errno_location Lib "/usr/lib/libSystem.B.dylib" Alias "__error" () As LongPtr
+    #End If
+    
     #If VBA7 Then
-        Private Declare PtrSafe Function MultiByteToWideChar Lib "kernel32" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long) As Long
-        Private Declare PtrSafe Function WideCharToMultiByte Lib "kernel32" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpDefaultChar As LongPtr, ByVal lpUsedDefaultChar As LongPtr) As Long
+        Private Declare PtrSafe Function CopyMemory Lib "/usr/lib/libc.dylib" Alias "memmove" (Destination As Any, Source As Any, ByVal Length As LongPtr) As LongPtr
+    #Else
+        Private Declare Function CopyMemory Lib "/usr/lib/libc.dylib" Alias "memmove" (Destination As Any, Source As Any, ByVal Length As Long) As Long
+    #End If
+#Else 'Windows
+    #If VBA7 Then
+        Private Declare PtrSafe Function MultiByteToWideChar Lib "kernel32" (ByVal codePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long) As Long
+        Private Declare PtrSafe Function WideCharToMultiByte Lib "kernel32" (ByVal codePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpDefaultChar As LongPtr, ByVal lpUsedDefaultChar As LongPtr) As Long
+        
+        Private Declare PtrSafe Function GetLastError Lib "kernel32" () As Long
+        Private Declare PtrSafe Sub SetLastError Lib "kernel32" (ByVal dwErrCode As Long)
     #Else
         Private Declare Function MultiByteToWideChar Lib "kernel32" Alias "MultiByteToWideChar" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As Long, ByVal cchMultiByte As Long, ByVal lpWideCharStr As Long, ByVal cchWideChar As Long) As Long
         Private Declare Function WideCharToMultiByte Lib "kernel32" Alias "WideCharToMultiByte" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As Long, ByVal cchWideChar As Long, ByVal lpMultiByteStr As Long, ByVal cchMultiByte As Long, ByVal lpDefaultChar As Long, ByVal lpUsedDefaultChar As Long) As Long
+    
+        Private Declare Function GetLastError Lib "kernel32" () As Long
+        Private Declare Sub SetLastError Lib "kernel32" (ByVal dwErrCode As Long)
     #End If
     
-    'For the unit tests:
     #If VBA7 Then
-        Private Declare PtrSafe Function getFrequency Lib "kernel32" Alias "QueryPerformanceFrequency" (ByRef Frequency As Currency) As LongPtr
-        Private Declare PtrSafe Function getTime Lib "kernel32" Alias "QueryPerformanceCounter" (ByRef counter As Currency) As LongPtr
+        Private Declare PtrSafe Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (Destination As Any, Source As Any, ByVal Length As LongPtr)
     #Else
-        Private Declare Function getFrequency Lib "kernel32" Alias "QueryPerformanceFrequency" (ByRef Frequency As Currency) As Long
-        Private Declare Function getTime Lib "kernel32" Alias "QueryPerformanceCounter" (ByRef Counter As Currency) As Long
+        Private Declare Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (Destination As Any, Source As Any, ByVal Length As Long)
     #End If
 #End If
+
+#If VBA7 = 0 Then
+    Public Enum LongPtr
+        [_]
+    End Enum
+#End If
+
+'For the unit tests:
+#If Mac Then
+    #If VBA7 Then
+        'https://developer.apple.com/documentation/kernel/1462446-mach_absolute_time
+        Private Declare PtrSafe Function mach_continuous_time Lib "/usr/lib/libSystem.dylib" () As Currency
+        Private Declare PtrSafe Function mach_timebase_info Lib "/usr/lib/libSystem.dylib" (ByRef timebaseInfo As MachTimebaseInfo) As Long
+    #Else
+        Private Declare Function mach_continuous_time Lib "/usr/lib/libSystem.dylib" () As Currency
+        Private Declare Function mach_timebase_info Lib "/usr/lib/libSystem.dylib" (ByRef timebaseInfo As MachTimebaseInfo) As Long
+    #End If
+#Else
+    #If VBA7 Then
+        Private Declare PtrSafe Function QueryPerformanceFrequency Lib "kernel32" (ByRef Frequency As Currency) As LongPtr
+        Private Declare PtrSafe Function QueryPerformanceCounter Lib "kernel32" (ByRef counter As Currency) As LongPtr
+    #Else
+        Private Declare Function QueryPerformanceFrequency Lib "kernel32" (ByRef Frequency As Currency) As Long
+        Private Declare Function QueryPerformanceCounter Lib "kernel32" (ByRef Counter As Currency) As Long
+    #End If
+#End If
+
+#If Mac Then
+    Private Type MachTimebaseInfo
+        Numerator As Long
+        Denominator As Long
+    End Type
+#End If
+
+'https://learn.microsoft.com/en-us/windows/win32/intl/code-page-identifiers
+Public Enum CodePageIdentifier
+    [_first_]
+'Enum_Name   Identifier             '.NET Name               Additional information
+    cpId_IBM037 = 37                     'IBM037                  IBM EBCDIC US-Canada
+    cpId_IBM437 = 437                    'IBM437                  OEM United States
+    cpId_IBM500 = 500                    'IBM500                  IBM EBCDIC International
+    cpId_ASMO_708 = 708                  'ASMO-708                Arabic (ASMO 708)
+    cpId_ASMO_449 = 709                  '                        Arabic (ASMO-449+, BCON V4)
+    cpId_Transparent_Arabic = 710        '                        Arabic - Transparent Arabic
+    cpId_DOS_720 = 720                   'DOS-720                 Arabic (Transparent ASMO); Arabic (DOS)
+    cpId_ibm737 = 737                    'ibm737                  OEM Greek (formerly 437G); Greek (DOS)
+    cpId_ibm775 = 775                    'ibm775                  OEM Baltic; Baltic (DOS)
+    cpId_ibm850 = 850                    'ibm850                  OEM Multilingual Latin 1; Western European (DOS)
+    cpId_ibm852 = 852                    'ibm852                  OEM Latin 2; Central European (DOS)
+    cpId_IBM855 = 855                    'IBM855                  OEM Cyrillic (primarily Russian)
+    cpId_ibm857 = 857                    'ibm857                  OEM Turkish; Turkish (DOS)
+    cpId_IBM00858 = 858                  'IBM00858                OEM Multilingual Latin 1 + Euro symbol
+    cpId_IBM860 = 860                    'IBM860                  OEM Portuguese; Portuguese (DOS)
+    cpId_ibm861 = 861                    'ibm861                  OEM Icelandic; Icelandic (DOS)
+    cpId_DOS_862 = 862                   'DOS-862                 OEM Hebrew; Hebrew (DOS)
+    cpId_IBM863 = 863                    'IBM863                  OEM French Canadian; French Canadian (DOS)
+    cpId_IBM864 = 864                    'IBM864                  OEM Arabic; Arabic (864)
+    cpId_IBM865 = 865                    'IBM865                  OEM Nordic; Nordic (DOS)
+    cpId_cp866 = 866                     'cp866                   OEM Russian; Cyrillic (DOS)
+    cpId_ibm869 = 869                    'ibm869                  OEM Modern Greek; Greek, Modern (DOS)
+    cpId_IBM870 = 870                    'IBM870                  IBM EBCDIC Multilingual/ROECE (Latin 2); IBM EBCDIC Multilingual Latin 2
+    cpId_windows_874 = 874               'windows-874             Thai (Windows)
+    cpId_cp875 = 875                     'cp875                   IBM EBCDIC Greek Modern
+    cpId_shift_jis = 932                 'shift_jis               ANSI/OEM Japanese; Japanese (Shift-JIS)
+    cpId_gb2312 = 936                    'gb2312                  ANSI/OEM Simplified Chinese (PRC, Singapore); Chinese Simplified (GB2312)
+    cpId_ks_c_5601_1987 = 949            'ks_c_5601-1987          ANSI/OEM Korean (Unified Hangul Code)
+    cpId_big5 = 950                      'big5                    ANSI/OEM Traditional Chinese (Taiwan; Hong Kong SAR, PRC); Chinese Traditional (Big5)
+    cpId_IBM1026 = 1026                  'IBM1026                 IBM EBCDIC Turkish (Latin 5)
+    cpId_IBM01047 = 1047                 'IBM01047                IBM EBCDIC Latin 1/Open System
+    cpId_IBM01140 = 1140                 'IBM01140                IBM EBCDIC US-Canada (037 + Euro symbol); IBM EBCDIC (US-Canada-Euro)
+    cpId_IBM01141 = 1141                 'IBM01141                IBM EBCDIC Germany (20273 + Euro symbol); IBM EBCDIC (Germany-Euro)
+    cpId_IBM01142 = 1142                 'IBM01142                IBM EBCDIC Denmark-Norway (20277 + Euro symbol); IBM EBCDIC (Denmark-Norway-Euro)
+    cpId_IBM01143 = 1143                 'IBM01143                IBM EBCDIC Finland-Sweden (20278 + Euro symbol); IBM EBCDIC (Finland-Sweden-Euro)
+    cpId_IBM01144 = 1144                 'IBM01144                IBM EBCDIC Italy (20280 + Euro symbol); IBM EBCDIC (Italy-Euro)
+    cpId_IBM01145 = 1145                 'IBM01145                IBM EBCDIC Latin America-Spain (20284 + Euro symbol); IBM EBCDIC (Spain-Euro)
+    cpId_IBM01146 = 1146                 'IBM01146                IBM EBCDIC United Kingdom (20285 + Euro symbol); IBM EBCDIC (UK-Euro)
+    cpId_IBM01147 = 1147                 'IBM01147                IBM EBCDIC France (20297 + Euro symbol); IBM EBCDIC (France-Euro)
+    cpId_IBM01148 = 1148                 'IBM01148                IBM EBCDIC International (500 + Euro symbol); IBM EBCDIC (International-Euro)
+    cpId_IBM01149 = 1149                 'IBM01149                IBM EBCDIC Icelandic (20871 + Euro symbol); IBM EBCDIC (Icelandic-Euro)
+    cpId_utf_16 = 1200                   'utf-16                  Unicode UTF-16, little endian byte order (BMP of ISO 10646); available only to managed applications
+    cpId_unicodeFFFE = 1201              'unicodeFFFE             Unicode UTF-16, big endian byte order; available only to managed applications
+    cpId_windows_1250 = 1250             'windows-1250            ANSI Central European; Central European (Windows)
+    cpId_windows_1251 = 1251             'windows-1251            ANSI Cyrillic; Cyrillic (Windows)
+    cpId_windows_1252 = 1252             'windows-1252            ANSI Latin 1; Western European (Windows)
+    cpId_windows_1253 = 1253             'windows-1253            ANSI Greek; Greek (Windows)
+    cpId_windows_1254 = 1254             'windows-1254            ANSI Turkish; Turkish (Windows)
+    cpId_windows_1255 = 1255             'windows-1255            ANSI Hebrew; Hebrew (Windows)
+    cpId_windows_1256 = 1256             'windows-1256            ANSI Arabic; Arabic (Windows)
+    cpId_windows_1257 = 1257             'windows-1257            ANSI Baltic; Baltic (Windows)
+    cpId_windows_1258 = 1258             'windows-1258            ANSI/OEM Vietnamese; Vietnamese (Windows)
+    cpId_Johab = 1361                    'Johab                   Korean (Johab)
+    cpId_macintosh = 10000               'macintosh               MAC Roman; Western European (Mac)
+    cpId_x_mac_japanese = 10001          'x-mac-japanese          Japanese (Mac)
+    cpId_x_mac_chinesetrad = 10002       'x-mac-chinesetrad       MAC Traditional Chinese (Big5); Chinese Traditional (Mac)
+    cpId_x_mac_korean = 10003            'x-mac-korean            Korean (Mac)
+    cpId_x_mac_arabic = 10004            'x-mac-arabic            Arabic (Mac)
+    cpId_x_mac_hebrew = 10005            'x-mac-hebrew            Hebrew (Mac)
+    cpId_x_mac_greek = 10006             'x-mac-greek             Greek (Mac)
+    cpId_x_mac_cyrillic = 10007          'x-mac-cyrillic          Cyrillic (Mac)
+    cpId_x_mac_chinesesimp = 10008       'x-mac-chinesesimp       MAC Simplified Chinese (GB 2312); Chinese Simplified (Mac)
+    cpId_x_mac_romanian = 10010          'x-mac-romanian          Romanian (Mac)
+    cpId_x_mac_ukrainian = 10017         'x-mac-ukrainian         Ukrainian (Mac)
+    cpId_x_mac_thai = 10021              'x-mac-thai              Thai (Mac)
+    cpId_x_mac_ce = 10029                'x-mac-ce                MAC Latin 2; Central European (Mac)
+    cpId_x_mac_icelandic = 10079         'x-mac-icelandic         Icelandic (Mac)
+    cpId_x_mac_turkish = 10081           'x-mac-turkish           Turkish (Mac)
+    cpId_x_mac_croatian = 10082          'x-mac-croatian          Croatian (Mac)
+    cpId_utf_32 = 12000                  'utf-32                  Unicode UTF-32, little endian byte order; available only to managed applications
+    cpId_utf_32BE = 12001                'utf-32BE                Unicode UTF-32, big endian byte order; available only to managed applications
+    cpId_x_Chinese_CNS = 20000           'x-Chinese_CNS           CNS Taiwan; Chinese Traditional (CNS)
+    cpId_x_cp20001 = 20001               'x-cp20001               TCA Taiwan
+    cpId_x_Chinese_Eten = 20002          'x_Chinese-Eten          Eten Taiwan; Chinese Traditional (Eten)
+    cpId_x_cp20003 = 20003               'x-cp20003               IBM5550 Taiwan
+    cpId_x_cp20004 = 20004               'x-cp20004               TeleText Taiwan
+    cpId_x_cp20005 = 20005               'x-cp20005               Wang Taiwan
+    cpId_x_IA5 = 20105                   'x-IA5                   IA5 (IRV International Alphabet No. 5, 7-bit); Western European (IA5)
+    cpId_x_IA5_German = 20106            'x-IA5-German            IA5 German (7-bit)
+    cpId_x_IA5_Swedish = 20107           'x-IA5-Swedish           IA5 Swedish (7-bit)
+    cpId_x_IA5_Norwegian = 20108         'x-IA5-Norwegian         IA5 Norwegian (7-bit)
+    cpId_us_ascii = 20127                'us-ascii                US-ASCII (7-bit)
+    cpId_x_cp20261 = 20261               'x-cp20261               T.61
+    cpId_x_cp20269 = 20269               'x-cp20269               ISO 6937 Non-Spacing Accent
+    cpId_IBM273 = 20273                  'IBM273                  IBM EBCDIC Germany
+    cpId_IBM277 = 20277                  'IBM277                  IBM EBCDIC Denmark-Norway
+    cpId_IBM278 = 20278                  'IBM278                  IBM EBCDIC Finland-Sweden
+    cpId_IBM280 = 20280                  'IBM280                  IBM EBCDIC Italy
+    cpId_IBM284 = 20284                  'IBM284                  IBM EBCDIC Latin America-Spain
+    cpId_IBM285 = 20285                  'IBM285                  IBM EBCDIC United Kingdom
+    cpId_IBM290 = 20290                  'IBM290                  IBM EBCDIC Japanese Katakana Extended
+    cpId_IBM297 = 20297                  'IBM297                  IBM EBCDIC France
+    cpId_IBM420 = 20420                  'IBM420                  IBM EBCDIC Arabic
+    cpId_IBM423 = 20423                  'IBM423                  IBM EBCDIC Greek
+    cpId_IBM424 = 20424                  'IBM424                  IBM EBCDIC Hebrew
+    cpId_x_EBCDIC_KoreanExtended = 20833 'x-EBCDIC-KoreanExtended IBM EBCDIC Korean Extended
+    cpId_IBM_Thai = 20838                'IBM-Thai                IBM EBCDIC Thai
+    cpId_koi8_r = 20866                  'koi8-r                  Russian (KOI8-R); Cyrillic (KOI8-R)
+    cpId_IBM871 = 20871                  'IBM871                  IBM EBCDIC Icelandic
+    cpId_IBM880 = 20880                  'IBM880                  IBM EBCDIC Cyrillic Russian
+    cpId_IBM905 = 20905                  'IBM905                  IBM EBCDIC Turkish
+    cpId_IBM00924 = 20924                'IBM00924                IBM EBCDIC Latin 1/Open System (1047 + Euro symbol)
+    cpId_euc_jp = 20932                  'EUC-JP                  Japanese (JIS 0208-1990 and 0212-1990)
+    cpId_x_cp20936 = 20936               'x-cp20936               Simplified Chinese (GB2312); Chinese Simplified (GB2312-80)
+    cpId_x_cp20949 = 20949               'x-cp20949               Korean Wansung
+    cpId_cp1025 = 21025                  'cp1025                  IBM EBCDIC Cyrillic Serbian-Bulgarian
+    cpId_deprecated = 21027              '                        (deprecated)
+    cpId_koi8_u = 21866                  'koi8-u                  Ukrainian (KOI8-U); Cyrillic (KOI8-U)
+    cpId_iso_8859_1 = 28591              'iso-8859-1              ISO 8859-1 Latin 1; Western European (ISO)
+    cpId_iso_8859_2 = 28592              'iso-8859-2              ISO 8859-2 Central European; Central European (ISO)
+    cpId_iso_8859_3 = 28593              'iso-8859-3              ISO 8859-3 Latin 3
+    cpId_iso_8859_4 = 28594              'iso-8859-4              ISO 8859-4 Baltic
+    cpId_iso_8859_5 = 28595              'iso-8859-5              ISO 8859-5 Cyrillic
+    cpId_iso_8859_6 = 28596              'iso-8859-6              ISO 8859-6 Arabic
+    cpId_iso_8859_7 = 28597              'iso-8859-7              ISO 8859-7 Greek
+    cpId_iso_8859_8 = 28598              'iso-8859-8              ISO 8859-8 Hebrew; Hebrew (ISO-Visual)
+    cpId_iso_8859_9 = 28599              'iso-8859-9              ISO 8859-9 Turkish
+    cpId_iso_8859_13 = 28603             'iso-8859-13             ISO 8859-13 Estonian
+    cpId_iso_8859_15 = 28605             'iso-8859-15             ISO 8859-15 Latin 9
+    cpId_x_Europa = 29001                'x-Europa                Europa 3
+    cpId_iso_8859_8_i = 38598            'iso-8859-8-i            ISO 8859-8 Hebrew; Hebrew (ISO-Logical)
+    cpId_iso_2022_jp = 50220             'iso-2022-jp             ISO 2022 Japanese with no halfwidth Katakana; Japanese (JIS)
+    cpId_csISO2022JP = 50221             'csISO2022JP             ISO 2022 Japanese with halfwidth Katakana; Japanese (JIS-Allow 1 byte Kana)
+    cpId_iso_2022_jp_w_1b_Kana = 50222   'iso-2022-jp             ISO 2022 Japanese JIS X 0201-1989; Japanese (JIS-Allow 1 byte Kana - SO/SI)
+    cpId_iso_2022_kr = 50225             'iso-2022-kr             ISO 2022 Korean
+    cpId_x_cp50227 = 50227               'x-cp50227               ISO 2022 Simplified Chinese; Chinese Simplified (ISO 2022)
+    cpId_ISO_2022_Trad_Chinese = 50229   '                        ISO 2022 Traditional Chinese
+    cpId_EBCDIC_Jap_Katakana_Ext = 50930 '                        EBCDIC Japanese (Katakana) Extended
+    cpId_EBCDIC_US_Can_and_Jap = 50931   '                        EBCDIC US-Canada and Japanese
+    cpId_EBCDIC_Kor_Ext_and_Kor = 50933  '                        EBCDIC Korean Extended and Korean
+    cpId_EBCDIC_Simp_Chin_Ext = 50935    '                        EBCDIC Simplified Chinese Extended and Simplified Chinese
+    cpId_EBCDIC_Simp_Chin = 50936        '                        EBCDIC Simplified Chinese
+    cpId_EBCDIC_US_Can_Trad_Chin = 50937 '                        EBCDIC US-Canada and Traditional Chinese
+    cpId_EBCDIC_Jap_Latin_Ext = 50939    '                        EBCDIC Japanese (Latin) Extended and Japaneseeuc_jp = 51932                  'euc-jp                 EUC Japanese
+    cpId_EUC_CN = 51936                  'EUC-CN                  EUC Simplified Chinese; Chinese Simplified (EUC)
+    cpId_euc_kr = 51949                  'euc-kr                  EUC Korean
+    cpId_EUC_Traditional_Chinese = 51950 '                        EUC Traditional Chinese
+    cpId_hz_gb_2312 = 52936              'hz-gb-2312              HZ-GB2312 Simplified Chinese; Chinese Simplified (HZ)
+    cpId_GB18030 = 54936                 'GB18030                 Windows XP and later: GB18030 Simplified Chinese (4 byte); Chinese Simplified (GB18030)
+    cpId_x_iscii_de = 57002              'x-iscii-de              ISCII Devanagari
+    cpId_x_iscii_be = 57003              'x-iscii-be              ISCII Bangla
+    cpId_x_iscii_ta = 57004              'x-iscii-ta              ISCII Tamil
+    cpId_x_iscii_te = 57005              'x-iscii-te              ISCII Telugu
+    cpId_x_iscii_as = 57006              'x-iscii-as              ISCII Assamese
+    cpId_x_iscii_or = 57007              'x-iscii-or              ISCII Odia
+    cpId_x_iscii_ka = 57008              'x-iscii-ka              ISCII Kannada
+    cpId_x_iscii_ma = 57009              'x-iscii-ma              ISCII Malayalam
+    cpId_x_iscii_gu = 57010              'x-iscii-gu              ISCII Gujarati
+    cpId_x_iscii_pa = 57011              'x-iscii-pa              ISCII Punjabi
+    cpId_utf_7 = 65000                   'utf-7                   Unicode (UTF-7)
+    cpId_utf_8 = 65001                   'utf-8                   Unicode (UTF-8)
+    [_last_]
+End Enum
+
+Function GetApiErrorNumber() As Long
+    #If Mac Then
+        Dim errnoPtr As LongPtr
+        Dim errnoValue As Long
+        
+        errnoPtr = errno_location()
+        CopyMemory GetApiErrorNumber, ByVal errnoPtr, LenB(GetApiErrorNumber)
+    #Else
+        GetApiErrorNumber = GetLastError()
+    #End If
+End Function
+
+Private Function CodePageToConversionDescriptorName() As Collection
+    Static c As Collection
+    
+    If Not c Is Nothing Then
+        Set CodePageToConversionDescriptorName = c
+        Exit Function
+    End If
+    
+    Set c = New Collection
+    'Item:=ConversionDescriptorName, Key:=CStr(CodePageIdentifier) '(Optional)
+    
+    'Source:
+    'https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/iconv_open.3.html#//apple_ref/doc/man/3/iconv_open
+    
+    'European languages
+    c.Add Item:="ASCII", Key:=CStr(cpId_us_ascii)
+    c.Add Item:="ISO-8859-1", Key:=CStr(cpId_iso_8859_1)
+    c.Add Item:="ISO-8859-2", Key:=CStr(cpId_iso_8859_2)
+    c.Add Item:="ISO-8859-3", Key:=CStr(cpId_iso_8859_3)
+    c.Add Item:="ISO-8859-4", Key:=CStr(cpId_iso_8859_4)
+    c.Add Item:="ISO-8859-5", Key:=CStr(cpId_iso_8859_5)
+    c.Add Item:="ISO-8859-7", Key:=CStr(cpId_iso_8859_7)
+    c.Add Item:="ISO-8859-9", Key:=CStr(cpId_iso_8859_9)
+    c.Add Item:="ISO-8859-10"      ', Key:=CStr( )
+    c.Add Item:="ISO-8859-13", Key:=CStr(cpId_iso_8859_13)
+    c.Add Item:="ISO-8859-14"      ', Key:=CStr( )
+    c.Add Item:="ISO-8859-15", Key:=CStr(cpId_iso_8859_15)
+    c.Add Item:="ISO-8859-16"      ', Key:=CStr( )
+    c.Add Item:="KOI8-R"           ', Key:=CStr( )
+    c.Add Item:="KOI8-U", Key:=CStr(cpId_koi8_u)
+    c.Add Item:="KOI8-RU"          ', Key:=CStr( )
+    c.Add Item:="CP1250", Key:=CStr(cpId_windows_1250)
+    c.Add Item:="CP1251", Key:=CStr(cpId_windows_1251)
+    c.Add Item:="CP1252", Key:=CStr(cpId_windows_1252)
+    c.Add Item:="CP1253", Key:=CStr(cpId_windows_1253)
+    c.Add Item:="CP1254", Key:=CStr(cpId_windows_1254)
+    c.Add Item:="CP1257", Key:=CStr(cpId_windows_1257)
+    c.Add Item:="CP850", Key:=CStr(cpId_ibm850)
+    c.Add Item:="CP866", Key:=CStr(cpId_cp866)
+    c.Add Item:="MacRoman"         ', Key:=CStr( )
+    c.Add Item:="MacCentralEurope", Key:=CStr(cpId_x_mac_ce)
+    c.Add Item:="MacIceland", Key:=CStr(cpId_x_mac_icelandic)
+    c.Add Item:="MacCroatian", Key:=CStr(cpId_x_mac_croatian)
+    c.Add Item:="MacRomania", Key:=CStr(cpId_x_mac_romanian)
+    c.Add Item:="MacCyrillic", Key:=CStr(cpId_x_mac_cyrillic)
+    c.Add Item:="MacUkraine", Key:=CStr(cpId_x_mac_ukrainian)
+    c.Add Item:="MacGreek", Key:=CStr(cpId_x_mac_greek)
+    c.Add Item:="MacTurkish", Key:=CStr(cpId_x_mac_turkish)
+    c.Add Item:="Macintosh", Key:=CStr(cpId_macintosh)
+
+    'Semitic languages
+    c.Add Item:="ISO-8859-6", Key:=CStr(cpId_iso_8859_6)
+    c.Add Item:="ISO-8859-8", Key:=CStr(cpId_iso_8859_8)
+    c.Add Item:="CP1255", Key:=CStr(cpId_windows_1255)
+    c.Add Item:="CP1256", Key:=CStr(cpId_windows_1256)
+    c.Add Item:="CP862", Key:=CStr(cpId_DOS_862)
+    c.Add Item:="MacHebrew", Key:=CStr(cpId_x_mac_hebrew)
+    c.Add Item:="MacArabic", Key:=CStr(cpId_x_mac_arabic)
+
+    'Japanese
+    c.Add Item:="EUC-JP"           ', Key:=CStr( )
+    c.Add Item:="SHIFT_JIS", Key:=CStr(cpId_shift_jis)
+    c.Add Item:="CP932" ', Key:=CStr(cpId_shift_jis) '(=cpId_shift_jis)
+    c.Add Item:="ISO-2022-JP"      ', Key:=CStr( )
+    c.Add Item:="ISO-2022-JP-2"    ', Key:=CStr( )
+    c.Add Item:="ISO-2022-JP-1"    ', Key:=CStr( )
+
+    'Chinese
+    c.Add Item:="EUC-CN"           ', Key:=CStr( )
+    c.Add Item:="HZ"               ', Key:=CStr( )
+    c.Add Item:="GBK"              ', Key:=CStr( )
+    c.Add Item:="CP936"            ', Key:=CStr( )
+    c.Add Item:="GB18030"          ', Key:=CStr( )
+    c.Add Item:="EUC-TW"           ', Key:=CStr( )
+    c.Add Item:="BIG5", Key:=CStr(cpId_big5)
+    c.Add Item:="CP950" ', Key:=CStr(cpId_big5) '(=cpId_big5)
+    c.Add Item:="BIG5-HKSCS"       ', Key:=CStr( )
+    c.Add Item:="BIG5-HKSCS:2001"  ', Key:=CStr( )
+    c.Add Item:="BIG5-HKSCS:1999"  ', Key:=CStr( )
+    c.Add Item:="ISO-2022-CN"      ', Key:=CStr( )
+    c.Add Item:="ISO-2022-CN-EXT"  ', Key:=CStr( )
+
+    'Korean
+    c.Add Item:="EUC-KR", Key:=CStr(cpId_euc_kr)
+    c.Add Item:="CP949", Key:=CStr(cpId_ks_c_5601_1987)
+    c.Add Item:="ISO-2022-KR", Key:=CStr(cpId_iso_2022_kr)
+    c.Add Item:="JOHAB"            ', Key:=CStr( )
+
+    'Armenian
+    c.Add Item:="ARMSCII-8"        ', Key:=CStr( )
+
+    'Georgian
+    c.Add Item:="Georgian-Academy" ', Key:=CStr( )
+    c.Add Item:="Georgian-PS"      ', Key:=CStr( )
+
+    'Tajik
+    c.Add Item:="KOI8-T"           ', Key:=CStr( )
+
+    'Kazakh
+    c.Add Item:="PT154"            ', Key:=CStr( )
+
+    'Thai
+    c.Add Item:="TIS-620"          ', Key:=CStr( )
+    c.Add Item:="CP874", Key:=CStr(cpId_windows_874)
+    c.Add Item:="MacThai", Key:=CStr(cpId_x_mac_thai)
+
+    'Laotian
+    c.Add Item:="MuleLao-1"        ', Key:=CStr( )
+    c.Add Item:="CP1133"           ', Key:=CStr( )
+
+    'Vietnamese
+    c.Add Item:="VISCII"           ', Key:=CStr( )
+    c.Add Item:="TCVN"             ', Key:=CStr( )
+    c.Add Item:="CP1258", Key:=CStr(cpId_windows_1258)
+
+    'Platform specifics
+    c.Add Item:="HP-ROMAN8"        ', Key:=CStr( )
+    c.Add Item:="NEXTSTEP"         ', Key:=CStr( )
+
+    'Full Unicode
+    c.Add Item:="UTF-8", Key:=CStr(cpId_utf_8)
+    c.Add Item:="UCS-2"            ', Key:=CStr( )
+    c.Add Item:="UCS-2BE", Key:=CStr(cpId_unicodeFFFE)
+    c.Add Item:="UCS-2LE", Key:=CStr(cpId_utf_16)
+    c.Add Item:="UCS-4"            ', Key:=CStr( )
+    c.Add Item:="UCS-4BE", Key:=CStr(cpId_utf_32BE)
+    c.Add Item:="UCS-4LE", Key:=CStr(cpId_utf_32)
+    c.Add Item:="UTF-16"           ', Key:=CStr( )
+    c.Add Item:="UTF-16BE", Key:=CStr(cpId_unicodeFFFE)
+    c.Add Item:="UTF-16LE", Key:=CStr(cpId_utf_16)
+    c.Add Item:="UTF-32"           ', Key:=CStr( )
+    c.Add Item:="UTF-32BE", Key:=CStr(cpId_utf_32BE)
+    c.Add Item:="UTF-32LE", Key:=CStr(cpId_utf_32)
+    c.Add Item:="UTF-7", Key:=CStr(cpId_utf_7)
+    c.Add Item:="C99"              ', Key:=CStr( )
+    c.Add Item:="JAVA"             ', Key:=CStr( )
+
+    'Full Unicode in terms of uint16_t or uint32_t
+    '(with machine dependent endianness and alignment)
+    c.Add Item:="UCS-2-INTERNAL"   ', Key:=CStr( )
+    c.Add Item:="UCS-4-INTERNAL"   ', Key:=CStr( )
+
+    'Locale dependent in terms of char or wchar_t
+    '(with  machine  dependent  endianness  and  alignment and with
+    'semantics depending on the OS and the  current  LC_CTYPE  locale facet)
+    c.Add Item:="char"             ', Key:=CStr( )
+    c.Add Item:="wchar_t"          ', Key:=CStr( )
+
+    'When  configured with the option --enable-extra-encodings
+    'it also pro-vides provides vides support for a few extra encodings:
+    
+    'European languages
+    c.Add Item:="CP437", Key:=CStr(cpId_IBM437)
+    c.Add Item:="CP737", Key:=CStr(cpId_ibm737)
+    c.Add Item:="CP775", Key:=CStr(cpId_ibm775)
+    c.Add Item:="CP852", Key:=CStr(cpId_ibm852)
+    c.Add Item:="CP853"            ', Key:=CStr( )
+    c.Add Item:="CP855", Key:=CStr(cpId_IBM855)
+    c.Add Item:="CP857", Key:=CStr(cpId_ibm857)
+    c.Add Item:="CP858", Key:=CStr(cpId_IBM00858)
+    c.Add Item:="CP860", Key:=CStr(cpId_IBM860)
+    c.Add Item:="CP861", Key:=CStr(cpId_ibm861)
+    c.Add Item:="CP863", Key:=CStr(cpId_IBM863)
+    c.Add Item:="CP865", Key:=CStr(cpId_IBM865)
+    c.Add Item:="CP869", Key:=CStr(cpId_ibm869)
+    c.Add Item:="CP1125"           ', Key:=CStr( )
+
+    'Semitic languages
+    c.Add Item:="CP864", Key:=CStr(cpId_IBM864)
+
+    'Japanese
+    c.Add Item:="EUC-JISX0213"     ', Key:=CStr( )
+    c.Add Item:="Shift_JISX0213"   ', Key:=CStr( )
+    c.Add Item:="ISO-2022-JP-3"    ', Key:=CStr( )
+
+    'Chinese
+    c.Add Item:="BIG5-2003"        ', Key:=CStr( ) '(experimental)
+
+    'Turkmen
+    c.Add Item:="TDS565"           ', Key:=CStr( )
+
+    'Platform specifics
+    c.Add Item:="ATARIST"          ', Key:=CStr( )
+    c.Add Item:="RISCOS-LATIN1"    ', Key:=CStr( )
+
+    'The empty encoding name is equivalent to "char":
+    'it denotes the locale dependent character encoding.
+    Set CodePageToConversionDescriptorName = c
+End Function
+
+Private Function ConversionDescriptorNameToCodePage() As Collection
+    Static c As Collection
+    
+    If Not c Is Nothing Then
+        Set ConversionDescriptorNameToCodePage = c
+        Exit Function
+    End If
+    
+    Dim cpID As Long
+    Dim conversionDescriptor As Variant
+    Set c = New Collection
+    
+    On Error Resume Next
+    For cpID = CodePageIdentifier.[_first_] To CodePageIdentifier.[_last_]
+        conversionDescriptor = CodePageToConversionDescriptorName(CStr(cpID))
+        If conversionDescriptor <> "" Then
+            c.Add Item:=cpID, Key:=conversionDescriptor
+        End If
+        conversionDescriptor = ""
+    Next cpID
+    
+    cpID = -1
+    For Each conversionDescriptor In CodePageToConversionDescriptorName
+        cpID = c(conversionDescriptor)
+        If cpID = -1 Then c.Add Item:=-1, Key:=conversionDescriptor
+        cpID = -1
+    Next conversionDescriptor
+    On Error GoTo 0
+    
+    Set ConversionDescriptorNameToCodePage = c
+End Function
+
+Public Function Transcode(ByRef str As String, _
+                          ByVal toCodePage As CodePageIdentifier, _
+                          ByVal fromCodePage As CodePageIdentifier, _
+                 Optional ByVal raiseErrors As Boolean = False) As String
+    Const methodName As String = "Transcode"
+    #If Mac Then
+        Dim inBytesLeft As LongPtr:  inBytesLeft = LenB(str)
+        Dim outBytesLeft As LongPtr: outBytesLeft = inBytesLeft * 4
+        Dim buffer As String:        buffer = Space$(CLng(inBytesLeft) * 2)
+        Dim inBuf As LongPtr:        inBuf = StrPtr(str)
+        Dim outBuf As LongPtr:       outBuf = StrPtr(buffer)
+        Dim cd As LongPtr
+        
+        cd = iconv_open(StrPtr(CodePageToConversionDescriptorName(toCodePage)), _
+                        StrPtr(CodePageToConversionDescriptorName(fromCodePage)))
+
+        If iconv(cd, inBuf, inBytesLeft, outBuf, outBytesLeft) = -1 _
+        And raiseErrors Then
+            'TODO: Do stuff based on GetApiErrorNumber
+            Err.raise 5, methodName, _
+                "Input is invalid byte sequence of CodePage " & fromCodePage
+        Else
+            Transcode = LeftB$(buffer, LenB(buffer) - CLng(outBytesLeft))
+        End If
+        iconv_close cd
+    #Else
+        If toCodePage = cpId_utf_16 Then
+            Transcode = Decode(str, fromCodePage, raiseErrors)
+        ElseIf fromCodePage = cpId_utf_16 Then
+            Transcode = Encode(str, toCodePage, raiseErrors)
+        Else
+            Transcode = Encode(Decode(str, fromCodePage, raiseErrors), _
+                               toCodePage, raiseErrors)
+        End If
+    #End If
+End Function
+
+'Encoding a VBA-native UTF-16LE encoded string to any CodePage passed as the
+'toCodePage argument using the appropriate Windows or MacOS API function
+Public Function Encode(ByRef utf16leStr As String, _
+                       ByVal toCodePage As CodePageIdentifier, _
+              Optional ByVal raiseErrors As Boolean = False) As String
+    Const methodName As String = "Encode"
+    If utf16leStr = vbNullString Then Exit Function
+    #If Mac Then
+        Encode = Transcode(utf16leStr, toCodePage, cpId_utf_16, raiseErrors)
+    #Else
+        If raiseErrors Then SetLastError 0
+    
+        Dim byteCount As Long
+        byteCount = WideCharToMultiByte(toCodePage, 0, StrPtr(utf16leStr), _
+                                        -1, 0, 0, 0, 0) - 1
+        
+        If byteCount < 1 Then
+            If raiseErrors Then
+                'TODO: Do stuff based on GetApiErrorNumber
+                Err.raise 5, methodName, _
+                    "Input is invalid byte sequence of CodePage " & toCodePage
+            Else
+                Exit Function
+            End If
+        End If
+    
+        Encode = Space$((byteCount + 1) \ 2)
+    
+        If byteCount Mod 2 = 1 Then Encode = LeftB$(Encode, byteCount)
+    
+        WideCharToMultiByte toCodePage, 0, StrPtr(utf16leStr), -1, _
+                            StrPtr(Encode), byteCount, 0, 0
+    #End If
+End Function
+
+'Decoding a string from any CodePage passed as the fromCodePage argument to the
+'VBA-native UTF-16LE encoding using the appropriate Windows or MacOS API function
+Public Function Decode(ByRef str As String, _
+                       ByVal fromCodePage As CodePageIdentifier, _
+              Optional ByVal raiseErrors As Boolean = False) As String
+    Const methodName As String = "Decode"
+    If str = vbNullString Then Exit Function
+    #If Mac Then
+        Decode = Transcode(str, cpId_utf_16, fromCodePage, raiseErrors)
+    #Else
+        Dim charCount As Long
+        charCount = MultiByteToWideChar(fromCodePage, 0, StrPtr(str), _
+                                        LenB(str), 0, 0)
+    
+        If charCount < 1 Then
+            If raiseErrors Then
+                'TODO: Do stuff based on GetApiErrorNumber
+                Err.raise 5, methodName, _
+                    "Input is invalid byte sequence of CodePage " & fromCodePage
+            Else
+                Exit Function
+            End If
+        End If
+    
+        Decode = Space$(charCount)
+        MultiByteToWideChar fromCodePage, 0, StrPtr(str), LenB(str), _
+                            StrPtr(Decode), charCount
+    #End If
+End Function
 
 #If Mac = 0 Then
 'Returns strings defined as hex literal as string.
@@ -64,9 +614,10 @@ Public Function HexToString(ByVal hexStr As String) As String
     Const methodName As String = "HexToString"
     Dim s As String
     
-    s = " " & Replace(Replace(Replace(Replace(Replace(LCase(hexStr), _
-            "0x", " "), ",", " "), ";", " "), "-", " "), "+", " ") & " "
-            
+    s = Replace(Replace(Replace(Replace(Replace(Replace(LCase(hexStr), _
+            "&h", " "), "0x", " "), ",", " "), ";", " "), "-", " "), "+", " ")
+    s = " " & Replace(s, " ", "  ") & " "
+    
     With CreateObject("VBScript.RegExp")
         .Global = True
         .MultiLine = True
@@ -76,12 +627,12 @@ Public Function HexToString(ByVal hexStr As String) As String
     End With
     
     s = Replace(s, " ", "")
-    If Len(s) Mod 2 Then Err.Raise 5, methodName, _
+    If Len(s) Mod 2 Then Err.raise 5, methodName, _
             "Invalid Hex string literal. (Length is not even)"
     
     Dim mask As String: mask = Replace(Space(Len(s)), " ", "[a-f0-9]")
     
-    If Not s Like mask Then Err.Raise 5, methodName, _
+    If Not s Like mask Then Err.raise 5, methodName, _
         "Invalid Hex string literal. (Contains characters other than a-f & 0-9)"
     
     Dim i As Long
@@ -96,15 +647,23 @@ End Function
 
 'Converts the input string into a string of hex literals.
 'e.g.: "abc" will be turned into "0x610062006300" (UTF-16LE)
-Public Function StringToHex(ByVal str As String) As String
+Public Function StringToHex(ByVal s As String) As String
+    Static map(0 To 255) As String
+    Dim b() As Byte: b = s
     Dim i As Long
-    Dim b() As Byte:      b = str
-    Dim hexStr As String: hexStr = "0x" & Space(Len(str) * 4 + 2)
-
-    For i = 1 To UBound(b) + 1
-        Mid(hexStr, i * 2 + 1, 2) = Right$("0" & Hex$(b(i - 1)), 2)
+    
+    If LenB(map(0)) = 0 Then
+        For i = 0 To 255
+            map(i) = Right$("0" & Hex$(i), 2)
+        Next i
+    End If
+    
+    StringToHex = Space$(LenB(s) * 2 + 2)
+    Mid$(StringToHex, 1, 2) = "0x"
+    
+    For i = LBound(b) To UBound(b)
+        Mid$(StringToHex, (i + 1) * 2 + 1, 2) = map(b(i))
     Next i
-    StringToHex = hexStr
 End Function
 
 #If Mac = 0 Then
@@ -160,7 +719,6 @@ Public Function EncodeUnicodeCharacters(ByVal str As String) As String
     Dim j As Long:          j = 1
     Dim result() As String: ReDim result(1 To Len(str))
     
-    
     For i = 1 To Len(str)
         codepoint = AscW(Mid(str, i, 1)) And &HFFFF&
         
@@ -190,7 +748,7 @@ End Function
     If codepoint < &HD800& Then
         ChrU = ChrW$(codepoint)
     ElseIf codepoint < &HE000& And Not allowSingleSurrogates Then
-        Err.Raise 5, methodName, _
+        Err.raise 5, methodName, _
             "Invalid Unicode codepoint. (Range reserved for surrogate pairs)"
     ElseIf codepoint < &H10000 Then
         ChrU = ChrW$(codepoint)
@@ -199,7 +757,7 @@ End Function
         ChrU = ChrW$(&HD800& Or (codepoint \ &H400&)) & _
                ChrW$(&HDC00& Or (codepoint And &H3FF&))
     Else
-        Err.Raise 5, methodName, "Codepoint outside of valid Unicode range."
+        Err.raise 5, methodName, "Codepoint outside of valid Unicode range."
     End If
 End Function
 
@@ -321,7 +879,7 @@ Private Function EncodeUTF8native(ByVal utf16leStr As String, _
                 i = i + 1
             Else
                 If raiseErrors Then _
-                    Err.Raise 5, methodName, _
+                    Err.raise 5, methodName, _
                         "Invalid Unicode codepoint. (Lonely high surrogate)"
                 codepoint = &HFFFD&
             End If
@@ -330,21 +888,18 @@ Private Function EncodeUTF8native(ByVal utf16leStr As String, _
         If codepoint < &H80& Then
             utf8(j) = codepoint
             j = j + 1
-            
         ElseIf codepoint < &H800& Then
             utf8(j) = &HC0& Or ((codepoint And &H7C0&) \ &H40&)
             utf8(j + 1) = &H80& Or (codepoint And &H3F&)
             j = j + 2
-            
         ElseIf codepoint < &HDC00 Then
             utf8(j) = &HE0& Or ((codepoint And &HF000&) \ &H1000&)
             utf8(j + 1) = &H80& Or ((codepoint And &HFC0&) \ &H40&)
             utf8(j + 2) = &H80& Or (codepoint And &H3F&)
             j = j + 3
-            
         ElseIf codepoint < &HE000 Then
             If raiseErrors Then _
-                Err.Raise 5, methodName, _
+                Err.raise 5, methodName, _
                     "Invalid Unicode codepoint. (Lonely low surrogate)"
             codepoint = &HFFFD&
         ElseIf codepoint < &H10000 Then
@@ -352,7 +907,6 @@ Private Function EncodeUTF8native(ByVal utf16leStr As String, _
             utf8(j + 1) = &H80& Or ((codepoint And &HFC0&) \ &H40&)
             utf8(j + 2) = &H80& Or (codepoint And &H3F&)
             j = j + 3
-            
         Else
             utf8(j) = &HF0& Or ((codepoint And &H1C0000) \ &H40000)
             utf8(j + 1) = &H80& Or ((codepoint And &H3F000) \ &H1000&)
@@ -401,13 +955,13 @@ Private Function DecodeUTF8native(ByVal utf8Str As String, _
         numBytesOfCodePoint = numBytesOfCodePoints(codepoint)
         
         If numBytesOfCodePoint = 0 Then
-            If raiseErrors Then Err.Raise 5, methodName, "Invalid byte"
+            If raiseErrors Then Err.raise 5, methodName, "Invalid byte"
             GoTo insertErrChar
         ElseIf numBytesOfCodePoint = 1 Then
             utf16(j) = codepoint
             j = j + 2
         ElseIf i + numBytesOfCodePoint - 1 > UBound(utf8) Then
-            If raiseErrors Then Err.Raise 5, methodName, _
+            If raiseErrors Then Err.raise 5, methodName, _
                     "Incomplete UTF-8 codepoint at end of string."
             GoTo insertErrChar
         Else
@@ -420,35 +974,31 @@ Private Function DecodeUTF8native(ByVal utf8Str As String, _
                     codepoint = (codepoint * &H40&) + (currByte And &H3F)
                 Else
                     If raiseErrors Then _
-                        Err.Raise 5, methodName, "Invalid continuation byte"
+                        Err.raise 5, methodName, "Invalid continuation byte"
                     GoTo insertErrChar
                 End If
             Next k
             'Convert the Unicode codepoint to UTF-16LE bytes
             If codepoint < minCp(numBytesOfCodePoint) Then
-                If raiseErrors Then Err.Raise 5, methodName, "Overlong encoding"
+                If raiseErrors Then Err.raise 5, methodName, "Overlong encoding"
                 GoTo insertErrChar
-                
             ElseIf codepoint < &HD800& Then
                 utf16(j) = CByte(codepoint And &HFF&)
                 utf16(j + 1) = CByte(codepoint \ &H100&)
                 j = j + 2
-                
             ElseIf codepoint < &HE000& Then
-                If raiseErrors Then Err.Raise 5, methodName, _
+                If raiseErrors Then Err.raise 5, methodName, _
                 "Invalid Unicode codepoint.(Range reserved for surrogate pairs)"
                 GoTo insertErrChar
-                
             ElseIf codepoint < &H10000 Then
                 If codepoint = &HFEFF& Then GoTo nextCp '(BOM - will be ignored)
                 utf16(j) = codepoint And &HFF&
                 utf16(j + 1) = codepoint \ &H100&
                 j = j + 2
-                
             ElseIf codepoint < &H110000 Then 'Calculate surrogate pair
-                Dim m As Long:            m = codepoint - &H10000
-                Dim loSurrogate As Long:  loSurrogate = &HDC00& Or (m And &H3FF)
-                Dim hiSurrogate As Long:  hiSurrogate = &HD800& Or (m \ &H400&)
+                Dim m As Long:           m = codepoint - &H10000
+                Dim loSurrogate As Long: loSurrogate = &HDC00& Or (m And &H3FF)
+                Dim hiSurrogate As Long: hiSurrogate = &HD800& Or (m \ &H400&)
                 
                 utf16(j) = hiSurrogate And &HFF&
                 utf16(j + 1) = hiSurrogate \ &H100&
@@ -456,7 +1006,7 @@ Private Function DecodeUTF8native(ByVal utf8Str As String, _
                 utf16(j + 3) = loSurrogate \ &H100&
                 j = j + 4
             Else
-                If raiseErrors Then Err.Raise 5, methodName, _
+                If raiseErrors Then Err.raise 5, methodName, _
                         "Codepoint outside of valid Unicode range"
 insertErrChar:  utf16(j) = &HFD
                 utf16(j + 1) = &HFF
@@ -504,37 +1054,6 @@ Private Function DecodeUTF8usingAdodbStream(ByVal utf8Str As String) As String
         .Close
     End With
 End Function
-
-'Transcoding a VBA-native UTF-16LE encoded string to UTF-8 using the Windows API
-'Even faster than EncodeUTF8usingAdodbStream, (Windows only)
-Private Function EncodeUTF8usingWinAPI(ByVal utf16leStr As String) As String
-    Const CP_UTF8 As Long = 65001
-    Dim utf8Len As Long
-    Dim utf8() As Byte
-
-    utf8Len = _
-        WideCharToMultiByte(CP_UTF8, 0, StrPtr(utf16leStr), -1, 0, 0, 0, 0) - 1
-    If utf8Len <= 0 Then Exit Function
-    ReDim utf8(utf8Len - 1)
-    WideCharToMultiByte CP_UTF8, 0, StrPtr(utf16leStr), -1, VarPtr(utf8(0)), _
-                                                                   utf8Len, 0, 0
-    EncodeUTF8usingWinAPI = utf8
-End Function
-
-'Transcoding an UTF-8 encoded string to VBA-native UTF-16LE using the Windows API
-'Even faster than DecodeUTF8usingAdodbStream, (Windows only)
-Private Function DecodeUTF8usingWinAPI(ByVal utf8Str As String) As String
-    Const CP_UTF8 As Long = 65001
-    Dim sLen As Long
-    Dim utf8() As Byte: utf8 = utf8Str
-    
-    sLen = MultiByteToWideChar(CP_UTF8, 0, VarPtr(utf8(0)), LenB(utf8Str), 0, 0)
-    If sLen <= 0 Then Exit Function
-    
-    DecodeUTF8usingWinAPI = String$(sLen, 0)
-    MultiByteToWideChar CP_UTF8, 0, VarPtr(utf8(0)), LenB(utf8Str), _
-                                             StrPtr(DecodeUTF8usingWinAPI), sLen
-End Function
 #End If
 
 'Function transcoding an VBA-native UTF-16LE encoded string to UTF-32
@@ -561,19 +1080,18 @@ Public Function EncodeUTF32LE(ByVal utf16leStr As String, _
                             (lowSurrogate - &HDC00&) + &H10000
                 i = i + 1
             Else
-                If raiseErrors Then Err.Raise 5, methodName, _
+                If raiseErrors Then Err.raise 5, methodName, _
                     "Invalid Unicode codepoint. (Lonely high surrogate)"
                 codepoint = &HFFFD&
             End If
         End If
         
         If codepoint >= &HD800& And codepoint < &HE000& Then
-            If raiseErrors Then Err.Raise 5, methodName, _
+            If raiseErrors Then Err.raise 5, methodName, _
                 "Invalid Unicode codepoint. (Lonely low surrogate)"
             codepoint = &HFFFD&
-            
         ElseIf codepoint > &H10FFFF Then
-            If raiseErrors Then Err.Raise 5, methodName, _
+            If raiseErrors Then Err.raise 5, methodName, _
                 "Codepoint outside of valid Unicode range"
             codepoint = &HFFFD&
         End If
@@ -605,7 +1123,7 @@ Public Function DecodeUTF32LE(ByVal utf32str As String, _
         Else
             If utf32(i + 3) <> 0 Then
                 If raiseErrors Then _
-                    Err.Raise 5, methodName, _
+                    Err.raise 5, methodName, _
                     "Codepoint outside of valid Unicode range"
                 codepoint = &HFFFD&
             Else
@@ -613,13 +1131,13 @@ Public Function DecodeUTF32LE(ByVal utf32str As String, _
                             utf32(i + 1) * &H100& + utf32(i)
                 If codepoint >= &HD800& And codepoint < &HE000& Then
                     If raiseErrors Then _
-                        Err.Raise 5, methodName, _
+                        Err.raise 5, methodName, _
                         "Invalid Unicode codepoint. " & _
                         "(Range reserved for surrogate pairs)"
                     codepoint = &HFFFD&
                 ElseIf codepoint > &H10FFFF Then
                     If raiseErrors Then _
-                        Err.Raise 5, methodName, _
+                        Err.raise 5, methodName, _
                         "Codepoint outside of valid Unicode range"
                     codepoint = &HFFFD&
                 End If
@@ -655,10 +1173,8 @@ Public Function RandomStringAlphanumeric(ByVal Length As Long) As String
         Select Case Rnd
             Case Is < 0.41935
                 Do: char = 25 * Rnd + 65: Loop Until char <> 0
-                
             Case Is < 0.83871
                 Do: char = 25 * Rnd + 97: Loop Until char <> 0
-                
             Case Else
                 Do: char = 9 * Rnd + 48: Loop Until char <> 0
         End Select
@@ -889,13 +1405,24 @@ Public Function SplitUnlessInQuotes(ByVal str As String, _
 End Function
 
 'Adds fillerChars to the right side of a string to make it the specified length
-Public Function ReDimPreserveString(str As String, _
-                              ByVal Length As Long, _
-                     Optional ByVal fillerChar As String = " ") As String
+Public Function PadRight(ByVal str As String, _
+                         ByVal Length As Long, _
+                Optional ByVal fillerChar As String = " ") As String
     If Length > Len(str) Then
-        ReDimPreserveString = str & String(Length - Len(str), fillerChar)
+        PadRight = str & String(Length - Len(str), fillerChar)
     Else
-        ReDimPreserveString = Left(str, Length)
+        PadRight = Left(str, Length)
+    End If
+End Function
+
+'Adds fillerChars to the left side of a string to make it the specified length
+Public Function PadLeft(ByVal str As String, _
+                        ByVal Length As Long, _
+               Optional ByVal fillerChar As String = " ") As String
+    If Length > Len(str) Then
+        PadLeft = String(Length - Len(str), fillerChar) & str
+    Else
+        PadLeft = Right(str, Length)
     End If
 End Function
 
@@ -920,30 +1447,29 @@ Private Sub TestEncodersAndDecoders()
     Dim utf16AsciiOnly As String: utf16AsciiOnly = RandomStringASCII(STR_LENGTH)
     
     'VBA natively implemented Encoders/Decoders
-    Debug.Print "UTF-8 Encoder/Decoder Test Basic Multilingual Plane: " & _
+    Debug.Print "Native UTF-8 Encoder/Decoder Test Basic Multilingual Plane: " & _
         IIf(DecodeUTF8native(EncodeUTF8native(bmpUnicode)) = bmpUnicode, "passed", "failed")
         
-    #If Mac = 0 Then
-        Debug.Print "UTF-8 Encoder/Decoder 2 Test Basic Multilingual Plane: " & _
-            IIf(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(bmpUnicode)) = bmpUnicode, "passed", "failed")
-            
-        Debug.Print "UTF-8 Encoder/Decoder 3 Test Basic Multilingual Plane: " & _
-            IIf(DecodeUTF8usingWinAPI(EncodeUTF8usingAdodbStream(bmpUnicode)) = bmpUnicode, "passed", "failed")
-    #End If
-    
+     Debug.Print "ADODB.Stream UTF-8 Encoder/Decoder Test Basic Multilingual Plane: " & _
+         IIf(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(bmpUnicode)) = bmpUnicode, "passed", "failed")
+         
+     Debug.Print "API UTF-8 Encoder/Decoder Test Basic Multilingual Plane: " & _
+         IIf(Decode(Encode(bmpUnicode, cpId_utf_8), cpId_utf_8) = bmpUnicode, "passed", "failed")
+
     Debug.Print "UTF-32 Encoder/Decoder Test Basic Multilingual Plane: " & _
         IIf(DecodeUTF32LE(EncodeUTF32LE(bmpUnicode)) = bmpUnicode, "passed", "failed")
         
-    Debug.Print "UTF-8 Encoder/Decoder Test full Unicode: " & _
+        
+    Debug.Print "Native UTF-8 Encoder/Decoder Test full Unicode: " & _
         IIf(DecodeUTF8native(EncodeUTF8native(fullUnicode)) = fullUnicode, "passed", "failed")
     
     #If Mac = 0 Then
-        Debug.Print "UTF-8 Encoder/Decoder 2 Test full Unicode: " & _
+        Debug.Print "ADODB.Stream UTF-8 Encoder/Decoder Test full Unicode: " & _
             IIf(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(fullUnicode)) = fullUnicode, "passed", "failed")
-            
-        Debug.Print "UTF-8 Encoder/Decoder 3 Test full Unicode: " & _
-            IIf(DecodeUTF8usingWinAPI(EncodeUTF8usingWinAPI(fullUnicode)) = fullUnicode, "passed", "failed")
     #End If
+    
+    Debug.Print "API UTF-8 Encoder/Decoder Test full Unicode: " & _
+        IIf(Decode(Encode(fullUnicode, cpId_utf_8), cpId_utf_8) = fullUnicode, "passed", "failed")
     
     Debug.Print "UTF-32 Encoder/Decoder Test full Unicode: " & _
         IIf(DecodeUTF32LE(EncodeUTF32LE(fullUnicode)) = fullUnicode, "passed", "failed")
@@ -953,11 +1479,8 @@ Private Sub TestEncodersAndDecoders()
 End Sub
 
 Private Sub TestUTF8EncodersPerformance()
-    Dim startTime As Currency
-    Dim endTime As Currency
-    Dim perSecond As Currency
-    Dim timeElapsed As Double
-    getFrequency perSecond
+    Dim t As Currency
+    
     Application.EnableCancelKey = xlInterrupt
     
     Dim numRepetitions As Variant: numRepetitions = VBA.Array(100000, 1000, 10)
@@ -982,44 +1505,34 @@ Private Sub TestUTF8EncodersPerformance()
                       strLength & " " & numReps & " times."
                       
         'VBA Native UTF-8 Encoder:
-        getTime startTime
+        t = AccurateTimer
         For j = 1 To numReps
             EncodeUTF8native s
         Next j
-        getTime endTime
-        timeElapsed = (endTime - startTime) / perSecond
-        Debug.Print "EncodeUTF8native took: " & timeElapsed & description
-        
+        Debug.Print "EncodeUTF8native took: " & AccurateTimer - t & description
+            
         #If Mac = 0 Then
             'ADODB.Stream UTF-8 Encoder:
-            getTime startTime
+            t = AccurateTimer
             For j = 1 To numReps
                 EncodeUTF8usingAdodbStream s
             Next j
-            getTime endTime
-            timeElapsed = (endTime - startTime) / perSecond
-            Debug.Print "EncodeUTF8usingAdodbStream took: " & timeElapsed & description
-            
-            'Windows API UTF-8 Encoder:
-            getTime startTime
-            For j = 1 To numReps
-                EncodeUTF8usingWinAPI s
-            Next j
-            getTime endTime
-            timeElapsed = (endTime - startTime) / perSecond
-            Debug.Print "EncodeUTF8usingWinAPI took: " & timeElapsed & description
+            Debug.Print "EncodeUTF8usingAdodbStream took: " & AccurateTimer - t & description
         #End If
+        
+        'Windows API UTF-8 Encoder:
+        t = AccurateTimer
+        For j = 1 To numReps
+            Encode s, cpId_utf_8
+        Next j
+        Debug.Print "EncodeUTF8usingAPI took: " & AccurateTimer - t & description
+        
         DoEvents
     Next i
 End Sub
 
-
 Private Sub TestUTF8DecodersPerformance()
-    Dim startTime As Currency
-    Dim endTime As Currency
-    Dim perSecond As Currency
-    Dim timeElapsed As Double
-    getFrequency perSecond
+    Dim t As Currency
     Application.EnableCancelKey = xlInterrupt
     
     Dim numRepetitions As Variant: numRepetitions = VBA.Array(100000, 1000, 10)
@@ -1045,43 +1558,34 @@ Private Sub TestUTF8DecodersPerformance()
                       strLength & " " & numReps & " times."
                       
         'VBA Native UTF-8 Decoder:
-        getTime startTime
+        t = AccurateTimer
         For j = 1 To numReps
             DecodeUTF8native s
         Next j
-        getTime endTime
-        timeElapsed = (endTime - startTime) / perSecond
-        Debug.Print "DecodeUTF8native took: " & timeElapsed & description
+        Debug.Print "DecodeUTF8native took: " & AccurateTimer - t & description
         
         #If Mac = 0 Then
             'ADODB.Stream UTF-8 Decoder:
-            getTime startTime
+            t = AccurateTimer
             For j = 1 To numReps
                 DecodeUTF8usingAdodbStream s
             Next j
-            getTime endTime
-            timeElapsed = (endTime - startTime) / perSecond
-            Debug.Print "DecodeUTF8usingAdodbStream took: " & timeElapsed & description
-            
-            'Windows API UTF-8 Decoder:
-            getTime startTime
-            For j = 1 To numReps
-                DecodeUTF8usingWinAPI s
-            Next j
-            getTime endTime
-            timeElapsed = (endTime - startTime) / perSecond
-            Debug.Print "DecodeUTF8usingWinAPI took: " & timeElapsed & description
+            Debug.Print "DecodeUTF8usingAdodbStream took: " & AccurateTimer - t & description
         #End If
+        
+        'Windows API UTF-8 Decoder:
+        t = AccurateTimer
+        For j = 1 To numReps
+            Decode s, cpId_utf_8
+        Next j
+        Debug.Print "DecodeUTF8usingWinAPI took: " & AccurateTimer - t & description
+        
         DoEvents
     Next i
 End Sub
 
 Private Sub TestUTF32EncodersAndDecodersPerformance()
-    Dim startTime As Currency
-    Dim endTime As Currency
-    Dim perSecond As Currency
-    Dim timeElapsed As Double
-    getFrequency perSecond
+    Dim t As Currency
     Application.EnableCancelKey = xlInterrupt
     
     Dim numRepetitions As Variant: numRepetitions = VBA.Array(100000, 1000, 10)
@@ -1108,34 +1612,26 @@ Private Sub TestUTF32EncodersAndDecodersPerformance()
                       strLength & " " & numReps & " times."
                       
         'VBA Native UTF-32 Encoder:
-        getTime startTime
+        t = AccurateTimer
         For j = 1 To numReps
             EncodeUTF32LE s
         Next j
-        getTime endTime
-        timeElapsed = (endTime - startTime) / perSecond
-        Debug.Print "EncodeUTF32LE took: " & timeElapsed & description
+        Debug.Print "EncodeUTF32LE took: " & AccurateTimer - t & description
         
 
         'VBA Native UTF-32 Decoder:
-        getTime startTime
+        t = AccurateTimer
         For j = 1 To numReps
             DecodeUTF32LE s2
         Next j
-        getTime endTime
-        timeElapsed = (endTime - startTime) / perSecond
-        Debug.Print "DecodeUTF32LE took: " & timeElapsed & description
+        Debug.Print "DecodeUTF32LE took: " & AccurateTimer - t & description
 
         DoEvents
     Next i
 End Sub
 
 Private Sub TestANSIEncodersAndDecodersPerformance()
-    Dim startTime As Currency
-    Dim endTime As Currency
-    Dim perSecond As Currency
-    Dim timeElapsed As Double
-    getFrequency perSecond
+    Dim t As Currency
     Application.EnableCancelKey = xlInterrupt
     
     Dim numRepetitions As Variant: numRepetitions = VBA.Array(100000, 1000, 10)
@@ -1162,23 +1658,19 @@ Private Sub TestANSIEncodersAndDecodersPerformance()
                       strLength & " " & numReps & " times."
                       
         'VBA Native UTF-32 Encoder:
-        getTime startTime
+        t = AccurateTimer
         For j = 1 To numReps
             EncodeANSI s
         Next j
-        getTime endTime
-        timeElapsed = (endTime - startTime) / perSecond
-        Debug.Print "EncodeANSI took: " & timeElapsed & description
+        Debug.Print "EncodeANSI took: " & AccurateTimer - t & description
         
 
         'VBA Native UTF-32 Decoder:
-        getTime startTime
+        t = AccurateTimer
         For j = 1 To numReps
             DecodeANSI s2
         Next j
-        getTime endTime
-        timeElapsed = (endTime - startTime) / perSecond
-        Debug.Print "DecodeANSI took: " & timeElapsed & description
+        Debug.Print "DecodeANSI took: " & AccurateTimer - t & description
 
         DoEvents
     Next i
@@ -1205,4 +1697,36 @@ Private Sub TestDifferentWaysOfGettingNumericalValuesFromStrings()
     #End If
 End Sub
 
+Private Sub TestHexToString()
+    Dim utf16leTestHexString As String
+    utf16leTestHexString = "0x3DD800DE3DD869DC0D203DD869DC3ED8B2DD3DD869DC3DD869DC0D203DD869DC0D203DD867DC0D203DD866DC3ED8B2DD0D203DD869DC0D203DD867DC0D203DD866DC3ED8B2DD0D203DD867DC0D203DD866DC55006E00690063006F006400650053007500700070006F007200740000D800DC6500730074003DD800DE0D203DD869DC3DD869DC0D203DD869DC0D203DD867DC0D203DD866DC3DD881DC3CD8FCDF0D2040260FFE3ED8D4DD3CD8FBDF0D2042260FFE3DD869DC0D2064270FFE0D203DD868DC3CD8C3DF3CD8FBDF0D2040260FFE"
+    
+    utf16leTestHexString = "0xA A A"
+    
+    Dim s As String
+    s = HexToString(utf16leTestHexString)
+    Debug.Print s
+End Sub
+
+Function GetTickCount() As Currency
+    #If Mac Then
+        GetTickCount = mach_continuous_time()
+    #Else
+        QueryPerformanceCounter GetTickCount
+    #End If
+End Function
+
+Function GetFrequency() As Currency
+    #If Mac Then
+        Dim timebaseInfo As MachTimebaseInfo
+        mach_timebase_info timebaseInfo
+        GetFrequency = (timebaseInfo.Denominator / timebaseInfo.Numerator) * 100000#
+    #Else
+        QueryPerformanceFrequency GetFrequency
+    #End If
+End Function
+
+Function AccurateTimer() As Currency
+    AccurateTimer = GetTickCount / GetFrequency
+End Function
 
