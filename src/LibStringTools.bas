@@ -647,6 +647,7 @@ End Function
 
 'Converts the input string into a string of hex literals.
 'e.g.: "abc" will be turned into "0x610062006300" (UTF-16LE)
+'e.g.: StrConv("ABC", vbFromUnicode) will be turned into "0x414243"
 Public Function StringToHex(ByVal s As String) As String
     Static map(0 To 255) As String
     Dim b() As Byte: b = s
