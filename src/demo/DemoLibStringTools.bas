@@ -63,6 +63,8 @@ Sub DemonstrateHexString()
     'Convert back and check if it stayed the same
     s = ReplaceUnicodeLiterals(s)
     Debug.Assert s = ThisWorkbook.Worksheets("Sheet1").Cells(1, 1)
+    
+    Err.LastDllError
 End Sub
 
 

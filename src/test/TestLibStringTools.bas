@@ -105,7 +105,7 @@ Private Sub TestEncodersAndDecoders()
          IIf(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(bmpUnicode)) = bmpUnicode, "passed", "failed")
          
      Debug.Print "API UTF-8 Encoder/Decoder Test Basic Multilingual Plane: " & _
-         IIf(Decode(Encode(bmpUnicode, cpId_utf_8), cpId_utf_8) = bmpUnicode, "passed", "failed")
+         IIf(Decode(Encode(bmpUnicode, cpUTF_8), cpUTF_8) = bmpUnicode, "passed", "failed")
 
     Debug.Print "UTF-32 Encoder/Decoder Test Basic Multilingual Plane: " & _
         IIf(DecodeUTF32LE(EncodeUTF32LE(bmpUnicode)) = bmpUnicode, "passed", "failed")
@@ -120,7 +120,7 @@ Private Sub TestEncodersAndDecoders()
     #End If
     
     Debug.Print "API UTF-8 Encoder/Decoder Test full Unicode: " & _
-        IIf(Decode(Encode(fullUnicode, cpId_utf_8), cpId_utf_8) = fullUnicode, "passed", "failed")
+        IIf(Decode(Encode(fullUnicode, cpUTF_8), cpUTF_8) = fullUnicode, "passed", "failed")
     
     Debug.Print "UTF-32 Encoder/Decoder Test full Unicode: " & _
         IIf(DecodeUTF32LE(EncodeUTF32LE(fullUnicode)) = fullUnicode, "passed", "failed")
@@ -174,7 +174,7 @@ Private Sub TestUTF8EncodersPerformance()
         'Windows API UTF-8 Encoder:
         t = AccurateTimer
         For j = 1 To numReps
-            Encode s, cpId_utf_8
+            Encode s, cpUTF_8
         Next j
         Debug.Print "EncodeUTF8usingAPI took: " & AccurateTimer - t & description
         
@@ -227,7 +227,7 @@ Private Sub TestUTF8DecodersPerformance()
         'Windows API UTF-8 Decoder:
         t = AccurateTimer
         For j = 1 To numReps
-            Decode s, cpId_utf_8
+            Decode s, cpUTF_8
         Next j
         Debug.Print "DecodeUTF8usingWinAPI took: " & AccurateTimer - t & description
         

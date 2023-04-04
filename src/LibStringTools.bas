@@ -76,157 +76,157 @@ Option Explicit
 Public Enum CodePageIdentifier
     [_first_]
 'Enum_Name   Identifier             '.NET Name               Additional information
-    cpId_IBM037 = 37                     'IBM037                  IBM EBCDIC US-Canada
-    cpId_IBM437 = 437                    'IBM437                  OEM United States
-    cpId_IBM500 = 500                    'IBM500                  IBM EBCDIC International
-    cpId_ASMO_708 = 708                  'ASMO-708                Arabic (ASMO 708)
-    cpId_ASMO_449 = 709                  '                        Arabic (ASMO-449+, BCON V4)
-    cpId_Transparent_Arabic = 710        '                        Arabic - Transparent Arabic
-    cpId_DOS_720 = 720                   'DOS-720                 Arabic (Transparent ASMO); Arabic (DOS)
-    cpId_ibm737 = 737                    'ibm737                  OEM Greek (formerly 437G); Greek (DOS)
-    cpId_ibm775 = 775                    'ibm775                  OEM Baltic; Baltic (DOS)
-    cpId_ibm850 = 850                    'ibm850                  OEM Multilingual Latin 1; Western European (DOS)
-    cpId_ibm852 = 852                    'ibm852                  OEM Latin 2; Central European (DOS)
-    cpId_IBM855 = 855                    'IBM855                  OEM Cyrillic (primarily Russian)
-    cpId_ibm857 = 857                    'ibm857                  OEM Turkish; Turkish (DOS)
-    cpId_IBM00858 = 858                  'IBM00858                OEM Multilingual Latin 1 + Euro symbol
-    cpId_IBM860 = 860                    'IBM860                  OEM Portuguese; Portuguese (DOS)
-    cpId_ibm861 = 861                    'ibm861                  OEM Icelandic; Icelandic (DOS)
-    cpId_DOS_862 = 862                   'DOS-862                 OEM Hebrew; Hebrew (DOS)
-    cpId_IBM863 = 863                    'IBM863                  OEM French Canadian; French Canadian (DOS)
-    cpId_IBM864 = 864                    'IBM864                  OEM Arabic; Arabic (864)
-    cpId_IBM865 = 865                    'IBM865                  OEM Nordic; Nordic (DOS)
-    cpId_cp866 = 866                     'cp866                   OEM Russian; Cyrillic (DOS)
-    cpId_ibm869 = 869                    'ibm869                  OEM Modern Greek; Greek, Modern (DOS)
-    cpId_IBM870 = 870                    'IBM870                  IBM EBCDIC Multilingual/ROECE (Latin 2); IBM EBCDIC Multilingual Latin 2
-    cpId_windows_874 = 874               'windows-874             Thai (Windows)
-    cpId_cp875 = 875                     'cp875                   IBM EBCDIC Greek Modern
-    cpId_shift_jis = 932                 'shift_jis               ANSI/OEM Japanese; Japanese (Shift-JIS)
-    cpId_gb2312 = 936                    'gb2312                  ANSI/OEM Simplified Chinese (PRC, Singapore); Chinese Simplified (GB2312)
-    cpId_ks_c_5601_1987 = 949            'ks_c_5601-1987          ANSI/OEM Korean (Unified Hangul Code)
-    cpId_big5 = 950                      'big5                    ANSI/OEM Traditional Chinese (Taiwan; Hong Kong SAR, PRC); Chinese Traditional (Big5)
-    cpId_IBM1026 = 1026                  'IBM1026                 IBM EBCDIC Turkish (Latin 5)
-    cpId_IBM01047 = 1047                 'IBM01047                IBM EBCDIC Latin 1/Open System
-    cpId_IBM01140 = 1140                 'IBM01140                IBM EBCDIC US-Canada (037 + Euro symbol); IBM EBCDIC (US-Canada-Euro)
-    cpId_IBM01141 = 1141                 'IBM01141                IBM EBCDIC Germany (20273 + Euro symbol); IBM EBCDIC (Germany-Euro)
-    cpId_IBM01142 = 1142                 'IBM01142                IBM EBCDIC Denmark-Norway (20277 + Euro symbol); IBM EBCDIC (Denmark-Norway-Euro)
-    cpId_IBM01143 = 1143                 'IBM01143                IBM EBCDIC Finland-Sweden (20278 + Euro symbol); IBM EBCDIC (Finland-Sweden-Euro)
-    cpId_IBM01144 = 1144                 'IBM01144                IBM EBCDIC Italy (20280 + Euro symbol); IBM EBCDIC (Italy-Euro)
-    cpId_IBM01145 = 1145                 'IBM01145                IBM EBCDIC Latin America-Spain (20284 + Euro symbol); IBM EBCDIC (Spain-Euro)
-    cpId_IBM01146 = 1146                 'IBM01146                IBM EBCDIC United Kingdom (20285 + Euro symbol); IBM EBCDIC (UK-Euro)
-    cpId_IBM01147 = 1147                 'IBM01147                IBM EBCDIC France (20297 + Euro symbol); IBM EBCDIC (France-Euro)
-    cpId_IBM01148 = 1148                 'IBM01148                IBM EBCDIC International (500 + Euro symbol); IBM EBCDIC (International-Euro)
-    cpId_IBM01149 = 1149                 'IBM01149                IBM EBCDIC Icelandic (20871 + Euro symbol); IBM EBCDIC (Icelandic-Euro)
-    cpId_utf_16 = 1200                   'utf-16                  Unicode UTF-16, little endian byte order (BMP of ISO 10646); available only to managed applications
-    cpId_unicodeFFFE = 1201              'unicodeFFFE             Unicode UTF-16, big endian byte order; available only to managed applications
-    cpId_windows_1250 = 1250             'windows-1250            ANSI Central European; Central European (Windows)
-    cpId_windows_1251 = 1251             'windows-1251            ANSI Cyrillic; Cyrillic (Windows)
-    cpId_windows_1252 = 1252             'windows-1252            ANSI Latin 1; Western European (Windows)
-    cpId_windows_1253 = 1253             'windows-1253            ANSI Greek; Greek (Windows)
-    cpId_windows_1254 = 1254             'windows-1254            ANSI Turkish; Turkish (Windows)
-    cpId_windows_1255 = 1255             'windows-1255            ANSI Hebrew; Hebrew (Windows)
-    cpId_windows_1256 = 1256             'windows-1256            ANSI Arabic; Arabic (Windows)
-    cpId_windows_1257 = 1257             'windows-1257            ANSI Baltic; Baltic (Windows)
-    cpId_windows_1258 = 1258             'windows-1258            ANSI/OEM Vietnamese; Vietnamese (Windows)
-    cpId_Johab = 1361                    'Johab                   Korean (Johab)
-    cpId_macintosh = 10000               'macintosh               MAC Roman; Western European (Mac)
-    cpId_x_mac_japanese = 10001          'x-mac-japanese          Japanese (Mac)
-    cpId_x_mac_chinesetrad = 10002       'x-mac-chinesetrad       MAC Traditional Chinese (Big5); Chinese Traditional (Mac)
-    cpId_x_mac_korean = 10003            'x-mac-korean            Korean (Mac)
-    cpId_x_mac_arabic = 10004            'x-mac-arabic            Arabic (Mac)
-    cpId_x_mac_hebrew = 10005            'x-mac-hebrew            Hebrew (Mac)
-    cpId_x_mac_greek = 10006             'x-mac-greek             Greek (Mac)
-    cpId_x_mac_cyrillic = 10007          'x-mac-cyrillic          Cyrillic (Mac)
-    cpId_x_mac_chinesesimp = 10008       'x-mac-chinesesimp       MAC Simplified Chinese (GB 2312); Chinese Simplified (Mac)
-    cpId_x_mac_romanian = 10010          'x-mac-romanian          Romanian (Mac)
-    cpId_x_mac_ukrainian = 10017         'x-mac-ukrainian         Ukrainian (Mac)
-    cpId_x_mac_thai = 10021              'x-mac-thai              Thai (Mac)
-    cpId_x_mac_ce = 10029                'x-mac-ce                MAC Latin 2; Central European (Mac)
-    cpId_x_mac_icelandic = 10079         'x-mac-icelandic         Icelandic (Mac)
-    cpId_x_mac_turkish = 10081           'x-mac-turkish           Turkish (Mac)
-    cpId_x_mac_croatian = 10082          'x-mac-croatian          Croatian (Mac)
-    cpId_utf_32 = 12000                  'utf-32                  Unicode UTF-32, little endian byte order; available only to managed applications
-    cpId_utf_32BE = 12001                'utf-32BE                Unicode UTF-32, big endian byte order; available only to managed applications
-    cpId_x_Chinese_CNS = 20000           'x-Chinese_CNS           CNS Taiwan; Chinese Traditional (CNS)
-    cpId_x_cp20001 = 20001               'x-cp20001               TCA Taiwan
-    cpId_x_Chinese_Eten = 20002          'x_Chinese-Eten          Eten Taiwan; Chinese Traditional (Eten)
-    cpId_x_cp20003 = 20003               'x-cp20003               IBM5550 Taiwan
-    cpId_x_cp20004 = 20004               'x-cp20004               TeleText Taiwan
-    cpId_x_cp20005 = 20005               'x-cp20005               Wang Taiwan
-    cpId_x_IA5 = 20105                   'x-IA5                   IA5 (IRV International Alphabet No. 5, 7-bit); Western European (IA5)
-    cpId_x_IA5_German = 20106            'x-IA5-German            IA5 German (7-bit)
-    cpId_x_IA5_Swedish = 20107           'x-IA5-Swedish           IA5 Swedish (7-bit)
-    cpId_x_IA5_Norwegian = 20108         'x-IA5-Norwegian         IA5 Norwegian (7-bit)
-    cpId_us_ascii = 20127                'us-ascii                US-ASCII (7-bit)
-    cpId_x_cp20261 = 20261               'x-cp20261               T.61
-    cpId_x_cp20269 = 20269               'x-cp20269               ISO 6937 Non-Spacing Accent
-    cpId_IBM273 = 20273                  'IBM273                  IBM EBCDIC Germany
-    cpId_IBM277 = 20277                  'IBM277                  IBM EBCDIC Denmark-Norway
-    cpId_IBM278 = 20278                  'IBM278                  IBM EBCDIC Finland-Sweden
-    cpId_IBM280 = 20280                  'IBM280                  IBM EBCDIC Italy
-    cpId_IBM284 = 20284                  'IBM284                  IBM EBCDIC Latin America-Spain
-    cpId_IBM285 = 20285                  'IBM285                  IBM EBCDIC United Kingdom
-    cpId_IBM290 = 20290                  'IBM290                  IBM EBCDIC Japanese Katakana Extended
-    cpId_IBM297 = 20297                  'IBM297                  IBM EBCDIC France
-    cpId_IBM420 = 20420                  'IBM420                  IBM EBCDIC Arabic
-    cpId_IBM423 = 20423                  'IBM423                  IBM EBCDIC Greek
-    cpId_IBM424 = 20424                  'IBM424                  IBM EBCDIC Hebrew
-    cpId_x_EBCDIC_KoreanExtended = 20833 'x-EBCDIC-KoreanExtended IBM EBCDIC Korean Extended
-    cpId_IBM_Thai = 20838                'IBM-Thai                IBM EBCDIC Thai
-    cpId_koi8_r = 20866                  'koi8-r                  Russian (KOI8-R); Cyrillic (KOI8-R)
-    cpId_IBM871 = 20871                  'IBM871                  IBM EBCDIC Icelandic
-    cpId_IBM880 = 20880                  'IBM880                  IBM EBCDIC Cyrillic Russian
-    cpId_IBM905 = 20905                  'IBM905                  IBM EBCDIC Turkish
-    cpId_IBM00924 = 20924                'IBM00924                IBM EBCDIC Latin 1/Open System (1047 + Euro symbol)
-    cpId_euc_jp = 20932                  'EUC-JP                  Japanese (JIS 0208-1990 and 0212-1990)
-    cpId_x_cp20936 = 20936               'x-cp20936               Simplified Chinese (GB2312); Chinese Simplified (GB2312-80)
-    cpId_x_cp20949 = 20949               'x-cp20949               Korean Wansung
-    cpId_cp1025 = 21025                  'cp1025                  IBM EBCDIC Cyrillic Serbian-Bulgarian
-    cpId_deprecated = 21027              '                        (deprecated)
-    cpId_koi8_u = 21866                  'koi8-u                  Ukrainian (KOI8-U); Cyrillic (KOI8-U)
-    cpId_iso_8859_1 = 28591              'iso-8859-1              ISO 8859-1 Latin 1; Western European (ISO)
-    cpId_iso_8859_2 = 28592              'iso-8859-2              ISO 8859-2 Central European; Central European (ISO)
-    cpId_iso_8859_3 = 28593              'iso-8859-3              ISO 8859-3 Latin 3
-    cpId_iso_8859_4 = 28594              'iso-8859-4              ISO 8859-4 Baltic
-    cpId_iso_8859_5 = 28595              'iso-8859-5              ISO 8859-5 Cyrillic
-    cpId_iso_8859_6 = 28596              'iso-8859-6              ISO 8859-6 Arabic
-    cpId_iso_8859_7 = 28597              'iso-8859-7              ISO 8859-7 Greek
-    cpId_iso_8859_8 = 28598              'iso-8859-8              ISO 8859-8 Hebrew; Hebrew (ISO-Visual)
-    cpId_iso_8859_9 = 28599              'iso-8859-9              ISO 8859-9 Turkish
-    cpId_iso_8859_13 = 28603             'iso-8859-13             ISO 8859-13 Estonian
-    cpId_iso_8859_15 = 28605             'iso-8859-15             ISO 8859-15 Latin 9
-    cpId_x_Europa = 29001                'x-Europa                Europa 3
-    cpId_iso_8859_8_i = 38598            'iso-8859-8-i            ISO 8859-8 Hebrew; Hebrew (ISO-Logical)
-    cpId_iso_2022_jp = 50220             'iso-2022-jp             ISO 2022 Japanese with no halfwidth Katakana; Japanese (JIS)
-    cpId_csISO2022JP = 50221             'csISO2022JP             ISO 2022 Japanese with halfwidth Katakana; Japanese (JIS-Allow 1 byte Kana)
-    cpId_iso_2022_jp_w_1b_Kana = 50222   'iso-2022-jp             ISO 2022 Japanese JIS X 0201-1989; Japanese (JIS-Allow 1 byte Kana - SO/SI)
-    cpId_iso_2022_kr = 50225             'iso-2022-kr             ISO 2022 Korean
-    cpId_x_cp50227 = 50227               'x-cp50227               ISO 2022 Simplified Chinese; Chinese Simplified (ISO 2022)
-    cpId_ISO_2022_Trad_Chinese = 50229   '                        ISO 2022 Traditional Chinese
-    cpId_EBCDIC_Jap_Katakana_Ext = 50930 '                        EBCDIC Japanese (Katakana) Extended
-    cpId_EBCDIC_US_Can_and_Jap = 50931   '                        EBCDIC US-Canada and Japanese
-    cpId_EBCDIC_Kor_Ext_and_Kor = 50933  '                        EBCDIC Korean Extended and Korean
-    cpId_EBCDIC_Simp_Chin_Ext = 50935    '                        EBCDIC Simplified Chinese Extended and Simplified Chinese
-    cpId_EBCDIC_Simp_Chin = 50936        '                        EBCDIC Simplified Chinese
-    cpId_EBCDIC_US_Can_Trad_Chin = 50937 '                        EBCDIC US-Canada and Traditional Chinese
-    cpId_EBCDIC_Jap_Latin_Ext = 50939    '                        EBCDIC Japanese (Latin) Extended and Japaneseeuc_jp = 51932                  'euc-jp                 EUC Japanese
-    cpId_EUC_CN = 51936                  'EUC-CN                  EUC Simplified Chinese; Chinese Simplified (EUC)
-    cpId_euc_kr = 51949                  'euc-kr                  EUC Korean
-    cpId_EUC_Traditional_Chinese = 51950 '                        EUC Traditional Chinese
-    cpId_hz_gb_2312 = 52936              'hz-gb-2312              HZ-GB2312 Simplified Chinese; Chinese Simplified (HZ)
-    cpId_GB18030 = 54936                 'GB18030                 Windows XP and later: GB18030 Simplified Chinese (4 byte); Chinese Simplified (GB18030)
-    cpId_x_iscii_de = 57002              'x-iscii-de              ISCII Devanagari
-    cpId_x_iscii_be = 57003              'x-iscii-be              ISCII Bangla
-    cpId_x_iscii_ta = 57004              'x-iscii-ta              ISCII Tamil
-    cpId_x_iscii_te = 57005              'x-iscii-te              ISCII Telugu
-    cpId_x_iscii_as = 57006              'x-iscii-as              ISCII Assamese
-    cpId_x_iscii_or = 57007              'x-iscii-or              ISCII Odia
-    cpId_x_iscii_ka = 57008              'x-iscii-ka              ISCII Kannada
-    cpId_x_iscii_ma = 57009              'x-iscii-ma              ISCII Malayalam
-    cpId_x_iscii_gu = 57010              'x-iscii-gu              ISCII Gujarati
-    cpId_x_iscii_pa = 57011              'x-iscii-pa              ISCII Punjabi
-    cpId_utf_7 = 65000                   'utf-7                   Unicode (UTF-7)
-    cpId_utf_8 = 65001                   'utf-8                   Unicode (UTF-8)
+    cpIBM037 = 37                     'IBM037                  IBM EBCDIC US-Canada
+    cpIBM437 = 437                    'IBM437                  OEM United States
+    cpIBM500 = 500                    'IBM500                  IBM EBCDIC International
+    cpASMO_708 = 708                  'ASMO-708                Arabic (ASMO 708)
+    cpASMO_449 = 709                  '                        Arabic (ASMO-449+, BCON V4)
+    cpTransparent_Arabic = 710        '                        Arabic - Transparent Arabic
+    cpDOS_720 = 720                   'DOS-720                 Arabic (Transparent ASMO); Arabic (DOS)
+    cpIbm737 = 737                    'ibm737                  OEM Greek (formerly 437G); Greek (DOS)
+    cpIbm775 = 775                    'ibm775                  OEM Baltic; Baltic (DOS)
+    cpIbm850 = 850                    'ibm850                  OEM Multilingual Latin 1; Western European (DOS)
+    cpIbm852 = 852                    'ibm852                  OEM Latin 2; Central European (DOS)
+    cpIBM855 = 855                    'IBM855                  OEM Cyrillic (primarily Russian)
+    cpIbm857 = 857                    'ibm857                  OEM Turkish; Turkish (DOS)
+    cpIBM00858 = 858                  'IBM00858                OEM Multilingual Latin 1 + Euro symbol
+    cpIBM860 = 860                    'IBM860                  OEM Portuguese; Portuguese (DOS)
+    cpIbm861 = 861                    'ibm861                  OEM Icelandic; Icelandic (DOS)
+    cpDOS_862 = 862                   'DOS-862                 OEM Hebrew; Hebrew (DOS)
+    cpIBM863 = 863                    'IBM863                  OEM French Canadian; French Canadian (DOS)
+    cpIBM864 = 864                    'IBM864                  OEM Arabic; Arabic (864)
+    cpIBM865 = 865                    'IBM865                  OEM Nordic; Nordic (DOS)
+    cpCp866 = 866                     'cp866                   OEM Russian; Cyrillic (DOS)
+    cpIbm869 = 869                    'ibm869                  OEM Modern Greek; Greek, Modern (DOS)
+    cpIBM870 = 870                    'IBM870                  IBM EBCDIC Multilingual/ROECE (Latin 2); IBM EBCDIC Multilingual Latin 2
+    cpWindows_874 = 874               'windows-874             Thai (Windows)
+    cpCp875 = 875                     'cp875                   IBM EBCDIC Greek Modern
+    cpShift_jis = 932                 'shift_jis               ANSI/OEM Japanese; Japanese (Shift-JIS)
+    cpGb2312 = 936                    'gb2312                  ANSI/OEM Simplified Chinese (PRC, Singapore); Chinese Simplified (GB2312)
+    cpKs_c_5601_1987 = 949            'ks_c_5601-1987          ANSI/OEM Korean (Unified Hangul Code)
+    cpBig5 = 950                      'big5                    ANSI/OEM Traditional Chinese (Taiwan; Hong Kong SAR, PRC); Chinese Traditional (Big5)
+    cpIBM1026 = 1026                  'IBM1026                 IBM EBCDIC Turkish (Latin 5)
+    cpIBM01047 = 1047                 'IBM01047                IBM EBCDIC Latin 1/Open System
+    cpIBM01140 = 1140                 'IBM01140                IBM EBCDIC US-Canada (037 + Euro symbol); IBM EBCDIC (US-Canada-Euro)
+    cpIBM01141 = 1141                 'IBM01141                IBM EBCDIC Germany (20273 + Euro symbol); IBM EBCDIC (Germany-Euro)
+    cpIBM01142 = 1142                 'IBM01142                IBM EBCDIC Denmark-Norway (20277 + Euro symbol); IBM EBCDIC (Denmark-Norway-Euro)
+    cpIBM01143 = 1143                 'IBM01143                IBM EBCDIC Finland-Sweden (20278 + Euro symbol); IBM EBCDIC (Finland-Sweden-Euro)
+    cpIBM01144 = 1144                 'IBM01144                IBM EBCDIC Italy (20280 + Euro symbol); IBM EBCDIC (Italy-Euro)
+    cpIBM01145 = 1145                 'IBM01145                IBM EBCDIC Latin America-Spain (20284 + Euro symbol); IBM EBCDIC (Spain-Euro)
+    cpIBM01146 = 1146                 'IBM01146                IBM EBCDIC United Kingdom (20285 + Euro symbol); IBM EBCDIC (UK-Euro)
+    cpIBM01147 = 1147                 'IBM01147                IBM EBCDIC France (20297 + Euro symbol); IBM EBCDIC (France-Euro)
+    cpIBM01148 = 1148                 'IBM01148                IBM EBCDIC International (500 + Euro symbol); IBM EBCDIC (International-Euro)
+    cpIBM01149 = 1149                 'IBM01149                IBM EBCDIC Icelandic (20871 + Euro symbol); IBM EBCDIC (Icelandic-Euro)
+    cpUTF_16 = 1200                   'utf-16                  Unicode UTF-16, little endian byte order (BMP of ISO 10646); available only to managed applications
+    cpUnicodeFFFE = 1201              'unicodeFFFE             Unicode UTF-16, big endian byte order; available only to managed applications
+    cpWindows_1250 = 1250             'windows-1250            ANSI Central European; Central European (Windows)
+    cpWindows_1251 = 1251             'windows-1251            ANSI Cyrillic; Cyrillic (Windows)
+    cpWindows_1252 = 1252             'windows-1252            ANSI Latin 1; Western European (Windows)
+    cpWindows_1253 = 1253             'windows-1253            ANSI Greek; Greek (Windows)
+    cpWindows_1254 = 1254             'windows-1254            ANSI Turkish; Turkish (Windows)
+    cpWindows_1255 = 1255             'windows-1255            ANSI Hebrew; Hebrew (Windows)
+    cpWindows_1256 = 1256             'windows-1256            ANSI Arabic; Arabic (Windows)
+    cpWindows_1257 = 1257             'windows-1257            ANSI Baltic; Baltic (Windows)
+    cpWindows_1258 = 1258             'windows-1258            ANSI/OEM Vietnamese; Vietnamese (Windows)
+    cpJohab = 1361                    'Johab                   Korean (Johab)
+    cpMacintosh = 10000               'macintosh               MAC Roman; Western European (Mac)
+    cpX_mac_japanese = 10001          'x-mac-japanese          Japanese (Mac)
+    cpX_mac_chinesetrad = 10002       'x-mac-chinesetrad       MAC Traditional Chinese (Big5); Chinese Traditional (Mac)
+    cpX_mac_korean = 10003            'x-mac-korean            Korean (Mac)
+    cpX_mac_arabic = 10004            'x-mac-arabic            Arabic (Mac)
+    cpX_mac_hebrew = 10005            'x-mac-hebrew            Hebrew (Mac)
+    cpX_mac_greek = 10006             'x-mac-greek             Greek (Mac)
+    cpX_mac_cyrillic = 10007          'x-mac-cyrillic          Cyrillic (Mac)
+    cpX_mac_chinesesimp = 10008       'x-mac-chinesesimp       MAC Simplified Chinese (GB 2312); Chinese Simplified (Mac)
+    cpX_mac_romanian = 10010          'x-mac-romanian          Romanian (Mac)
+    cpX_mac_ukrainian = 10017         'x-mac-ukrainian         Ukrainian (Mac)
+    cpX_mac_thai = 10021              'x-mac-thai              Thai (Mac)
+    cpX_mac_ce = 10029                'x-mac-ce                MAC Latin 2; Central European (Mac)
+    cpX_mac_icelandic = 10079         'x-mac-icelandic         Icelandic (Mac)
+    cpX_mac_turkish = 10081           'x-mac-turkish           Turkish (Mac)
+    cpX_mac_croatian = 10082          'x-mac-croatian          Croatian (Mac)
+    cpUTF_32 = 12000                  'utf-32                  Unicode UTF-32, little endian byte order; available only to managed applications
+    cpUTF_32BE = 12001                'utf-32BE                Unicode UTF-32, big endian byte order; available only to managed applications
+    cpX_Chinese_CNS = 20000           'x-Chinese_CNS           CNS Taiwan; Chinese Traditional (CNS)
+    cpX_cp20001 = 20001               'x-cp20001               TCA Taiwan
+    cpX_Chinese_Eten = 20002          'x_Chinese-Eten          Eten Taiwan; Chinese Traditional (Eten)
+    cpX_cp20003 = 20003               'x-cp20003               IBM5550 Taiwan
+    cpX_cp20004 = 20004               'x-cp20004               TeleText Taiwan
+    cpX_cp20005 = 20005               'x-cp20005               Wang Taiwan
+    cpX_IA5 = 20105                   'x-IA5                   IA5 (IRV International Alphabet No. 5, 7-bit); Western European (IA5)
+    cpX_IA5_German = 20106            'x-IA5-German            IA5 German (7-bit)
+    cpX_IA5_Swedish = 20107           'x-IA5-Swedish           IA5 Swedish (7-bit)
+    cpX_IA5_Norwegian = 20108         'x-IA5-Norwegian         IA5 Norwegian (7-bit)
+    cpUs_ascii = 20127                'us-ascii                US-ASCII (7-bit)
+    cpX_cp20261 = 20261               'x-cp20261               T.61
+    cpX_cp20269 = 20269               'x-cp20269               ISO 6937 Non-Spacing Accent
+    cpIBM273 = 20273                  'IBM273                  IBM EBCDIC Germany
+    cpIBM277 = 20277                  'IBM277                  IBM EBCDIC Denmark-Norway
+    cpIBM278 = 20278                  'IBM278                  IBM EBCDIC Finland-Sweden
+    cpIBM280 = 20280                  'IBM280                  IBM EBCDIC Italy
+    cpIBM284 = 20284                  'IBM284                  IBM EBCDIC Latin America-Spain
+    cpIBM285 = 20285                  'IBM285                  IBM EBCDIC United Kingdom
+    cpIBM290 = 20290                  'IBM290                  IBM EBCDIC Japanese Katakana Extended
+    cpIBM297 = 20297                  'IBM297                  IBM EBCDIC France
+    cpIBM420 = 20420                  'IBM420                  IBM EBCDIC Arabic
+    cpIBM423 = 20423                  'IBM423                  IBM EBCDIC Greek
+    cpIBM424 = 20424                  'IBM424                  IBM EBCDIC Hebrew
+    cpX_EBCDIC_KoreanExtended = 20833 'x-EBCDIC-KoreanExtended IBM EBCDIC Korean Extended
+    cpIBM_Thai = 20838                'IBM-Thai                IBM EBCDIC Thai
+    cpKoi8_r = 20866                  'koi8-r                  Russian (KOI8-R); Cyrillic (KOI8-R)
+    cpIBM871 = 20871                  'IBM871                  IBM EBCDIC Icelandic
+    cpIBM880 = 20880                  'IBM880                  IBM EBCDIC Cyrillic Russian
+    cpIBM905 = 20905                  'IBM905                  IBM EBCDIC Turkish
+    cpIBM00924 = 20924                'IBM00924                IBM EBCDIC Latin 1/Open System (1047 + Euro symbol)
+    cpEuc_jp = 20932                  'EUC-JP                  Japanese (JIS 0208-1990 and 0212-1990)
+    cpX_cp20936 = 20936               'x-cp20936               Simplified Chinese (GB2312); Chinese Simplified (GB2312-80)
+    cpX_cp20949 = 20949               'x-cp20949               Korean Wansung
+    cpCp1025 = 21025                  'cp1025                  IBM EBCDIC Cyrillic Serbian-Bulgarian
+    cpD = 21027                       '                        (deprecated)
+    cpKoi8_u = 21866                  'koi8-u                  Ukrainian (KOI8-U); Cyrillic (KOI8-U)
+    cpIso_8859_1 = 28591              'iso-8859-1              ISO 8859-1 Latin 1; Western European (ISO)
+    cpIso_8859_2 = 28592              'iso-8859-2              ISO 8859-2 Central European; Central European (ISO)
+    cpIso_8859_3 = 28593              'iso-8859-3              ISO 8859-3 Latin 3
+    cpIso_8859_4 = 28594              'iso-8859-4              ISO 8859-4 Baltic
+    cpIso_8859_5 = 28595              'iso-8859-5              ISO 8859-5 Cyrillic
+    cpIso_8859_6 = 28596              'iso-8859-6              ISO 8859-6 Arabic
+    cpIso_8859_7 = 28597              'iso-8859-7              ISO 8859-7 Greek
+    cpIso_8859_8 = 28598              'iso-8859-8              ISO 8859-8 Hebrew; Hebrew (ISO-Visual)
+    cpIso_8859_9 = 28599              'iso-8859-9              ISO 8859-9 Turkish
+    cpIso_8859_13 = 28603             'iso-8859-13             ISO 8859-13 Estonian
+    cpIso_8859_15 = 28605             'iso-8859-15             ISO 8859-15 Latin 9
+    cpX_Europa = 29001                'x-Europa                Europa 3
+    cpIso_8859_8_i = 38598            'iso-8859-8-i            ISO 8859-8 Hebrew; Hebrew (ISO-Logical)
+    cpIso_2022_jp = 50220             'iso-2022-jp             ISO 2022 Japanese with no halfwidth Katakana; Japanese (JIS)
+    cpCsISO2022JP = 50221             'csISO2022JP             ISO 2022 Japanese with halfwidth Katakana; Japanese (JIS-Allow 1 byte Kana)
+    cpIso_2022_jp_w_1b_Kana = 50222   'iso-2022-jp             ISO 2022 Japanese JIS X 0201-1989; Japanese (JIS-Allow 1 byte Kana - SO/SI)
+    cpIso_2022_kr = 50225             'iso-2022-kr             ISO 2022 Korean
+    cpX_cp50227 = 50227               'x-cp50227               ISO 2022 Simplified Chinese; Chinese Simplified (ISO 2022)
+    cpISO_2022_Trad_Chinese = 50229   '                        ISO 2022 Traditional Chinese
+    cpEBCDIC_Jap_Katakana_Ext = 50930 '                        EBCDIC Japanese (Katakana) Extended
+    cpEBCDIC_US_Can_and_Jap = 50931   '                        EBCDIC US-Canada and Japanese
+    cpEBCDIC_Kor_Ext_and_Kor = 50933  '                        EBCDIC Korean Extended and Korean
+    cpEBCDIC_Simp_Chin_Ext = 50935    '                        EBCDIC Simplified Chinese Extended and Simplified Chinese
+    cpEBCDIC_Simp_Chin = 50936        '                        EBCDIC Simplified Chinese
+    cpEBCDIC_US_Can_Trad_Chin = 50937 '                        EBCDIC US-Canada and Traditional Chinese
+    cpEBCDIC_Jap_Latin_Ext = 50939    '                        EBCDIC Japanese (Latin) Extended and Japaneseeuc_jp = 51932                  'euc-jp                 EUC Japanese
+    cpEUC_CN = 51936                  'EUC-CN                  EUC Simplified Chinese; Chinese Simplified (EUC)
+    cpEuc_kr = 51949                  'euc-kr                  EUC Korean
+    cpEUC_Traditional_Chinese = 51950 '                        EUC Traditional Chinese
+    cpHz_gb_2312 = 52936              'hz-gb-2312              HZ-GB2312 Simplified Chinese; Chinese Simplified (HZ)
+    cpGB18030 = 54936                 'GB18030                 Windows XP and later: GB18030 Simplified Chinese (4 byte); Chinese Simplified (GB18030)
+    cpX_iscii_de = 57002              'x-iscii-de              ISCII Devanagari
+    cpX_iscii_be = 57003              'x-iscii-be              ISCII Bangla
+    cpX_iscii_ta = 57004              'x-iscii-ta              ISCII Tamil
+    cpX_iscii_te = 57005              'x-iscii-te              ISCII Telugu
+    cpX_iscii_as = 57006              'x-iscii-as              ISCII Assamese
+    cpX_iscii_or = 57007              'x-iscii-or              ISCII Odia
+    cpX_iscii_ka = 57008              'x-iscii-ka              ISCII Kannada
+    cpX_iscii_ma = 57009              'x-iscii-ma              ISCII Malayalam
+    cpX_iscii_gu = 57010              'x-iscii-gu              ISCII Gujarati
+    cpX_iscii_pa = 57011              'x-iscii-pa              ISCII Punjabi
+    cpUTF_7 = 65000                   'utf-7                   Unicode (UTF-7)
+    cpUTF_8 = 65001                  'utf-8                   Unicode (UTF-8)
     [_last_]
 End Enum
 
@@ -243,200 +243,191 @@ Private Function GetApiErrorNumber() As Long
 End Function
 
 'Returns a Collection for converting CodePageIDs to ConversionDescriptorNames
-Private Function CodePageToConversionDescriptorName() As Collection
-    Static c As Collection
+Private Static Property Get ConversionDescriptorName() As Variant
+    Static arr(CodePageIdentifier.[_first_] To _
+               CodePageIdentifier.[_last_]) As String
     
-    If Not c Is Nothing Then
-        Set CodePageToConversionDescriptorName = c
-        Exit Function
+    If arr(CodePageIdentifier.[_first_]) <> 0 Then
+        ConversionDescriptorName = arr
+        Exit Property
     End If
-    
-    Set c = New Collection
-    On Error Resume Next  '(Sometimes multiple ConversionDescriptorNames describe
-                        'the same CodePage)
-    'Item:=ConversionDescriptorName, Key:=CStr(CodePageIdentifier) '(Optional)
     
     'Source:
     'https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/iconv_open.3.html#//apple_ref/doc/man/3/iconv_open
-    
     'European languages
-    c.Add Item:="ASCII", Key:=CStr(cpId_us_ascii)
-    c.Add Item:="ISO-8859-1", Key:=CStr(cpId_iso_8859_1)
-    c.Add Item:="ISO-8859-2", Key:=CStr(cpId_iso_8859_2)
-    c.Add Item:="ISO-8859-3", Key:=CStr(cpId_iso_8859_3)
-    c.Add Item:="ISO-8859-4", Key:=CStr(cpId_iso_8859_4)
-    c.Add Item:="ISO-8859-5", Key:=CStr(cpId_iso_8859_5)
-    c.Add Item:="ISO-8859-7", Key:=CStr(cpId_iso_8859_7)
-    c.Add Item:="ISO-8859-9", Key:=CStr(cpId_iso_8859_9)
-    c.Add Item:="ISO-8859-10"      ', Key:=CStr( )
-    c.Add Item:="ISO-8859-13", Key:=CStr(cpId_iso_8859_13)
-    c.Add Item:="ISO-8859-14"      ', Key:=CStr( )
-    c.Add Item:="ISO-8859-15", Key:=CStr(cpId_iso_8859_15)
-    c.Add Item:="ISO-8859-16"      ', Key:=CStr( )
-    c.Add Item:="KOI8-R"           ', Key:=CStr( )
-    c.Add Item:="KOI8-U", Key:=CStr(cpId_koi8_u)
-    c.Add Item:="KOI8-RU"          ', Key:=CStr( )
-    c.Add Item:="CP1250", Key:=CStr(cpId_windows_1250)
-    c.Add Item:="CP1251", Key:=CStr(cpId_windows_1251)
-    c.Add Item:="CP1252", Key:=CStr(cpId_windows_1252)
-    c.Add Item:="CP1253", Key:=CStr(cpId_windows_1253)
-    c.Add Item:="CP1254", Key:=CStr(cpId_windows_1254)
-    c.Add Item:="CP1257", Key:=CStr(cpId_windows_1257)
-    c.Add Item:="CP850", Key:=CStr(cpId_ibm850)
-    c.Add Item:="CP866", Key:=CStr(cpId_cp866)
-    c.Add Item:="MacRoman"         ', Key:=CStr( )
-    c.Add Item:="MacCentralEurope", Key:=CStr(cpId_x_mac_ce)
-    c.Add Item:="MacIceland", Key:=CStr(cpId_x_mac_icelandic)
-    c.Add Item:="MacCroatian", Key:=CStr(cpId_x_mac_croatian)
-    c.Add Item:="MacRomania", Key:=CStr(cpId_x_mac_romanian)
-    c.Add Item:="MacCyrillic", Key:=CStr(cpId_x_mac_cyrillic)
-    c.Add Item:="MacUkraine", Key:=CStr(cpId_x_mac_ukrainian)
-    c.Add Item:="MacGreek", Key:=CStr(cpId_x_mac_greek)
-    c.Add Item:="MacTurkish", Key:=CStr(cpId_x_mac_turkish)
-    c.Add Item:="Macintosh", Key:=CStr(cpId_macintosh)
+    arr(cpIso_8859_1) = "ISO-8859-1"
+    arr(cpIso_8859_2) = "ISO-8859-2"
+    arr(cpIso_8859_3) = "ISO-8859-3"
+    arr(cpIso_8859_4) = "ISO-8859-4"
+    arr(cpIso_8859_5) = "ISO-8859-5"
+    arr(cpIso_8859_7) = "ISO-8859-7"
+    arr(cpIso_8859_9) = "ISO-8859-9"
+    'arr( ) =  "ISO-8859-10"
+    arr(cpIso_8859_13) = "ISO-8859-13"
+    'arr( ) =  "ISO-8859-14"
+    arr(cpIso_8859_15) = "ISO-8859-15"
+    'arr( ) =  "ISO-8859-16"
+    'arr( ) =  "KOI8-R"
+    arr(cpKoi8_u) = "KOI8-U"
+    'arr( ) =  "KOI8-RU"
+    arr(cpWindows_1250) = "CP1250"
+    arr(cpWindows_1251) = "CP1251"
+    arr(cpWindows_1252) = "CP1252"
+    arr(cpWindows_1253) = "CP1253"
+    arr(cpWindows_1254) = "CP1254"
+    arr(cpWindows_1257) = "CP1257"
+    arr(cpIbm850) = "CP850"
+    arr(cpCp866) = "CP866"
+    'arr( ) =  "MacRoman"
+    arr(cpX_mac_ce) = "MacCentralEurope"
+    arr(cpX_mac_icelandic) = "MacIceland"
+    arr(cpX_mac_croatian) = "MacCroatian"
+    arr(cpX_mac_romanian) = "MacRomania"
+    arr(cpX_mac_cyrillic) = "MacCyrillic"
+    arr(cpX_mac_ukrainian) = "MacUkraine"
+    arr(cpX_mac_greek) = "MacGreek"
+    arr(cpX_mac_turkish) = "MacTurkish"
+    arr(cpMacintosh) = "Macintosh"
 
     'Semitic languages
-    c.Add Item:="ISO-8859-6", Key:=CStr(cpId_iso_8859_6)
-    c.Add Item:="ISO-8859-8", Key:=CStr(cpId_iso_8859_8)
-    c.Add Item:="CP1255", Key:=CStr(cpId_windows_1255)
-    c.Add Item:="CP1256", Key:=CStr(cpId_windows_1256)
-    c.Add Item:="CP862", Key:=CStr(cpId_DOS_862)
-    c.Add Item:="MacHebrew", Key:=CStr(cpId_x_mac_hebrew)
-    c.Add Item:="MacArabic", Key:=CStr(cpId_x_mac_arabic)
+    arr(cpIso_8859_6) = "ISO-8859-6"
+    arr(cpIso_8859_8) = "ISO-8859-8"
+    arr(cpWindows_1255) = "CP1255"
+    arr(cpWindows_1256) = "CP1256"
+    arr(cpDOS_862) = "CP862"
+    arr(cpX_mac_hebrew) = "MacHebrew"
+    arr(cpX_mac_arabic) = "MacArabic"
 
     'Japanese
-    c.Add Item:="EUC-JP"           ', Key:=CStr( )
-    c.Add Item:="SHIFT_JIS", Key:=CStr(cpId_shift_jis)
-    c.Add Item:="CP932", Key:=CStr(cpId_shift_jis)  '(duplicate)
-    c.Add Item:="ISO-2022-JP"      ', Key:=CStr( )
-    c.Add Item:="ISO-2022-JP-2"    ', Key:=CStr( )
-    c.Add Item:="ISO-2022-JP-1"    ', Key:=CStr( )
+    'arr( ) =  "EUC-JP"
+    arr(cpShift_jis) = "SHIFT_JIS"
+    arr(cpShift_jis) = "CP932" '(duplicate)
+    'arr( ) =  "ISO-2022-JP"
+    'arr( ) =  "ISO-2022-JP-2"
+    'arr( ) =  "ISO-2022-JP-1"
 
     'Chinese
-    c.Add Item:="EUC-CN"           ', Key:=CStr( )
-    c.Add Item:="HZ"               ', Key:=CStr( )
-    c.Add Item:="GBK"              ', Key:=CStr( )
-    c.Add Item:="CP936"            ', Key:=CStr( )
-    c.Add Item:="GB18030"          ', Key:=CStr( )
-    c.Add Item:="EUC-TW"           ', Key:=CStr( )
-    c.Add Item:="BIG5", Key:=CStr(cpId_big5)
-    c.Add Item:="CP950", Key:=CStr(cpId_big5) '(duplicate)
-    c.Add Item:="BIG5-HKSCS"       ', Key:=CStr( )
-    c.Add Item:="BIG5-HKSCS:2001"  ', Key:=CStr( )
-    c.Add Item:="BIG5-HKSCS:1999"  ', Key:=CStr( )
-    c.Add Item:="ISO-2022-CN"      ', Key:=CStr( )
-    c.Add Item:="ISO-2022-CN-EXT"  ', Key:=CStr( )
+    'arr( ) =  "EUC-CN"
+    'arr( ) =  "HZ"
+    'arr( ) =  "GBK"
+    'arr( ) =  "CP936"
+    'arr( ) =  "GB18030"
+    'arr( ) =  "EUC-TW"
+    arr(cpBig5) = "BIG5"
+    arr(cpBig5) = "CP950" '(duplicate)
+    'arr( ) =  "BIG5-HKSCS"
+    'arr( ) =  "BIG5-HKSCS:2001"
+    'arr( ) =  "BIG5-HKSCS:1999"
+    'arr( ) =  "ISO-2022-CN"
+    'arr( ) =  "ISO-2022-CN-EXT"
 
     'Korean
-    c.Add Item:="EUC-KR", Key:=CStr(cpId_euc_kr)
-    c.Add Item:="CP949", Key:=CStr(cpId_ks_c_5601_1987)
-    c.Add Item:="ISO-2022-KR", Key:=CStr(cpId_iso_2022_kr)
-    c.Add Item:="JOHAB"            ', Key:=CStr( )
+    arr(cpEuc_kr) = "EUC-KR"
+    arr(cpKs_c_5601_1987) = "CP949"
+    arr(cpIso_2022_kr) = "ISO-2022-KR"
+    'arr( ) =  "JOHAB"
 
     'Armenian
-    c.Add Item:="ARMSCII-8"        ', Key:=CStr( )
+    'arr( ) =  "ARMSCII-8"
 
     'Georgian
-    c.Add Item:="Georgian-Academy" ', Key:=CStr( )
-    c.Add Item:="Georgian-PS"      ', Key:=CStr( )
+    'arr( ) =  "Georgian-Academy"
+    'arr( ) =  "Georgian-PS"
 
     'Tajik
-    c.Add Item:="KOI8-T"           ', Key:=CStr( )
+    'arr( ) =  "KOI8-T"
 
     'Kazakh
-    c.Add Item:="PT154"            ', Key:=CStr( )
+    'arr( ) =  "PT154"
 
     'Thai
-    c.Add Item:="TIS-620"          ', Key:=CStr( )
-    c.Add Item:="CP874", Key:=CStr(cpId_windows_874)
-    c.Add Item:="MacThai", Key:=CStr(cpId_x_mac_thai)
+    'arr( ) =  "TIS-620"
+    arr(cpWindows_874) = "CP874"
+    arr(cpX_mac_thai) = "MacThai"
 
     'Laotian
-    c.Add Item:="MuleLao-1"        ', Key:=CStr( )
-    c.Add Item:="CP1133"           ', Key:=CStr( )
+    'arr( ) =  "MuleLao-1"
+    'arr( ) =  "CP1133"
 
     'Vietnamese
-    c.Add Item:="VISCII"           ', Key:=CStr( )
-    c.Add Item:="TCVN"             ', Key:=CStr( )
-    c.Add Item:="CP1258", Key:=CStr(cpId_windows_1258)
+    'arr( ) =  "VISCII"
+    'arr( ) =  "TCVN"
+    arr(cpWindows_1258) = "CP1258"
 
     'Platform specifics
-    c.Add Item:="HP-ROMAN8"        ', Key:=CStr( )
-    c.Add Item:="NEXTSTEP"         ', Key:=CStr( )
+    'arr( ) =  "HP-ROMAN8"
+    'arr( ) =  "NEXTSTEP"
 
     'Full Unicode
-    c.Add Item:="UTF-16"           ', Key:=CStr( )
-    c.Add Item:="UTF-16BE", Key:=CStr(cpId_unicodeFFFE)
-    c.Add Item:="UTF-16LE", Key:=CStr(cpId_utf_16)
-    c.Add Item:="UTF-32"           ', Key:=CStr( )
-    c.Add Item:="UTF-32BE", Key:=CStr(cpId_utf_32BE)
-    c.Add Item:="UTF-32LE", Key:=CStr(cpId_utf_32)
-    c.Add Item:="UTF-7", Key:=CStr(cpId_utf_7)
-    c.Add Item:="UTF-8", Key:=CStr(cpId_utf_8)
-    c.Add Item:="UCS-2"            ', Key:=CStr( )
-    c.Add Item:="UCS-2BE", Key:=CStr(cpId_unicodeFFFE) '(duplicate)
-    c.Add Item:="UCS-2LE", Key:=CStr(cpId_utf_16) '(duplicate)
-    c.Add Item:="UCS-4"            ', Key:=CStr( )
-    c.Add Item:="UCS-4BE", Key:=CStr(cpId_utf_32BE) '(duplicate)
-    c.Add Item:="UCS-4LE", Key:=CStr(cpId_utf_32) '(duplicate)
-    c.Add Item:="C99"              ', Key:=CStr( )
-    c.Add Item:="JAVA"             ', Key:=CStr( )
+    'arr( ) =  "UCS-2"
+    arr(cpUnicodeFFFE) = "UCS-2BE" '(duplicate)
+    arr(cpUTF_16) = "UCS-2LE" '(duplicate)
+    'arr( ) =  "UCS-4"
+    arr(cpUTF_32BE) = "UCS-4BE" '(duplicate)
+    arr(cpUTF_32) = "UCS-4LE" '(duplicate)
+    'arr( ) =  "UTF-16"
+    arr(cpUnicodeFFFE) = "UTF-16BE"
+    arr(cpUTF_16) = "UTF-16LE"
+    'arr( ) =  "UTF-32"
+    arr(cpUTF_32BE) = "UTF-32BE"
+    arr(cpUTF_32) = "UTF-32LE"
+    arr(cpUTF_7) = "UTF-7"
+    arr(cpUTF_8) = "UTF-8"
+    'arr( ) =  "C99"
+    'arr( ) =  "JAVA"
 
     'Full Unicode in terms of uint16_t or uint32_t
     '(with machine dependent endianness and alignment)
-    c.Add Item:="UCS-2-INTERNAL"   ', Key:=CStr( )
-    c.Add Item:="UCS-4-INTERNAL"   ', Key:=CStr( )
+    'arr( ) =  "UCS-2-INTERNAL"
+    'arr( ) =  "UCS-4-INTERNAL"
 
     'Locale dependent in terms of char or wchar_t
     '(with  machine  dependent  endianness  and  alignment and with
     'semantics depending on the OS and the  current  LC_CTYPE  locale facet)
-    c.Add Item:="char"             ', Key:=CStr( )
-    c.Add Item:="wchar_t"          ', Key:=CStr( )
+    'arr( ) =  "char"
+    'arr( ) =  "wchar_t"
 
     'When  configured with the option --enable-extra-encodings
     'it also pro-vides provides vides support for a few extra encodings:
-    
+
     'European languages
-    c.Add Item:="CP437", Key:=CStr(cpId_IBM437)
-    c.Add Item:="CP737", Key:=CStr(cpId_ibm737)
-    c.Add Item:="CP775", Key:=CStr(cpId_ibm775)
-    c.Add Item:="CP852", Key:=CStr(cpId_ibm852)
-    c.Add Item:="CP853"            ', Key:=CStr( )
-    c.Add Item:="CP855", Key:=CStr(cpId_IBM855)
-    c.Add Item:="CP857", Key:=CStr(cpId_ibm857)
-    c.Add Item:="CP858", Key:=CStr(cpId_IBM00858)
-    c.Add Item:="CP860", Key:=CStr(cpId_IBM860)
-    c.Add Item:="CP861", Key:=CStr(cpId_ibm861)
-    c.Add Item:="CP863", Key:=CStr(cpId_IBM863)
-    c.Add Item:="CP865", Key:=CStr(cpId_IBM865)
-    c.Add Item:="CP869", Key:=CStr(cpId_ibm869)
-    c.Add Item:="CP1125"           ', Key:=CStr( )
+    arr(cpIBM437) = "CP437"
+    arr(cpIbm737) = "CP737"
+    arr(cpIbm775) = "CP775"
+    arr(cpIbm852) = "CP852"
+    'arr( ) =  "CP853"
+    arr(cpIBM855) = "CP855"
+    arr(cpIbm857) = "CP857"
+    arr(cpIBM00858) = "CP858"
+    arr(cpIBM860) = "CP860"
+    arr(cpIbm861) = "CP861"
+    arr(cpIBM863) = "CP863"
+    arr(cpIBM865) = "CP865"
+    arr(cpIbm869) = "CP869"
+    'arr( ) =  "CP1125"
 
     'Semitic languages
-    c.Add Item:="CP864", Key:=CStr(cpId_IBM864)
+    arr(cpIBM864) = "CP864"
 
     'Japanese
-    c.Add Item:="EUC-JISX0213"     ', Key:=CStr( )
-    c.Add Item:="Shift_JISX0213"   ', Key:=CStr( )
-    c.Add Item:="ISO-2022-JP-3"    ', Key:=CStr( )
+    'arr( ) =  "EUC-JISX0213"
+    'arr( ) =  "Shift_JISX0213"
+    'arr( ) =  "ISO-2022-JP-3"
 
     'Chinese
-    c.Add Item:="BIG5-2003"        ', Key:=CStr( ) '(experimental)
+    'arr( ) = "BIG5-2003" '(experimental)
 
     'Turkmen
-    c.Add Item:="TDS565"           ', Key:=CStr( )
+    'arr( ) =  "TDS565"
 
     'Platform specifics
-    c.Add Item:="ATARIST"          ', Key:=CStr( )
-    c.Add Item:="RISCOS-LATIN1"    ', Key:=CStr( )
+    'arr( ) =  "ATARIST"
+    'arr( ) =  "RISCOS-LATIN1"
 
     'The empty encoding name is equivalent to "char":
     'it denotes the locale dependent character encoding.
-    Set CodePageToConversionDescriptorName = c
-'    Exit Function
-'errh:
-    
-End Function
+    ConversionDescriptorName = arr
+End Property
 
 ''Returns a Collection for converting ConversionDescriptorNames to CodePageIDs
 'Private Function ConversionDescriptorNameToCodePage() As Collection
@@ -484,8 +475,9 @@ Public Function Transcode(ByRef str As String, _
         Dim outBuf As LongPtr:       outBuf = StrPtr(buffer)
         Dim cd As LongPtr
         
-        cd = iconv_open(StrPtr(CodePageToConversionDescriptorName(toCodePage)), _
-                        StrPtr(CodePageToConversionDescriptorName(fromCodePage)))
+        cd = iconv_open( _
+            StrPtr(StrConv(ConversionDescriptorName(toCodePage), vbFromUnicode)), _
+            StrPtr(StrConv(ConversionDescriptorName(fromCodePage), vbFromUnicode)))
 
         If iconv(cd, inBuf, inBytesLeft, outBuf, outBytesLeft) = -1 _
         And raiseErrors Then
@@ -497,9 +489,9 @@ Public Function Transcode(ByRef str As String, _
         End If
         iconv_close cd
     #Else
-        If toCodePage = cpId_utf_16 Then
+        If toCodePage = cpUTF_16 Then
             Transcode = Decode(str, fromCodePage, raiseErrors)
-        ElseIf fromCodePage = cpId_utf_16 Then
+        ElseIf fromCodePage = cpUTF_16 Then
             Transcode = Encode(str, toCodePage, raiseErrors)
         Else
             Transcode = Encode(Decode(str, fromCodePage, raiseErrors), _
@@ -516,14 +508,13 @@ Public Function Encode(ByRef utf16leStr As String, _
     Const methodName As String = "Encode"
     If utf16leStr = vbNullString Then Exit Function
     #If Mac Then
-        Encode = Transcode(utf16leStr, toCodePage, cpId_utf_16, raiseErrors)
+        Encode = Transcode(utf16leStr, toCodePage, cpUTF_16, raiseErrors)
     #Else
         If raiseErrors Then SetLastError 0
     
         Dim byteCount As Long
         byteCount = WideCharToMultiByte(toCodePage, 0, StrPtr(utf16leStr), _
                                         -1, 0, 0, 0, 0) - 1
-        
         If byteCount < 1 Then
             If raiseErrors Then
                 'TODO: Do stuff based on GetApiErrorNumber
@@ -554,7 +545,7 @@ Public Function Decode(ByRef str As String, _
     Const methodName As String = "Decode"
     If str = vbNullString Then Exit Function
     #If Mac Then
-        Decode = Transcode(str, cpId_utf_16, fromCodePage, raiseErrors)
+        Decode = Transcode(str, cpUTF_16, fromCodePage, raiseErrors)
     #Else
         If raiseErrors Then SetLastError 0
         
@@ -661,17 +652,22 @@ Public Function StringToHex(ByVal s As String) As String
 End Function
 
 #If Mac = 0 Then
-'Replaces all occurences of unicode literals of the following formattings:
-'\uXXXX \UXXXX (4 or 8 hex digits, 8 for chars outside BMP)
-'\u{XXXXX} \U{XXXXX} (1 to 5 hex digits)
-'u+XXXX U+XXXX (4 or 5 hex digits)
-'&#dddd;
-'Where: X...hex digit (0-9 or a-f), d...decimal digit (0-9)
-'e.g.: the string "abc &#97; u+0062 \U0063 \u{64}"
-'      will be transformed to "abc a b c d"
-'This function can be slow for very large amount of different literals and very
-'long input strings
-'Depends on: ChrU
+'Replaces all occurences of unicode literals
+'Accepts the following formattings:
+'   \uXXXX \uXXXXXXXX    (4 or 8 hex digits, 8 for chars outside BMP)
+'   \u{XXXXX} \U{XXXXX}  (1 to 5 hex digits)
+'   u+XXXX u+XXXXX       (4 or 5 hex digits)
+'   &#dddddd;            (1 to 6 decimal digits)
+'Where:
+'   - prefixes \u is case insensitive
+'   - X = 0-9 or a-f or A-F (also case insensitive)
+'Example:
+'   - "abcd &#97;u+0062\U0063xy\u{64}" returns "abcd abcxyd"
+'Notes:
+'   - Avoid u+XXXX syntax if string contains literals without delimiters as it
+'     can be misinterpreted if adjacent to text starting with 0-9 or a-f.
+'   - This function can be slow for very long input strings with many
+'     different literals
 Public Function ReplaceUnicodeLiterals(ByVal str As String) As String
     Const PATTERN_UNICODE_LITERALS As String = _
         "\\u000[0-9a-f]{5}|\\u[0-9a-f]{4}|" & _
@@ -711,10 +707,11 @@ End Function
 #End If
 
 'Replaces all occurences of unicode characters outside the ANSI codePoint range
-'with literals of the following formatting:
-'\uXXXX (4 or 8 hex digits, 8 for chars outside BMP) (X = 0-9 or a-f)
-'e.g.: No example possible because VBE doesn't allow such characters
-'Depends on: AscU
+'(which the VBA-IDE can not display) with literals of the following formattings:
+'   \uXXXX      for characters inside the basic multilingual plane
+'   \uXXXXXXXX  for characters outside the basic multilingual plane
+'Where:
+'   Xes are the digits of the codepoint in hexadecimal. (X = 0-9 or A-F)
 Public Function EncodeUnicodeCharacters(ByVal str As String) As String
     Dim codepoint As Long
     Dim i As Long
@@ -814,30 +811,19 @@ Public Function EncodeANSI(ByVal utf16leStr As String) As String
             ansi(i) = utf16le(j)
             j = j + 2
         Else
-            ansi(i) = &H3F
-            j = j + 2 '&H3F = "?"
+            ansi(i) = &H3F 'Chr(&H3F) = "?"
+            j = j + 2
         End If
     Next i
     EncodeANSI = ansi
 End Function
-
-''Slower but shorter version
-'Public Function EncodeANSI_2(ByVal utf16leStr As String) As String
-'    Dim i As Long
-'    Dim ansi() As Byte: ReDim ansi(1 To Len(utf16leStr))
-'
-'    For i = 1 To UBound(ansi)
-'        ansi(i) = Asc(Mid(utf16leStr, i, 1))
-'    Next i
-'    EncodeANSI_2 = ansi
-'End Function
 
 Public Function EncodeUTF8(ByVal utf16leStr As String, _
                   Optional ByVal raiseErrors As Boolean = False) As String
     If Len(utf16leStr) < 50 Then
         EncodeUTF8 = EncodeUTF8native(utf16leStr, raiseErrors)
     Else
-        EncodeUTF8 = Encode(utf16leStr, cpId_utf_8, raiseErrors)
+        EncodeUTF8 = Encode(utf16leStr, cpUTF_8, raiseErrors)
     End If
 End Function
 
@@ -846,7 +832,7 @@ Public Function DecodeUTF8(ByVal utf8Str As String, _
     If Len(utf8Str) < 50 Then
         DecodeUTF8 = DecodeUTF8native(utf8Str, raiseErrors)
     Else
-        DecodeUTF8 = Decode(utf8Str, cpId_utf_8, raiseErrors)
+        DecodeUTF8 = Decode(utf8Str, cpUTF_8, raiseErrors)
     End If
 End Function
 
@@ -1364,7 +1350,6 @@ End Function
 'Inserts a string into another string at a specified position
 'Insert("abcd", "ff", 0) = "ffabcd"
 'Insert("abcd", "ff", 1) = "affbcd"
-'Insert("abcd", "ff", 2) = "abffcd"
 'Insert("abcd", "ff", 3) = "abcffd"
 'Insert("abcd", "ff", 4) = "abcdff"
 'Insert("abcd", "ff", 9) = "abcdff"
@@ -1441,4 +1426,3 @@ Public Function PadLeft(ByVal str As String, _
         PadLeft = Right(str, Length)
     End If
 End Function
-
