@@ -540,6 +540,9 @@ Public Function Encode(ByRef utf16leStr As String, _
     
         WideCharToMultiByte toCodePage, 0, StrPtr(utf16leStr), -1, _
                             StrPtr(Encode), byteCount, 0, 0
+        If raiseErrors Then
+            'Check if GetApiErrorNumber = 0
+        End If
     #End If
 End Function
 
@@ -553,10 +556,11 @@ Public Function Decode(ByRef str As String, _
     #If Mac Then
         Decode = Transcode(str, cpId_utf_16, fromCodePage, raiseErrors)
     #Else
+        If raiseErrors Then SetLastError 0
+        
         Dim charCount As Long
         charCount = MultiByteToWideChar(fromCodePage, 0, StrPtr(str), _
                                         LenB(str), 0, 0)
-    
         If charCount < 1 Then
             If raiseErrors Then
                 'TODO: Do stuff based on GetApiErrorNumber
@@ -570,6 +574,9 @@ Public Function Decode(ByRef str As String, _
         Decode = Space$(charCount)
         MultiByteToWideChar fromCodePage, 0, StrPtr(str), LenB(str), _
                             StrPtr(Decode), charCount
+        If raiseErrors Then
+            'Check if GetApiErrorNumber = 0
+        End If
     #End If
 End Function
 
@@ -658,13 +665,13 @@ End Function
 '\uXXXX \UXXXX (4 or 8 hex digits, 8 for chars outside BMP) (X = 0-9 or a-f)
 'u+XXXX U+XXXX (4 or 5 hex digits) (X = 0-9 or a-f)
 '&#dddd;       (1 to 6 dec digits) (d = 0-9)
-'e.g.: the string "abc &#97 u+0062 \U0063" will be transformed to "abc a b c"
+'e.g.: the string "abc &#97; u+0062 \U0063" will be transformed to "abc a b c"
 'This function can be slow for very large amount of different literals and very
 'long input strings
 'Depends on: ChrU
 Public Function ReplaceUnicodeLiterals(ByVal str As String) As String
     Const PATTERN_UNICODE_LITERALS As String = _
-        "\\u000[0-9a-f]{5}|\\u[0-9a-f]{4}|u\+[0-9|a-f]{4,5}|&#\d{1,6}"
+        "\\u000[0-9a-f]{5}|\\u[0-9a-f]{4}|u\+[0-9|a-f]{4,5}|&#\d{1,6};"
     Dim mc As Object
     
     With CreateObject("VBScript.RegExp")

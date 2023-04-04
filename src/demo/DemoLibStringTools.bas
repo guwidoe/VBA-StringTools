@@ -3,9 +3,9 @@ Option Explicit
 
 '''=============================================================================
 ''' VBA StringTools Demo Module
-''' ------------------------------------------
-''' https://github.com/guwidoe/VBA-StringTools
-''' ------------------------------------------
+''' ------------------------------------------------------------------------------------
+''' https://github.com/guwidoe/VBA-StringTools/blob/main/src/demo/DemoLibStringTools.bas
+''' ------------------------------------------------------------------------------------
 ''' MIT License
 '''
 ''' Copyright (c) 2023 Guido Witt-Döring
