@@ -44,7 +44,7 @@ Option Explicit
         Private Declare Function iconv_open Lib "/usr/lib/libiconv.dylib" (ByVal toCode As Long, ByVal fromCode As Long) As Long
         Private Declare Function iconv_close Lib "/usr/lib/libiconv.dylib" (ByVal cd As Long) As Long
         
-        Declare Function errno_location Lib "/usr/lib/libSystem.B.dylib" Alias "__error" () As LongPtr
+        Declare Function errno_location Lib "/usr/lib/libSystem.B.dylib" Alias "__error" () As Long
     #End If
     
     #If VBA7 Then
@@ -265,7 +265,7 @@ Public Enum CodePageIdentifier
     [_last_]
 End Enum
 
-Function GetApiErrorNumber() As Long
+Private Function GetApiErrorNumber() As Long
     #If Mac Then
         Dim errnoPtr As LongPtr
         Dim errnoValue As Long
@@ -277,6 +277,7 @@ Function GetApiErrorNumber() As Long
     #End If
 End Function
 
+'Returns a Collection for converting CodePageIDs to ConversionDescriptorNames
 Private Function CodePageToConversionDescriptorName() As Collection
     Static c As Collection
     
@@ -286,6 +287,8 @@ Private Function CodePageToConversionDescriptorName() As Collection
     End If
     
     Set c = New Collection
+    On Error Resume Next  '(Sometimes multiple ConversionDescriptorNames describe
+                        'the same CodePage)
     'Item:=ConversionDescriptorName, Key:=CStr(CodePageIdentifier) '(Optional)
     
     'Source:
@@ -339,7 +342,7 @@ Private Function CodePageToConversionDescriptorName() As Collection
     'Japanese
     c.Add Item:="EUC-JP"           ', Key:=CStr( )
     c.Add Item:="SHIFT_JIS", Key:=CStr(cpId_shift_jis)
-    c.Add Item:="CP932" ', Key:=CStr(cpId_shift_jis) '(=cpId_shift_jis)
+    c.Add Item:="CP932", Key:=CStr(cpId_shift_jis)  '(duplicate)
     c.Add Item:="ISO-2022-JP"      ', Key:=CStr( )
     c.Add Item:="ISO-2022-JP-2"    ', Key:=CStr( )
     c.Add Item:="ISO-2022-JP-1"    ', Key:=CStr( )
@@ -352,7 +355,7 @@ Private Function CodePageToConversionDescriptorName() As Collection
     c.Add Item:="GB18030"          ', Key:=CStr( )
     c.Add Item:="EUC-TW"           ', Key:=CStr( )
     c.Add Item:="BIG5", Key:=CStr(cpId_big5)
-    c.Add Item:="CP950" ', Key:=CStr(cpId_big5) '(=cpId_big5)
+    c.Add Item:="CP950", Key:=CStr(cpId_big5) '(duplicate)
     c.Add Item:="BIG5-HKSCS"       ', Key:=CStr( )
     c.Add Item:="BIG5-HKSCS:2001"  ', Key:=CStr( )
     c.Add Item:="BIG5-HKSCS:1999"  ', Key:=CStr( )
@@ -397,13 +400,6 @@ Private Function CodePageToConversionDescriptorName() As Collection
     c.Add Item:="NEXTSTEP"         ', Key:=CStr( )
 
     'Full Unicode
-    c.Add Item:="UTF-8", Key:=CStr(cpId_utf_8)
-    c.Add Item:="UCS-2"            ', Key:=CStr( )
-    c.Add Item:="UCS-2BE", Key:=CStr(cpId_unicodeFFFE)
-    c.Add Item:="UCS-2LE", Key:=CStr(cpId_utf_16)
-    c.Add Item:="UCS-4"            ', Key:=CStr( )
-    c.Add Item:="UCS-4BE", Key:=CStr(cpId_utf_32BE)
-    c.Add Item:="UCS-4LE", Key:=CStr(cpId_utf_32)
     c.Add Item:="UTF-16"           ', Key:=CStr( )
     c.Add Item:="UTF-16BE", Key:=CStr(cpId_unicodeFFFE)
     c.Add Item:="UTF-16LE", Key:=CStr(cpId_utf_16)
@@ -411,6 +407,13 @@ Private Function CodePageToConversionDescriptorName() As Collection
     c.Add Item:="UTF-32BE", Key:=CStr(cpId_utf_32BE)
     c.Add Item:="UTF-32LE", Key:=CStr(cpId_utf_32)
     c.Add Item:="UTF-7", Key:=CStr(cpId_utf_7)
+    c.Add Item:="UTF-8", Key:=CStr(cpId_utf_8)
+    c.Add Item:="UCS-2"            ', Key:=CStr( )
+    c.Add Item:="UCS-2BE", Key:=CStr(cpId_unicodeFFFE) '(duplicate)
+    c.Add Item:="UCS-2LE", Key:=CStr(cpId_utf_16) '(duplicate)
+    c.Add Item:="UCS-4"            ', Key:=CStr( )
+    c.Add Item:="UCS-4BE", Key:=CStr(cpId_utf_32BE) '(duplicate)
+    c.Add Item:="UCS-4LE", Key:=CStr(cpId_utf_32) '(duplicate)
     c.Add Item:="C99"              ', Key:=CStr( )
     c.Add Item:="JAVA"             ', Key:=CStr( )
 
@@ -465,39 +468,43 @@ Private Function CodePageToConversionDescriptorName() As Collection
     'The empty encoding name is equivalent to "char":
     'it denotes the locale dependent character encoding.
     Set CodePageToConversionDescriptorName = c
+'    Exit Function
+'errh:
+    
 End Function
 
-Private Function ConversionDescriptorNameToCodePage() As Collection
-    Static c As Collection
-    
-    If Not c Is Nothing Then
-        Set ConversionDescriptorNameToCodePage = c
-        Exit Function
-    End If
-    
-    Dim cpID As Long
-    Dim conversionDescriptor As Variant
-    Set c = New Collection
-    
-    On Error Resume Next
-    For cpID = CodePageIdentifier.[_first_] To CodePageIdentifier.[_last_]
-        conversionDescriptor = CodePageToConversionDescriptorName(CStr(cpID))
-        If conversionDescriptor <> "" Then
-            c.Add Item:=cpID, Key:=conversionDescriptor
-        End If
-        conversionDescriptor = ""
-    Next cpID
-    
-    cpID = -1
-    For Each conversionDescriptor In CodePageToConversionDescriptorName
-        cpID = c(conversionDescriptor)
-        If cpID = -1 Then c.Add Item:=-1, Key:=conversionDescriptor
-        cpID = -1
-    Next conversionDescriptor
-    On Error GoTo 0
-    
-    Set ConversionDescriptorNameToCodePage = c
-End Function
+''Returns a Collection for converting ConversionDescriptorNames to CodePageIDs
+'Private Function ConversionDescriptorNameToCodePage() As Collection
+'    Static c As Collection
+'
+'    If Not c Is Nothing Then
+'        Set ConversionDescriptorNameToCodePage = c
+'        Exit Function
+'    End If
+'
+'    Dim cpID As Long
+'    Dim conversionDescriptor As Variant
+'    Set c = New Collection
+'
+'    On Error Resume Next
+'    For cpID = CodePageIdentifier.[_first_] To CodePageIdentifier.[_last_]
+'        conversionDescriptor = CodePageToConversionDescriptorName(CStr(cpID))
+'        If conversionDescriptor <> "" Then
+'            c.Add Item:=cpID, Key:=conversionDescriptor
+'        End If
+'        conversionDescriptor = ""
+'    Next cpID
+'
+'    cpID = -1
+'    For Each conversionDescriptor In CodePageToConversionDescriptorName
+'        cpID = c(conversionDescriptor)
+'        If cpID = -1 Then c.Add Item:=-1, Key:=conversionDescriptor
+'        cpID = -1
+'    Next conversionDescriptor
+'    On Error GoTo 0
+'
+'    Set ConversionDescriptorNameToCodePage = c
+'End Function
 
 Public Function Transcode(ByRef str As String, _
                           ByVal toCodePage As CodePageIdentifier, _
@@ -833,27 +840,19 @@ End Function
 
 Public Function EncodeUTF8(ByVal utf16leStr As String, _
                   Optional ByVal raiseErrors As Boolean = False) As String
-    If raiseErrors Or Len(utf16leStr) < 50 Then
+    If Len(utf16leStr) < 50 Then
         EncodeUTF8 = EncodeUTF8native(utf16leStr, raiseErrors)
     Else
-        #If Mac Then
-            EncodeUTF8 = EncodeUTF8native(utf16leStr, False)
-        #Else
-            EncodeUTF8 = EncodeUTF8usingWinAPI(utf16leStr)
-        #End If
+        EncodeUTF8 = Encode(utf16leStr, cpId_utf_8, raiseErrors)
     End If
 End Function
 
 Public Function DecodeUTF8(ByVal utf8Str As String, _
                   Optional ByVal raiseErrors As Boolean = False) As String
-    If raiseErrors Or Len(utf8Str) < 50 Then
+    If Len(utf8Str) < 50 Then
         DecodeUTF8 = DecodeUTF8native(utf8Str, raiseErrors)
     Else
-        #If Mac Then
-            DecodeUTF8 = DecodeUTF8native(utf8Str, False)
-        #Else
-            DecodeUTF8 = DecodeUTF8usingWinAPI(utf8Str)
-        #End If
+        DecodeUTF8 = Decode(utf8Str, cpId_utf_8, raiseErrors)
     End If
 End Function
 
@@ -1709,7 +1708,7 @@ Private Sub TestHexToString()
     Debug.Print s
 End Sub
 
-Function GetTickCount() As Currency
+Private Function GetTickCount() As Currency
     #If Mac Then
         GetTickCount = mach_continuous_time()
     #Else
@@ -1717,7 +1716,7 @@ Function GetTickCount() As Currency
     #End If
 End Function
 
-Function GetFrequency() As Currency
+Private Function GetFrequency() As Currency
     #If Mac Then
         Dim timebaseInfo As MachTimebaseInfo
         mach_timebase_info timebaseInfo
@@ -1727,7 +1726,7 @@ Function GetFrequency() As Currency
     #End If
 End Function
 
-Function AccurateTimer() As Currency
+Private Function AccurateTimer() As Currency
     AccurateTimer = GetTickCount / GetFrequency
 End Function
 
