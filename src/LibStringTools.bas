@@ -662,16 +662,20 @@ End Function
 
 #If Mac = 0 Then
 'Replaces all occurences of unicode literals of the following formattings:
-'\uXXXX \UXXXX (4 or 8 hex digits, 8 for chars outside BMP) (X = 0-9 or a-f)
-'u+XXXX U+XXXX (4 or 5 hex digits) (X = 0-9 or a-f)
-'&#dddd;       (1 to 6 dec digits) (d = 0-9)
-'e.g.: the string "abc &#97; u+0062 \U0063" will be transformed to "abc a b c"
+'\uXXXX \UXXXX (4 or 8 hex digits, 8 for chars outside BMP)
+'\u{XXXXX} \U{XXXXX} (1 to 5 hex digits)
+'u+XXXX U+XXXX (4 or 5 hex digits)
+'&#dddd;
+'Where: X...hex digit (0-9 or a-f), d...decimal digit (0-9)
+'e.g.: the string "abc &#97; u+0062 \U0063 \u{64}"
+'      will be transformed to "abc a b c d"
 'This function can be slow for very large amount of different literals and very
 'long input strings
 'Depends on: ChrU
 Public Function ReplaceUnicodeLiterals(ByVal str As String) As String
     Const PATTERN_UNICODE_LITERALS As String = _
-        "\\u000[0-9a-f]{5}|\\u[0-9a-f]{4}|u\+[0-9|a-f]{4,5}|&#\d{1,6};"
+        "\\u000[0-9a-f]{5}|\\u[0-9a-f]{4}|" & _
+        "\\u{[0-9a-f]{1,5}}|u\+[0-9|a-f]{4,5}|&#\d{1,6};"
     Dim mc As Object
     
     With CreateObject("VBScript.RegExp")
@@ -691,7 +695,11 @@ Public Function ReplaceUnicodeLiterals(ByVal str As String) As String
         If Left(mv, 1) = "&" Then
             codepoint = CLng(Mid(mv, 3, Len(mv) - 3))
         Else
-            codepoint = CLng("&H" & Mid(mv, 3))
+            If Mid(mv, 3, 1) = "{" Then
+                codepoint = CLng("&H" & Mid(mv, 4, Len(mv) - 4))
+            Else
+                codepoint = CLng("&H" & Mid(mv, 3))
+            End If
         End If
         If codepoint < &H110000 Then
             If codepoint < &HD800& Or codepoint >= &HE000& Then _
