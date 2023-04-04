@@ -608,49 +608,63 @@ Public Function Decode(ByRef str As String, _
     #End If
 End Function
 
-#If Mac = 0 Then
-'Returns strings defined as hex literal as string.
+'Returns strings defined as hex literal as string
 'Accepts the following formattings:
-'0xXXXXXX (even number of Xes, X = 0-9 or a-f, not case sensitive)
-'XXXXXX (even number of Xes, X = 0-9 or a-f, not case sensitive)
-'X XX XX X XX (Xes separated by " ", X = 0-9 or a-f, not case sensitive)
-'instead of " ", the following separators are also accepted: ",;-+"
-'Accepts any combination of the above formattings
-'e.g.: "0x610062006300" will be converted to "abc"
+'   0xXXXXXX
+'   &HXXXXXX
+'   XXXXXX
+'Where:
+'   - prefixes 0x and &H are case sensitive
+'   - there's an even number of Xes, X = 0-9 or a-f or A-F (case insensitive)
+'Raises error 5 if:
+'   - Length is not even / partial bytes
+'   - Invalid characters are found (outside prefix and 0-9 / a-f / A-F ranges)
+'Examples:
+'   - HexToString("0x610062006300") returns "abc"
+'   - StrConv(HexToString("0x616263"), vbUnicode) returns "abc"
+'   - HexToString("0x61626t") or HexToString("0x61626") both raise error 5
 Public Function HexToString(ByVal hexStr As String) As String
     Const methodName As String = "HexToString"
-    Dim s As String
+    Const errPrefix As String = "Invalid Hex string literal. "
+    Dim size As Long: size = Len(hexStr)
     
-    s = Replace(Replace(Replace(Replace(Replace(Replace(LCase(hexStr), _
-            "&h", " "), "0x", " "), ",", " "), ";", " "), "-", " "), "+", " ")
-    s = " " & Replace(s, " ", "  ") & " "
+    If size = 0 Then Exit Function
+    If size Mod 2 = 1 Then Err.raise 5, methodName, errPrefix & "Uneven length"
     
-    With CreateObject("VBScript.RegExp")
-        .Global = True
-        .MultiLine = True
-        .IgnoreCase = False 'Already LCase()
-        .Pattern = " ([a-f0-9]) "
-        s = .Replace(s, "0$1 ")
-    End With
-    
-    s = Replace(s, " ", "")
-    If Len(s) Mod 2 Then Err.raise 5, methodName, _
-            "Invalid Hex string literal. (Length is not even)"
-    
-    Dim mask As String: mask = Replace(Space(Len(s)), " ", "[a-f0-9]")
-    
-    If Not s Like mask Then Err.raise 5, methodName, _
-        "Invalid Hex string literal. (Contains characters other than a-f & 0-9)"
-    
+    Static nibbleMap(0 To 255) As Long 'Nibble: 0 to F. Byte: 00 to FF
+    Static charMap(0 To 255) As String
     Dim i As Long
-    Dim b() As Byte: ReDim b(0 To Len(s) \ 2 - 1)
     
-    For i = LBound(b) To UBound(b)
-        b(i) = "&H" & Mid$(s, i * 2 + 1, 2)
+    If nibbleMap(0) = 0 Then
+        For i = 0 To 255
+            nibbleMap(i) = -256 'To force invalid character code
+            charMap(i) = ChrB$(i)
+        Next i
+        For i = 0 To 9
+            nibbleMap(Asc(CStr(i))) = i
+        Next i
+        For i = 10 To 15
+            nibbleMap(i + 55) = i 'Asc("A") to Asc("F")
+            nibbleMap(i + 87) = i 'Asc("a") to Asc("f")
+        Next i
+    End If
+    
+    Dim prefix As String: prefix = Left$(hexStr, 2)
+    Dim startPos As Long: startPos = -4 * CLng(prefix = "0x" Or prefix = "&H")
+    Dim b() As Byte:      b = hexStr
+    Dim j As Long
+    Dim charCode As Long
+    
+    HexToString = MidB$(hexStr, 1, size / 2 - Sgn(startPos))
+    For i = startPos To UBound(b) Step 4
+        j = j + 1
+        charCode = nibbleMap(b(i)) * &H10& + nibbleMap(b(i + 2))
+        If charCode < 0 Or b(i + 1) > 0 Or b(i + 3) > 0 Then
+            Err.raise 5, methodName, errPrefix & "Expected a-f/A-F or 0-9"
+        End If
+        MidB$(HexToString, j, 1) = charMap(charCode)
     Next i
-    HexToString = b
 End Function
-#End If
 
 'Converts the input string into a string of hex literals.
 'e.g.: "abc" will be turned into "0x610062006300" (UTF-16LE)
