@@ -74,7 +74,7 @@ Option Explicit
 
 'https://learn.microsoft.com/en-us/windows/win32/intl/code-page-identifiers
 Public Enum CodePageIdentifier
-    [_first_]
+    [_first]
 'Enum_Name   Identifier             '.NET Name               Additional information
     cpIBM037 = 37                     'IBM037                  IBM EBCDIC US-Canada
     cpIBM437 = 437                    'IBM437                  OEM United States
@@ -227,29 +227,32 @@ Public Enum CodePageIdentifier
     cpX_iscii_pa = 57011              'x-iscii-pa              ISCII Punjabi
     cpUTF_7 = 65000                   'utf-7                   Unicode (UTF-7)
     cpUTF_8 = 65001                  'utf-8                   Unicode (UTF-8)
-    [_last_]
+    [_last]
 End Enum
 
 Private Function GetApiErrorNumber() As Long
     #If Mac Then
-        Dim errnoPtr As LongPtr
-        Dim errnoValue As Long
-        
-        errnoPtr = errno_location()
-        CopyMemory GetApiErrorNumber, ByVal errnoPtr, LenB(GetApiErrorNumber)
+        CopyMemory GetApiErrorNumber, ByVal errno_location(), 4
     #Else
-        GetApiErrorNumber = GetLastError()
+        GetApiErrorNumber = Err.LastDllError 'GetLastError
+    #End If
+End Function
+
+Private Function SetApiErrorNumber(ByVal errNumber As Long) As Long
+    #If Mac Then
+        CopyMemory ByVal errno_location(), errNumber, 4
+    #Else
+        SetLastError errNumber
     #End If
 End Function
 
 'Returns a Collection for converting CodePageIDs to ConversionDescriptorNames
-Private Static Property Get ConversionDescriptorName() As Variant
-    Static arr(CodePageIdentifier.[_first_] To _
-               CodePageIdentifier.[_last_]) As String
+Private Static Function ConversionDescriptorName(ByVal cpID As Long) As String
+    Dim arr(CodePageIdentifier.[_first] To CodePageIdentifier.[_last]) As String
     
-    If arr(CodePageIdentifier.[_first_]) <> 0 Then
-        ConversionDescriptorName = arr
-        Exit Property
+    If arr(CodePageIdentifier.[_first]) <> 0 Then
+        ConversionDescriptorName = StrConv(arr(cpID), vbFromUnicode)
+        Exit Function
     End If
     
     'Source:
@@ -426,8 +429,8 @@ Private Static Property Get ConversionDescriptorName() As Variant
 
     'The empty encoding name is equivalent to "char":
     'it denotes the locale dependent character encoding.
-    ConversionDescriptorName = arr
-End Property
+    ConversionDescriptorName = arr(cpID)
+End Function
 
 ''Returns a Collection for converting ConversionDescriptorNames to CodePageIDs
 'Private Function ConversionDescriptorNameToCodePage() As Collection
@@ -476,8 +479,8 @@ Public Function Transcode(ByRef str As String, _
         Dim cd As LongPtr
         
         cd = iconv_open( _
-            StrPtr(StrConv(ConversionDescriptorName(toCodePage), vbFromUnicode)), _
-            StrPtr(StrConv(ConversionDescriptorName(fromCodePage), vbFromUnicode)))
+            StrPtr(ConversionDescriptorName(toCodePage)), _
+            StrPtr(ConversionDescriptorName(fromCodePage)))
 
         If iconv(cd, inBuf, inBytesLeft, outBuf, outBytesLeft) = -1 _
         And raiseErrors Then
@@ -573,9 +576,9 @@ End Function
 
 'Returns strings defined as hex literal as string
 'Accepts the following formattings:
-'   0xXXXXXX
-'   &HXXXXXX
-'   XXXXXX
+'   0xXXXXXX...
+'   &HXXXXXX...
+'   XXXXXX...
 'Where:
 '   - prefixes 0x and &H are case sensitive
 '   - there's an even number of Xes, X = 0-9 or a-f or A-F (case insensitive)
