@@ -31,24 +31,25 @@ Attribute VB_Name = "LibStringTools"
 'Make ReplaceUnicodeLiterals Mac compatible by removing Regex
 
 Option Explicit
+Option Base 0
 
 #Const TEST_MODE = False
 
 #If Mac Then
     #If VBA7 Then 'https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/iconv.3.html
-        Declare PtrSafe Function iconv_open Lib "/usr/lib/libiconv.dylib" (ByVal toCode As LongPtr, ByVal fromCode As LongPtr) As LongPtr
-        Declare PtrSafe Function iconv_close Lib "/usr/lib/libiconv.dylib" (ByVal cd As LongPtr) As Long
-        Declare PtrSafe Function iconv Lib "/usr/lib/libiconv.dylib" (ByVal cd As LongPtr, ByRef inBuf As LongPtr, ByRef inBytesLeft As LongPtr, ByRef outBuf As LongPtr, ByRef outBytesLeft As LongPtr) As LongPtr
+        Private Declare PtrSafe Function iconv_open Lib "/usr/lib/libiconv.dylib" (ByVal toCode As LongPtr, ByVal fromCode As LongPtr) As LongPtr
+        Private Declare PtrSafe Function iconv_close Lib "/usr/lib/libiconv.dylib" (ByVal cd As LongPtr) As Long
+        Private Declare PtrSafe Function iconv Lib "/usr/lib/libiconv.dylib" (ByVal cd As LongPtr, ByRef inBuf As LongPtr, ByRef inBytesLeft As LongPtr, ByRef outBuf As LongPtr, ByRef outBytesLeft As LongPtr) As LongPtr
         
-        Private Declare PtrSafe Function CopyMemory Lib "/usr/lib/libc.dylib" Alias "memmove" (Destination As Any, Source As Any, ByVal Length As LongPtr) As LongPtr
-        Declare PtrSafe Function errno_location Lib "/usr/lib/libSystem.B.dylib" Alias "__error" () As LongPtr
+        Private Declare PtrSafe Function CopyMemory Lib "/usr/lib/libc.dylib" Alias "memmove" (Destination As Any, source As Any, ByVal Length As LongPtr) As LongPtr
+        Private Declare PtrSafe Function errno_location Lib "/usr/lib/libSystem.B.dylib" Alias "__error" () As LongPtr
     #Else
         Private Declare Function iconv Lib "/usr/lib/libiconv.dylib" (ByVal cd As Long, ByRef inBuf As Long, ByRef inBytesLeft As Long, ByRef outBuf As Long, ByRef outBytesLeft As Long) As Long
         Private Declare Function iconv_open Lib "/usr/lib/libiconv.dylib" (ByVal toCode As Long, ByVal fromCode As Long) As Long
         Private Declare Function iconv_close Lib "/usr/lib/libiconv.dylib" (ByVal cd As Long) As Long
         
         Private Declare Function CopyMemory Lib "/usr/lib/libc.dylib" Alias "memmove" (Destination As Any, Source As Any, ByVal Length As Long) As Long
-        Declare Function errno_location Lib "/usr/lib/libSystem.B.dylib" Alias "__error" () As Long
+        Private Declare Function errno_location Lib "/usr/lib/libSystem.B.dylib" Alias "__error" () As Long
     #End If
 #Else 'Windows
     #If VBA7 Then
@@ -230,22 +231,6 @@ Public Enum CodePageIdentifier
     [_last]
 End Enum
 
-Private Function GetApiErrorNumber() As Long
-    #If Mac Then
-        CopyMemory GetApiErrorNumber, ByVal errno_location(), 4
-    #Else
-        GetApiErrorNumber = Err.LastDllError 'GetLastError
-    #End If
-End Function
-
-Private Function SetApiErrorNumber(ByVal errNumber As Long) As Long
-    #If Mac Then
-        CopyMemory ByVal errno_location(), errNumber, 4
-    #Else
-        SetLastError errNumber
-    #End If
-End Function
-
 'Returns a Collection for converting CodePageIDs to ConversionDescriptorNames
 Private Static Function ConversionDescriptorName(ByVal cpID As Long) As String
     Dim arr(CodePageIdentifier.[_first] To CodePageIdentifier.[_last]) As String
@@ -254,6 +239,11 @@ Private Static Function ConversionDescriptorName(ByVal cpID As Long) As String
         ConversionDescriptorName = StrConv(arr(cpID), vbFromUnicode)
         Exit Function
     End If
+    
+    Dim i As Long
+    For i = CodePageIdentifier.[_first] To CodePageIdentifier.[_last]
+        arr(i) = -1
+    Next i
     
     'Source:
     'https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/iconv_open.3.html#//apple_ref/doc/man/3/iconv_open
@@ -465,6 +455,22 @@ End Function
 '    Set ConversionDescriptorNameToCodePage = c
 'End Function
 
+Private Function GetApiErrorNumber() As Long
+    #If Mac Then
+        CopyMemory GetApiErrorNumber, ByVal errno_location(), 4
+    #Else
+        GetApiErrorNumber = Err.LastDllError 'GetLastError
+    #End If
+End Function
+
+Private Function SetApiErrorNumber(ByVal errNumber As Long) As Long
+    #If Mac Then
+        CopyMemory ByVal errno_location(), errNumber, 4
+    #Else
+        SetLastError errNumber
+    #End If
+End Function
+
 Public Function Transcode(ByRef str As String, _
                           ByVal toCodePage As CodePageIdentifier, _
                           ByVal fromCodePage As CodePageIdentifier, _
@@ -485,7 +491,7 @@ Public Function Transcode(ByRef str As String, _
         If iconv(cd, inBuf, inBytesLeft, outBuf, outBytesLeft) = -1 _
         And raiseErrors Then
             'TODO: Do stuff based on GetApiErrorNumber
-            Err.raise 5, methodName, _
+            Err.Raise 5, methodName, _
                 "Input is invalid byte sequence of CodePage " & fromCodePage
         Else
             Transcode = LeftB$(buffer, LenB(buffer) - CLng(outBytesLeft))
@@ -521,7 +527,7 @@ Public Function Encode(ByRef utf16leStr As String, _
         If byteCount < 1 Then
             If raiseErrors Then
                 'TODO: Do stuff based on GetApiErrorNumber
-                Err.raise 5, methodName, _
+                Err.Raise 5, methodName, _
                     "Input is invalid byte sequence of CodePage " & toCodePage
             Else
                 Exit Function
@@ -558,7 +564,7 @@ Public Function Decode(ByRef str As String, _
         If charCount < 1 Then
             If raiseErrors Then
                 'TODO: Do stuff based on GetApiErrorNumber
-                Err.raise 5, methodName, _
+                Err.Raise 5, methodName, _
                     "Input is invalid byte sequence of CodePage " & fromCodePage
             Else
                 Exit Function
@@ -595,7 +601,7 @@ Public Function HexToString(ByVal hexStr As String) As String
     Dim size As Long: size = Len(hexStr)
     
     If size = 0 Then Exit Function
-    If size Mod 2 = 1 Then Err.raise 5, methodName, errPrefix & "Uneven length"
+    If size Mod 2 = 1 Then Err.Raise 5, methodName, errPrefix & "Uneven length"
     
     Static nibbleMap(0 To 255) As Long 'Nibble: 0 to F. Byte: 00 to FF
     Static charMap(0 To 255) As String
@@ -626,7 +632,7 @@ Public Function HexToString(ByVal hexStr As String) As String
         j = j + 1
         charCode = nibbleMap(b(i)) * &H10& + nibbleMap(b(i + 2))
         If charCode < 0 Or b(i + 1) > 0 Or b(i + 3) > 0 Then
-            Err.raise 5, methodName, errPrefix & "Expected a-f/A-F or 0-9"
+            Err.Raise 5, methodName, errPrefix & "Expected a-f/A-F or 0-9"
         End If
         MidB$(HexToString, j, 1) = charMap(charCode)
     Next i
@@ -750,7 +756,7 @@ End Function
     If codepoint < &HD800& Then
         ChrU = ChrW$(codepoint)
     ElseIf codepoint < &HE000& And Not allowSingleSurrogates Then
-        Err.raise 5, methodName, _
+        Err.Raise 5, methodName, _
             "Invalid Unicode codepoint. (Range reserved for surrogate pairs)"
     ElseIf codepoint < &H10000 Then
         ChrU = ChrW$(codepoint)
@@ -759,7 +765,7 @@ End Function
         ChrU = ChrW$(&HD800& Or (codepoint \ &H400&)) & _
                ChrW$(&HDC00& Or (codepoint And &H3FF&))
     Else
-        Err.raise 5, methodName, "Codepoint outside of valid Unicode range."
+        Err.Raise 5, methodName, "Codepoint outside of valid Unicode range."
     End If
 End Function
 
@@ -868,7 +874,7 @@ Private Function EncodeUTF8native(ByVal utf16leStr As String, _
                 i = i + 1
             Else
                 If raiseErrors Then _
-                    Err.raise 5, methodName, _
+                    Err.Raise 5, methodName, _
                         "Invalid Unicode codepoint. (Lonely high surrogate)"
                 codepoint = &HFFFD&
             End If
@@ -888,7 +894,7 @@ Private Function EncodeUTF8native(ByVal utf16leStr As String, _
             j = j + 3
         ElseIf codepoint < &HE000 Then
             If raiseErrors Then _
-                Err.raise 5, methodName, _
+                Err.Raise 5, methodName, _
                     "Invalid Unicode codepoint. (Lonely low surrogate)"
             codepoint = &HFFFD&
         ElseIf codepoint < &H10000 Then
@@ -951,13 +957,13 @@ Private Function DecodeUTF8native(ByVal utf8Str As String, _
         numBytesOfCodePoint = numBytesOfCodePoints(codepoint)
         
         If numBytesOfCodePoint = 0 Then
-            If raiseErrors Then Err.raise 5, methodName, "Invalid byte"
+            If raiseErrors Then Err.Raise 5, methodName, "Invalid byte"
             GoTo insertErrChar
         ElseIf numBytesOfCodePoint = 1 Then
             utf16(j) = codepoint
             j = j + 2
         ElseIf i + numBytesOfCodePoint - 1 > UBound(utf8) Then
-            If raiseErrors Then Err.raise 5, methodName, _
+            If raiseErrors Then Err.Raise 5, methodName, _
                     "Incomplete UTF-8 codepoint at end of string."
             GoTo insertErrChar
         Else
@@ -970,20 +976,20 @@ Private Function DecodeUTF8native(ByVal utf8Str As String, _
                     codepoint = (codepoint * &H40&) + (currByte And &H3F)
                 Else
                     If raiseErrors Then _
-                        Err.raise 5, methodName, "Invalid continuation byte"
+                        Err.Raise 5, methodName, "Invalid continuation byte"
                     GoTo insertErrChar
                 End If
             Next k
             'Convert the Unicode codepoint to UTF-16LE bytes
             If codepoint < minCp(numBytesOfCodePoint) Then
-                If raiseErrors Then Err.raise 5, methodName, "Overlong encoding"
+                If raiseErrors Then Err.Raise 5, methodName, "Overlong encoding"
                 GoTo insertErrChar
             ElseIf codepoint < &HD800& Then
                 utf16(j) = CByte(codepoint And &HFF&)
                 utf16(j + 1) = CByte(codepoint \ &H100&)
                 j = j + 2
             ElseIf codepoint < &HE000& Then
-                If raiseErrors Then Err.raise 5, methodName, _
+                If raiseErrors Then Err.Raise 5, methodName, _
                 "Invalid Unicode codepoint.(Range reserved for surrogate pairs)"
                 GoTo insertErrChar
             ElseIf codepoint < &H10000 Then
@@ -1002,7 +1008,7 @@ Private Function DecodeUTF8native(ByVal utf8Str As String, _
                 utf16(j + 3) = loSurrogate \ &H100&
                 j = j + 4
             Else
-                If raiseErrors Then Err.raise 5, methodName, _
+                If raiseErrors Then Err.Raise 5, methodName, _
                         "Codepoint outside of valid Unicode range"
 insertErrChar:  utf16(j) = &HFD
                 utf16(j + 1) = &HFF
@@ -1085,18 +1091,18 @@ Public Function EncodeUTF32LE(ByVal utf16leStr As String, _
                             (lowSurrogate - &HDC00&) + &H10000
                 i = i + 1
             Else
-                If raiseErrors Then Err.raise 5, methodName, _
+                If raiseErrors Then Err.Raise 5, methodName, _
                     "Invalid Unicode codepoint. (Lonely high surrogate)"
                 codepoint = &HFFFD&
             End If
         End If
         
         If codepoint >= &HD800& And codepoint < &HE000& Then
-            If raiseErrors Then Err.raise 5, methodName, _
+            If raiseErrors Then Err.Raise 5, methodName, _
                 "Invalid Unicode codepoint. (Lonely low surrogate)"
             codepoint = &HFFFD&
         ElseIf codepoint > &H10FFFF Then
-            If raiseErrors Then Err.raise 5, methodName, _
+            If raiseErrors Then Err.Raise 5, methodName, _
                 "Codepoint outside of valid Unicode range"
             codepoint = &HFFFD&
         End If
@@ -1128,7 +1134,7 @@ Public Function DecodeUTF32LE(ByVal utf32str As String, _
         Else
             If utf32(i + 3) <> 0 Then
                 If raiseErrors Then _
-                    Err.raise 5, methodName, _
+                    Err.Raise 5, methodName, _
                     "Codepoint outside of valid Unicode range"
                 codepoint = &HFFFD&
             Else
@@ -1136,13 +1142,13 @@ Public Function DecodeUTF32LE(ByVal utf32str As String, _
                             utf32(i + 1) * &H100& + utf32(i)
                 If codepoint >= &HD800& And codepoint < &HE000& Then
                     If raiseErrors Then _
-                        Err.raise 5, methodName, _
+                        Err.Raise 5, methodName, _
                         "Invalid Unicode codepoint. " & _
                         "(Range reserved for surrogate pairs)"
                     codepoint = &HFFFD&
                 ElseIf codepoint > &H10FFFF Then
                     If raiseErrors Then _
-                        Err.raise 5, methodName, _
+                        Err.Raise 5, methodName, _
                         "Codepoint outside of valid Unicode range"
                     codepoint = &HFFFD&
                 End If
@@ -1160,8 +1166,7 @@ Public Function DecodeUTF32LE(ByVal utf32str As String, _
         End If
         i = i + 4
     Loop
-    ReDim Preserve utf16(LBound(utf16) To j - 1)
-    DecodeUTF32LE = utf16
+    DecodeUTF32LE = MidB$(utf16, 1, j)
 End Function
 
 'Function returning a string containing all alphanumeric characters equally
@@ -1391,7 +1396,11 @@ Public Function SplitUnlessInQuotes(ByVal str As String, _
             Exit For
         End If
         
-        If Mid(str, i, 1) = """" Then doSplit = Not doSplit
+        If Mid(str, i, 1) = """" Then
+            doSplit = Not doSplit
+            If Not doSplit Then _
+                doSplit = InStr(i + 1, str, """", vbBinaryCompare) = 0
+        End If
         
         If Mid(str, i, Len(delim)) = delim And doSplit Or i = Len(str) Then
             If i = Len(str) Then s = s & Mid(str, i, 1)
