@@ -1379,6 +1379,10 @@ End Function
 '                      "Hello "" "" World"
 '               and:
 '                      "Goodbye World"
+'If " is chosen as delimiter, splits at the outermost two occurrences of ", or
+'if only one " exists in the string, splits the string into two parts.
+'E.g. SplitUnlessInQuotes("asdf""asdf""asdf""asdf", """") returns
+'    "asdf", "asdf""asdf", and "asdf"
 Public Function SplitUnlessInQuotes(ByVal str As String, _
                            Optional ByVal delim As String = " ", _
                            Optional limit As Long = -1) As Variant
@@ -1387,6 +1391,26 @@ Public Function SplitUnlessInQuotes(ByVal str As String, _
     Dim ub As Long:         ub = -1
     Dim parts As Variant:   ReDim parts(0 To 0)
     Dim doSplit As Boolean: doSplit = True
+
+    If delim = """" Then
+        i = InStr(1, str, """", vbBinaryCompare)
+        If i <> 0 Then
+            Dim j As Long: j = InStrRev(str, """", , vbBinaryCompare)
+            If i = j Then
+                SplitUnlessInQuotes = Split(str, """", , vbBinaryCompare)
+                Exit Function
+            Else
+                ReDim parts(0 To 2)
+                parts(0) = Left$(str, i - 1)
+                parts(1) = Mid$(str, i + 1, j)
+                parts(2) = Mid$(str, j + 1)
+            End If
+        Else
+            parts(0) = str
+        End If
+        SplitUnlessInQuotes = parts
+        Exit Function
+    End If
     
     For i = 1 To Len(str)
         If ub = limit - 2 Then
@@ -1415,6 +1439,43 @@ Public Function SplitUnlessInQuotes(ByVal str As String, _
         End If
     Next i
     SplitUnlessInQuotes = parts
+End Function
+
+'Repeats the string str, repeatTimes times.
+'Works with byte strings of uneven LenB
+'E.g.: RepeatString("a", 3) -> "aaa"
+'      StrConv(RepeatString(MidB("a", 1, 1), 3), vbUnicode) -> "aaa"
+Public Function RepeatString(ByRef str As String, _
+                    Optional ByVal repeatTimes As Long = 2) As String
+    RepeatString = Space((LenB(str) * repeatTimes + 1) \ 2)
+    
+    If (LenB(str) * repeatTimes) Mod 2 = 1 Then _
+        RepeatString = MidB(RepeatString, 1, LenB(RepeatString) - 1)
+
+    Dim i As Long
+    For i = 1 To LenB(RepeatString) Step LenB(str)
+        MidB(RepeatString, i, LenB(str)) = str
+    Next i
+End Function
+
+'Replaces repeated occurrences of consecutive 'substring' with a single one
+'E.g.: LimitRepeatedSubstrings("aaabaac", "a", 1) -> "abac"
+Public Function LimitRepeatedSubstrings(ByVal str As String, _
+                               Optional ByVal subStr As String = vbNewLine, _
+                               Optional ByVal limit As Long = 1, _
+                               Optional ByVal compare As VbCompareMethod) _
+                                        As String
+    Dim sReplace As String:     sReplace = RepeatString(subStr, limit)
+    Dim sCompare As String:     sCompare = str
+    Do
+        Dim sFind As String:    sFind = sReplace & subStr
+        Do
+            LimitRepeatedSubstrings = sCompare
+            sCompare = Replace(sCompare, sFind, sReplace, , , compare)
+            sFind = sFind & subStr 'This together with outer loop should
+                                   'improve worst-case runtime a lot
+        Loop Until sCompare = LimitRepeatedSubstrings
+    Loop Until sFind = sReplace & subStr & subStr
 End Function
 
 'Adds fillerChars to the right side of a string to make it the specified length
