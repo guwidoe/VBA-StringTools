@@ -88,6 +88,7 @@ Public Sub RunAllTests()
     TestUTF32EncodersAndDecodersPerformance
     TestANSIEncodersAndDecodersPerformance
     TestDifferentWaysOfGettingNumericalValuesFromStrings
+    RunLimitConsecutiveSubstringRepetitionTests
 End Sub
 
 Private Sub TestEncodersAndDecoders()
@@ -355,6 +356,63 @@ Private Sub TestHexToString()
     Dim s As String
     s = HexToString(utf16leTestHexString)
     Debug.Print s
+End Sub
+
+
+Private Function LimitConsecutiveSubstringRepetitionCheck(ByVal str As String, _
+                                           Optional ByVal subStr As String = vbNewLine, _
+                                           Optional ByVal limit As Long = 1, _
+                                           Optional ByVal compare As VbCompareMethod) _
+                                                    As String
+    Dim sReplace As String:     sReplace = RepeatString(subStr, limit)
+    Dim sCompare As String:     sCompare = str
+    Do
+        Dim sFind As String:    sFind = sReplace & subStr
+        Do
+            LimitConsecutiveSubstringRepetitionCheck = sCompare
+            sCompare = Replace(sCompare, sFind, sReplace, , , compare)
+            sFind = sFind & subStr 'This together with outer loop should
+                                   'improve worst-case runtime a lot
+        Loop Until sCompare = LimitConsecutiveSubstringRepetitionCheck
+    Loop Until sFind = sReplace & subStr & subStr
+End Function
+
+Sub RunLimitConsecutiveSubstringRepetitionTests()
+    Dim failedTests As Long
+    On Error GoTo errh:
+    TestLimitConsecutiveSubstringRepetition "aaaabaaca", "a", 1
+    TestLimitConsecutiveSubstringRepetition "aaaabaaca", "aa", 1
+    TestLimitConsecutiveSubstringRepetition "abaca", "aa", 1
+    TestLimitConsecutiveSubstringRepetition "aaaaabaaca", "aa", 1
+    TestLimitConsecutiveSubstringRepetition "aaaaababaca", "ab", 1
+    TestLimitConsecutiveSubstringRepetition "bbbaaababbb", "ab", 1
+    'Add more tests here
+    
+    If failedTests = 0 Then _
+        Debug.Print "LimitConsecutiveSubstringRepetition PASSED all tests"
+    Exit Sub
+errh:
+    If Err.Number = vbObjectError + 43233 Then
+        failedTests = failedTests + 1
+        Debug.Print Err.description
+        Resume Next
+    Else
+        Err.Raise Err
+    End If
+End Sub
+
+Private Sub TestLimitConsecutiveSubstringRepetition(ByVal str As String, _
+                                  Optional ByVal subStr As String = vbNewLine, _
+                                  Optional ByVal limit As Long = 1, _
+                                  Optional ByVal compare As VbCompareMethod)
+    If LimitConsecutiveSubstringRepetition(str, subStr, limit, compare) _
+    <> LimitConsecutiveSubstringRepetitionCheck(str, subStr, limit, compare) Then _
+        Err.Raise vbObjectError + 43233, "TestLimitConsecutiveSubstringRepetition", _
+        "TestLimitConsecutiveSubstringRepetition failed for: " & vbNewLine & _
+        "vbCompareMethod: " & compare & vbNewLine & _
+        "limit: " & limit & vbNewLine & _
+        "subStr: " & subStr & _
+        "str: " & str
 End Sub
 
 

@@ -33,7 +33,7 @@ Attribute VB_Name = "LibStringTools"
 Option Explicit
 Option Base 0
 
-#Const TEST_MODE = False
+#Const TEST_MODE = True
 
 #If Mac Then
     #If VBA7 Then 'https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/iconv.3.html
@@ -1459,23 +1459,49 @@ Public Function RepeatString(ByRef str As String, _
 End Function
 
 'Replaces repeated occurrences of consecutive 'substring' with a single one
-'E.g.: LimitRepeatedSubstrings("aaabaac", "a", 1) -> "abac"
-Public Function LimitRepeatedSubstrings(ByVal str As String, _
-                               Optional ByVal subStr As String = vbNewLine, _
-                               Optional ByVal limit As Long = 1, _
-                               Optional ByVal compare As VbCompareMethod) _
-                                        As String
-    Dim sReplace As String:     sReplace = RepeatString(subStr, limit)
-    Dim sCompare As String:     sCompare = str
-    Do
-        Dim sFind As String:    sFind = sReplace & subStr
-        Do
-            LimitRepeatedSubstrings = sCompare
-            sCompare = Replace(sCompare, sFind, sReplace, , , compare)
-            sFind = sFind & subStr 'This together with outer loop should
-                                   'improve worst-case runtime a lot
-        Loop Until sCompare = LimitRepeatedSubstrings
-    Loop Until sFind = sReplace & subStr & subStr
+'E.g.: LimitConsecutiveSubstringRepetition("aaabaac", "a", 1) -> "abac"
+Public Function LimitConsecutiveSubstringRepetition(ByVal str As String, _
+                                           Optional ByVal subStr As String = vbNewLine, _
+                                           Optional ByVal limit As Long = 1, _
+                                           Optional ByVal compare As VbCompareMethod) _
+                                                    As String
+    Dim i As Long:                 i = InStrB(1, str, subStr, compare)
+    Dim j As Long:                 j = 1
+    Dim lenBSubStr As Long:        lenBSubStr = LenB(subStr)
+    Dim copyChunkSize As Long:     copyChunkSize = 0
+    Dim consecutiveCount As Long:  consecutiveCount = 0
+    Dim lastOccurrence As Long:    lastOccurrence = 1 - lenBSubStr
+    Dim occurrenceDiff As Long
+    
+    LimitConsecutiveSubstringRepetition = str
+    Do Until i = 0
+        occurrenceDiff = i - lastOccurrence
+        
+        If occurrenceDiff = lenBSubStr Then
+            consecutiveCount = consecutiveCount + 1
+            If consecutiveCount <= limit Then
+                copyChunkSize = copyChunkSize + occurrenceDiff
+            ElseIf consecutiveCount = limit + 1 Then
+                MidB$(LimitConsecutiveSubstringRepetition, j, copyChunkSize) = _
+                    MidB$(str, i - copyChunkSize, copyChunkSize)
+                j = j + copyChunkSize
+                copyChunkSize = 0
+            End If
+        Else
+            copyChunkSize = copyChunkSize + occurrenceDiff
+            consecutiveCount = 1
+        End If
+        
+        lastOccurrence = i
+        i = InStrB(i + lenBSubStr, str, subStr, compare)
+    Loop
+    
+    copyChunkSize = copyChunkSize + LenB(str) - lastOccurrence - lenBSubStr + 1
+    MidB$(LimitConsecutiveSubstringRepetition, j, copyChunkSize) = _
+        MidB$(str, LenB(str) - copyChunkSize + 1)
+        
+    LimitConsecutiveSubstringRepetition = _
+        LeftB$(LimitConsecutiveSubstringRepetition, j + copyChunkSize - 1)
 End Function
 
 'Adds fillerChars to the right side of a string to make it the specified length
