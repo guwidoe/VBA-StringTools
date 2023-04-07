@@ -1459,12 +1459,29 @@ Public Function RepeatString(ByRef str As String, _
 End Function
 
 'Replaces repeated occurrences of consecutive 'substring' with a single one
-'E.g.: LimitConsecutiveSubstringRepetition("aaabaac", "a", 1) -> "abac"
-Public Function LimitConsecutiveSubstringRepetition(ByVal str As String, _
-                                           Optional ByVal subStr As String = vbNewLine, _
-                                           Optional ByVal limit As Long = 1, _
-                                           Optional ByVal compare As VbCompareMethod) _
-                                                    As String
+'E.g.: LimitConsecutiveSubstringRepetition("aaaabaaac", "a", 1)  -> "abac"
+'      LimitConsecutiveSubstringRepetition("aaaabaaac", "aa", 1) -> "aabaaac"
+'      LimitConsecutiveSubstringRepetition("aaaabaaac", "a", 2)  -> "aabaac"
+'      LimitConsecutiveSubstringRepetition("aaaabaaac", "ab", 0) -> "aaaaaac"
+Public Function LimitConsecutiveSubstringRepetition( _
+                                           ByVal str As String, _
+                                  Optional ByVal subStr As String = vbNewLine, _
+                                  Optional ByVal limit As Long = 1, _
+                                  Optional ByVal compare As VbCompareMethod) _
+                                           As String
+    Const methodName As String = "LimitConsecutiveSubstringRepetition"
+    If str = vbNullString Then Exit Function
+    If limit = 0 Then
+        LimitConsecutiveSubstringRepetition = Replace(str, subStr, _
+                                                      vbNullString, , , compare)
+        Exit Function
+    ElseIf limit < 0 Then
+        Err.Raise 5, methodName, "Argument 'limit' = " & limit & " < 0, invalid"
+    Else
+        LimitConsecutiveSubstringRepetition = str
+    End If
+    If subStr = vbNullString Then Exit Function
+    
     Dim i As Long:                 i = InStrB(1, str, subStr, compare)
     Dim j As Long:                 j = 1
     Dim lenBSubStr As Long:        lenBSubStr = LenB(subStr)
@@ -1472,8 +1489,7 @@ Public Function LimitConsecutiveSubstringRepetition(ByVal str As String, _
     Dim consecutiveCount As Long:  consecutiveCount = 0
     Dim lastOccurrence As Long:    lastOccurrence = 1 - lenBSubStr
     Dim occurrenceDiff As Long
-    
-    LimitConsecutiveSubstringRepetition = str
+
     Do Until i = 0
         occurrenceDiff = i - lastOccurrence
         
