@@ -1454,6 +1454,63 @@ Public Function RepeatString(ByRef str As String, _
     Next i
 End Function
 
+'Counts the number of times a substring exists in a string. Does not count
+'overlapping occurrences of substring.
+'E.g.: CountSubstringOccurrences("abababab", "abab") -> 2
+Public Function CountSubstringOccurrences(ByVal bytes As String, _
+                                          ByVal subStr As String, _
+                                 Optional ByVal lStart As Long = 1, _
+                                 Optional ByVal lCount As Long = -1, _
+                                 Optional ByVal lCompare As VbCompareMethod _
+                                                         = vbBinaryCompare) _
+                                          As Long
+    Const methodName As String = "CountSubstringOccurrences"
+    If lStart < 1 Then _
+        Err.Raise 5, methodName, "Argument 'Start' = " & lStart & " < 1, invalid"
+    If lCount < -1 Then _
+        Err.Raise 5, methodName, "Argument 'Count' = " & lCount & " < -1, invalid"
+        
+    Dim lenSubStr As Long: lenSubStr = Len(subStr)
+    Dim i As Long:          i = InStr(lStart, bytes, subStr, lCompare)
+    
+    CountSubstringOccurrences = 0
+    Do Until i = 0
+        CountSubstringOccurrences = CountSubstringOccurrences + 1
+        i = InStr(i + lenSubStr, bytes, subStr, lCompare)
+    Loop
+End Function
+
+'Like CountSubstringOccurrences but scans a string bytewise.
+'Example illustrating the difference to CountSubstringOccurrences:
+'                       |c1||c2|
+'bytes = HexToString("0x00610061")
+'                         |c3|
+'sFind =   HexToString("0x6100")
+'CountSubstringOccurrences(bytes, sFind) -> 0
+'CountSubstringOccurrencesB(bytes, sFind) -> 1
+Public Function CountSubstringOccurrencesB(ByVal bytes As String, _
+                                           ByVal subStr As String, _
+                                  Optional ByVal lStart As Long = 1, _
+                                  Optional ByVal lCount As Long = -1, _
+                                  Optional ByVal lCompare As VbCompareMethod _
+                                                          = vbBinaryCompare) _
+                                           As Long
+    Const methodName As String = "CountSubstringOccurrencesB"
+    If lStart < 1 Then _
+        Err.Raise 5, methodName, "Argument 'Start' = " & lStart & " < 1, invalid"
+    If lCount < -1 Then _
+        Err.Raise 5, methodName, "Argument 'Count' = " & lCount & " < -1, invalid"
+        
+    Dim lenBSubStr As Long: lenBSubStr = LenB(subStr)
+    Dim i As Long:          i = InStrB(lStart, bytes, subStr, lCompare)
+    
+    CountSubstringOccurrencesB = 0
+    Do Until i = 0
+        CountSubstringOccurrencesB = CountSubstringOccurrencesB + 1
+        i = InStrB(i + lenBSubStr, bytes, subStr, lCompare)
+    Loop
+End Function
+
 'Replaces repeated occurrences of consecutive 'substring' with a single one
 'E.g.: LimitConsecutiveSubstringRepetition("aaaabaaac", "a", 1)  -> "abac"
 '      LimitConsecutiveSubstringRepetition("aaaabaaac", "aa", 1) -> "aabaaac"
@@ -1548,15 +1605,15 @@ Public Function LimitConsecutiveSubstringRepetitionB( _
 
     Dim i As Long:                i = InStrB(1, str, subStr, compare)
     Dim j As Long:                j = 1
-    Dim lenBsubStr As Long:       lenBsubStr = LenB(subStr)
+    Dim lenBSubStr As Long:       lenBSubStr = LenB(subStr)
     Dim copyChunkSize As Long:    copyChunkSize = 0
     Dim consecutiveCount As Long: consecutiveCount = 0
-    Dim lastOccurrence As Long:   lastOccurrence = 1 - lenBsubStr
+    Dim lastOccurrence As Long:   lastOccurrence = 1 - lenBSubStr
     Dim occurrenceDiff As Long
 
     Do Until i = 0
         occurrenceDiff = i - lastOccurrence
-        If occurrenceDiff = lenBsubStr Then
+        If occurrenceDiff = lenBSubStr Then
             consecutiveCount = consecutiveCount + 1
             If consecutiveCount <= limit Then
                 copyChunkSize = copyChunkSize + occurrenceDiff
@@ -1571,10 +1628,10 @@ Public Function LimitConsecutiveSubstringRepetitionB( _
             consecutiveCount = 1
         End If
         lastOccurrence = i
-        i = InStrB(i + lenBsubStr, str, subStr, compare)
+        i = InStrB(i + lenBSubStr, str, subStr, compare)
     Loop
 
-    copyChunkSize = copyChunkSize + LenB(str) - lastOccurrence - lenBsubStr + 1
+    copyChunkSize = copyChunkSize + LenB(str) - lastOccurrence - lenBSubStr + 1
     MidB$(LimitConsecutiveSubstringRepetitionB, j, copyChunkSize) = _
         MidB$(str, LenB(str) - copyChunkSize + 1)
 
