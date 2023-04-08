@@ -386,8 +386,16 @@ Sub RunLimitConsecutiveSubstringRepetitionTests()
     TestLimitConsecutiveSubstringRepetition "aaaaabaaca", "aa", 1
     TestLimitConsecutiveSubstringRepetition "aaaaababaca", "ab", 1
     TestLimitConsecutiveSubstringRepetition "bbbaaababbb", "ab", 1
+    TestLimitConsecutiveSubstringRepetition _
+        ReplaceUnicodeLiterals("\u6100\u6100\u6100"), "a", 1
     'Add more tests here
-    
+    Debug.Print ReplaceUnicodeLiterals("\u6100\u6100\u6100")
+    Debug.Print LenB(ReplaceUnicodeLiterals("\u6100\u6100\u6100"))
+    Debug.Print LimitConsecutiveSubstringRepetition( _
+                    ReplaceUnicodeLiterals("\u6100\u6100\u6100"), "a", 1)
+    Debug.Print LenB(LimitConsecutiveSubstringRepetition( _
+                    ReplaceUnicodeLiterals("\u6100\u6100\u6100"), "a", 1))
+                    
     If failedTests = 0 Then _
         Debug.Print "LimitConsecutiveSubstringRepetition PASSED all tests"
     Exit Sub
@@ -415,5 +423,11 @@ Private Sub TestLimitConsecutiveSubstringRepetition(ByVal str As String, _
         "str: " & str
 End Sub
 
+Private Sub TestReplaceB()
+    Dim bytes As String: bytes = HexToString("0x00610061")
+    Dim sFind As String: sFind = HexToString("0x6100")
+    Debug.Print "ReplaceB:", StringToHex(ReplaceB(bytes, sFind, ""))
+    Debug.Print "Replace:", StringToHex(Replace(bytes, sFind, ""))
+End Sub
 
 
