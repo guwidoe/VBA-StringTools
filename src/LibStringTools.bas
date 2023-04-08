@@ -1645,32 +1645,56 @@ End Function
 Public Function PadRight(ByVal str As String, _
                          ByVal Length As Long, _
                 Optional ByVal fillerStr As String = " ") As String
-    If Length > Len(str) Then
-        If LenB(fillerStr) = 2 Then
-            PadRight = str & String(Length - Len(str), fillerStr)
-        Else
-            PadRight = str & Left$(RepeatString(fillerStr, (((Length - _
-                Len(str)) * 2) + 1) \ LenB(fillerStr) + 1), Length - Len(str))
-        End If
-    Else
-        PadRight = Left$(str, Length)
-    End If
+    PadRight = PadRightB(str, Length * 2, fillerStr)
 End Function
 
 'Adds fillerStr to the left side of a string repeatedly until the resulting
 'string reaches length 'Length'
-'E.g.: PadLeft("asd", 11, "xyz") -> "xyzxyzxyasd"
+'E.g.: PadLeft("asd", 11, "xyz") -> "yzxyzxyzasd"
 Public Function PadLeft(ByVal str As String, _
                         ByVal Length As Long, _
                Optional ByVal fillerStr As String = " ") As String
-    If Length > Len(str) Then
+    PadLeft = PadLeftB(str, Length * 2, fillerStr)
+End Function
+
+'Adds fillerStr to the right side of a string repeatedly until the resulting
+'string reaches length 'Length' in bytes!
+'E.g.: PadRightB("asd", 16, "xyz") -> "asdxyzxy"
+Public Function PadRightB(ByVal str As String, _
+                          ByVal Length As Long, _
+                 Optional ByVal fillerStr As String = " ") As String
+    If Length > LenB(str) Then
         If LenB(fillerStr) = 2 Then
-            PadLeft = String(Length - Len(str), fillerStr) & str
+            PadRightB = str & String((Length - LenB(str) + 1) \ 2, fillerStr)
+            If Length Mod 2 = 1 Then _
+                PadRightB = LeftB$(PadRightB, LenB(PadRightB) - 1)
         Else
-            PadLeft = Left$(RepeatString(fillerStr, (((Length - Len(str)) * 2) _
-                           + 1) \ LenB(fillerStr) + 1), Length - Len(str)) & str
+            PadRightB = str & LeftB$(RepeatString(fillerStr, (((Length - _
+                LenB(str))) + 1) \ LenB(fillerStr) + 1), Length - LenB(str))
         End If
     Else
-        PadLeft = Right$(str, Length)
+        PadRightB = LeftB$(str, Length)
+    End If
+End Function
+
+'Adds fillerStr to the left side of a string repeatedly until the resulting
+'string reaches length 'Length' in bytes!
+'Note that this can result in an invalid UTF-16 output for uneven lengths!
+'E.g.: PadLeftB("asd", 16, "xyz") -> "yzxyzasd"
+'      PadLeftB("asd", 11, "xyz") -> "?????"
+Public Function PadLeftB(ByVal str As String, _
+                         ByVal Length As Long, _
+                Optional ByVal fillerStr As String = " ") As String
+    If Length > LenB(str) Then
+        If LenB(fillerStr) = 2 Then
+            PadLeftB = String((Length - LenB(str) + 1) \ 2, fillerStr) & str
+            If Length Mod 2 = 1 Then _
+                PadLeftB = RightB$(PadLeftB, LenB(PadLeftB) - 1)
+        Else
+            PadLeftB = RightB$(RepeatString(fillerStr, (((Length - LenB(str))) _
+                          + 1) \ LenB(fillerStr) + 1), Length - LenB(str)) & str
+        End If
+    Else
+        PadLeftB = RightB$(str, Length)
     End If
 End Function
