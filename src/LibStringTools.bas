@@ -1437,23 +1437,6 @@ Public Function SplitUnlessInQuotes(ByVal str As String, _
     SplitUnlessInQuotes = parts
 End Function
 
-'Repeats the string str, repeatTimes times.
-'Works with byte strings of uneven LenB
-'E.g.: RepeatString("a", 3) -> "aaa"
-'      StrConv(RepeatString(MidB("a", 1, 1), 3), vbUnicode) -> "aaa"
-Public Function RepeatString(ByRef str As String, _
-                    Optional ByVal repeatTimes As Long = 2) As String
-    RepeatString = Space((LenB(str) * repeatTimes + 1) \ 2)
-    
-    If (LenB(str) * repeatTimes) Mod 2 = 1 Then _
-        RepeatString = MidB(RepeatString, 1, LenB(RepeatString) - 1)
-
-    Dim i As Long
-    For i = 1 To LenB(RepeatString) Step LenB(str)
-        MidB(RepeatString, i, LenB(str)) = str
-    Next i
-End Function
-
 'Counts the number of times a substring exists in a string. Does not count
 'overlapping occurrences of substring.
 'E.g.: CountSubstringOccurrences("abababab", "abab") -> 2
@@ -1471,7 +1454,7 @@ Public Function CountSubstringOccurrences(ByVal bytes As String, _
         Err.Raise 5, methodName, "Argument 'Count' = " & lCount & " < -1, invalid"
         
     Dim lenSubStr As Long: lenSubStr = Len(subStr)
-    Dim i As Long:          i = InStr(lStart, bytes, subStr, lCompare)
+    Dim i As Long:         i = InStr(lStart, bytes, subStr, lCompare)
     
     CountSubstringOccurrences = 0
     Do Until i = 0
@@ -1639,24 +1622,55 @@ Public Function LimitConsecutiveSubstringRepetitionB( _
         LeftB$(LimitConsecutiveSubstringRepetitionB, j + copyChunkSize - 1)
 End Function
 
-'Adds fillerChars to the right side of a string to make it the specified length
+'Repeats the string str, repeatTimes times.
+'Works with byte strings of uneven LenB
+'E.g.: RepeatString("a", 3) -> "aaa"
+'      StrConv(RepeatString(MidB("a", 1, 1), 3), vbUnicode) -> "aaa"
+Public Function RepeatString(ByRef str As String, _
+                    Optional ByVal repeatTimes As Long = 2) As String
+    RepeatString = Space((LenB(str) * repeatTimes + 1) \ 2)
+    
+    If (LenB(str) * repeatTimes) Mod 2 = 1 Then _
+        RepeatString = MidB(RepeatString, 1, LenB(RepeatString) - 1)
+
+    Dim i As Long
+    For i = 1 To LenB(RepeatString) Step LenB(str)
+        MidB(RepeatString, i, LenB(str)) = str
+    Next i
+End Function
+
+'Adds fillerStr to the right side of a string repeatedly until the resulting
+'string reaches length 'Length'
+'E.g.: PadRight("asd", 11, "xyz") -> "asdxyzxyzxy"
 Public Function PadRight(ByVal str As String, _
                          ByVal Length As Long, _
-                Optional ByVal fillerChar As String = " ") As String
+                Optional ByVal fillerStr As String = " ") As String
     If Length > Len(str) Then
-        PadRight = str & String(Length - Len(str), fillerChar)
+        If LenB(fillerStr) = 2 Then
+            PadRight = str & String(Length - Len(str), fillerStr)
+        Else
+            PadRight = str & Left$(RepeatString(fillerStr, (((Length - _
+                Len(str)) * 2) + 1) \ LenB(fillerStr) + 1), Length - Len(str))
+        End If
     Else
-        PadRight = Left(str, Length)
+        PadRight = Left$(str, Length)
     End If
 End Function
 
-'Adds fillerChars to the left side of a string to make it the specified length
+'Adds fillerStr to the left side of a string repeatedly until the resulting
+'string reaches length 'Length'
+'E.g.: PadLeft("asd", 11, "xyz") -> "xyzxyzxyasd"
 Public Function PadLeft(ByVal str As String, _
                         ByVal Length As Long, _
-               Optional ByVal fillerChar As String = " ") As String
+               Optional ByVal fillerStr As String = " ") As String
     If Length > Len(str) Then
-        PadLeft = String(Length - Len(str), fillerChar) & str
+        If LenB(fillerStr) = 2 Then
+            PadLeft = String(Length - Len(str), fillerStr) & str
+        Else
+            PadLeft = Left$(RepeatString(fillerStr, (((Length - Len(str)) * 2) _
+                           + 1) \ LenB(fillerStr) + 1), Length - Len(str)) & str
+        End If
     Else
-        PadLeft = Right(str, Length)
+        PadLeft = Right$(str, Length)
     End If
 End Function
