@@ -1449,6 +1449,7 @@ Public Function ReplaceB(ByRef bytes As String, _
         "Argument 'lStart' = " & lStart & " < 1, invalid"
     If lCount < -1 Then Err.Raise 5, methodName, _
         "Argument 'lCount' = " & lCount & " < -1, invalid"
+    lCount = lCount And &H7FFFFFFF
     
     If LenB(bytes) = 0 Or LenB(sFind) = 0 Then
         ReplaceB = bytes
@@ -1459,7 +1460,7 @@ Public Function ReplaceB(ByRef bytes As String, _
     Dim lenBReplace As Long: lenBReplace = LenB(sReplace)
     Dim numRepl As Long:     numRepl = CountSubstringB(bytes, sFind, _
                                                        lStart, lCompare)
-    If (lCount And &H7FFFFFFF) < numRepl Then numRepl = lCount
+    If lCount < numRepl Then numRepl = lCount
     
     Dim buffer() As Byte
     ReDim buffer(0 To LenB(bytes) - lStart + numRepl * (lenBReplace - lenBFind))
@@ -1468,8 +1469,9 @@ Public Function ReplaceB(ByRef bytes As String, _
     Dim i As Long:                i = InStrB(lStart, bytes, sFind, lCompare)
     Dim j As Long:                j = 1
     Dim lastOccurrence As Long:   lastOccurrence = lStart
+    Dim count As Long:            count = 1
     
-    Do Until i = 0
+    Do Until i = 0 Or count > lCount
         Dim diff As Long: diff = i - lastOccurrence
         MidB$(ReplaceB, j, diff) = MidB$(bytes, lastOccurrence, diff)
         j = j + diff
@@ -1477,6 +1479,7 @@ Public Function ReplaceB(ByRef bytes As String, _
             MidB$(ReplaceB, j, lenBReplace) = sReplace
             j = j + lenBReplace
         End If
+        count = count + 1
         lastOccurrence = i + lenBFind
         i = InStrB(lastOccurrence, bytes, sFind, lCompare)
     Loop
@@ -1697,6 +1700,49 @@ Public Function PadLeftB(ByVal str As String, _
     Else
         PadLeftB = RightB$(str, Length)
     End If
+End Function
+
+'Works like the inbuilt 'Split', but parses string bytewise, so it splits at
+'all occurrences of 'Delimiter', even at uneven byte-index positions.
+'Example illustrating the difference:
+'bytes = HexToString("0x00610061")
+'sDelim = HexToString("0x6100")
+'SplitB(bytes, sDelim)) -> "0x00", "0x61"
+'Split(bytes, sDelim, "")) -> "0x00610061"
+Public Function SplitB(ByRef bytes As String, _
+              Optional ByRef sDelimiter As String = " ", _
+              Optional ByVal lLimit As Long = -1, _
+              Optional ByVal lCompare As VbCompareMethod = vbBinaryCompare) _
+                       As Variant
+    Const methodName As String = "SplitB"
+    If lLimit < -1 Then Err.Raise 5, methodName, _
+        "Argument 'lLimit' = " & lLimit & " < -1, invalid"
+    lLimit = lLimit And &H7FFFFFFF
+    
+    If LenB(bytes) = 0 Or LenB(sDelimiter) = 0 Or lLimit < 2 Then
+        SplitB = VBA.Array(bytes) 'Ignores Option Base 1, like inbuilt 'Split'
+        Exit Function
+    End If
+    
+    Dim lenBDelim As Long:  lenBDelim = LenB(sDelimiter)
+    Dim numParts As Long:   numParts = CountSubstringB(bytes, sDelimiter, _
+                                                       1, lCompare) + 1
+    If lLimit < numParts Then numParts = lLimit
+    
+    Dim arr As Variant:         ReDim arr(0 To numParts - 1)
+    Dim i As Long:              i = InStrB(1, bytes, sDelimiter, lCompare)
+    Dim lastOccurrence As Long: lastOccurrence = 1
+    Dim count As Long:          count = 0
+
+    Do Until i = 0 Or count + 1 >= lLimit
+        Dim diff As Long: diff = i - lastOccurrence
+        arr(count) = MidB$(bytes, lastOccurrence, diff)
+        count = count + 1
+        lastOccurrence = i + lenBDelim
+        i = InStrB(lastOccurrence, bytes, sDelimiter, lCompare)
+    Loop
+    arr(count) = MidB$(bytes, lastOccurrence)
+    SplitB = arr
 End Function
 
 'Splits a string at every occurrence of the specified delimiter "delim", unless

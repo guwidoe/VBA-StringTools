@@ -424,10 +424,21 @@ Private Sub TestLimitConsecutiveSubstringRepetition(ByVal str As String, _
 End Sub
 
 Private Sub TestReplaceB()
-    Dim bytes As String: bytes = HexToString("0x00610061")
+    Dim bytes As String: bytes = HexToString("0x006100610061")
     Dim sFind As String: sFind = HexToString("0x6100")
     Debug.Print "ReplaceB:", StringToHex(ReplaceB(bytes, sFind, ""))
     Debug.Print "Replace:", StringToHex(Replace(bytes, sFind, ""))
+End Sub
+
+Private Sub TestSplitB()
+    Dim bytes As String: bytes = HexToString("0x006100610061")
+    Dim sFind As String: sFind = HexToString("0x6100")
+    Dim v As Variant
+    v = SplitB(bytes, sFind)
+    Debug.Print StringToHex(v(0)), StringToHex(v(1)), StringToHex(v(2))
+    Stop
+    v = Split(bytes, sFind)
+    Stop
 End Sub
 
 
