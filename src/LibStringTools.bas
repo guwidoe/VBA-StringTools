@@ -1361,12 +1361,342 @@ End Function
 'Insert("abcd", "ff", 3) = "abcffd"
 'Insert("abcd", "ff", 4) = "abcdff"
 'Insert("abcd", "ff", 9) = "abcdff"
-Public Function Insert(str As String, _
-                       strToInsert As String, _
-                       afterPos As Long) As String
+Public Function Insert(ByRef str As String, _
+                       ByRef strToInsert As String, _
+                       ByRef afterPos As Long) As String
+    Const methodName As String = "Insert"
+    If afterPos < 0 Then Err.Raise 5, methodName, _
+        "Argument 'Start' = " & lStart & " < 1, invalid"
+    
+    Insert = Mid$(str, 1, afterPos) & strToInsert & Mid$(str, afterPos + 1)
+End Function
+
+'Works like Insert but interprets 'afterPos' as byte-index, not char-index
+'Inserting at uneven byte positions likely invalidates an utf-16 string!
+Public Function InsertB(ByRef str As String, _
+                        ByRef strToInsert As String, _
+                        ByRef afterPos As Long) As String
+    Const methodName As String = "InsertB"
     If afterPos < 0 Then afterPos = 0
     
-    Insert = Mid(str, 1, afterPos) & strToInsert & Mid(str, afterPos + 1)
+    InsertB = MidB$(str, 1, afterPos) & strToInsert & MidB$(str, afterPos + 1)
+End Function
+
+'Counts the number of times a substring exists in a string. Does not count
+'overlapping occurrences of substring.
+'E.g.: CountSubstring("abababab", "abab") -> 2
+Public Function CountSubstring(ByRef str As String, _
+                               ByRef subStr As String, _
+                      Optional ByVal lStart As Long = 1, _
+                      Optional ByVal lCompare As VbCompareMethod _
+                                                 = vbBinaryCompare) As Long
+    Const methodName As String = "CountSubstring"
+    If lStart < 1 Then Err.Raise 5, methodName, _
+        "Argument 'Start' = " & lStart & " < 1, invalid"
+ 
+    Dim lenSubStr As Long: lenSubStr = Len(subStr)
+    Dim i As Long:         i = InStr(lStart, str, subStr, lCompare)
+    
+    CountSubstring = 0
+    Do Until i = 0
+        CountSubstring = CountSubstring + 1
+        i = InStr(i + lenSubStr, str, subStr, lCompare)
+    Loop
+End Function
+
+'Like CountSubstring but scans a string bytewise.
+'Example illustrating the difference to CountSubstring:
+'                       |c1||c2|
+'bytes = HexToString("0x00610061")
+'                         |c3|
+'sFind =   HexToString("0x6100")
+'CountSubstring(bytes, sFind) -> 0
+'CountSubstringB(bytes, sFind) -> 1
+Public Function CountSubstringB(ByRef bytes As String, _
+                                ByRef subStr As String, _
+                       Optional ByVal lStart As Long = 1, _
+                       Optional ByVal lCompare As VbCompareMethod _
+                                               = vbBinaryCompare) As Long
+    Const methodName As String = "CountSubstringB"
+    If lStart < 1 Then Err.Raise 5, methodName, _
+        "Argument 'Start' = " & lStart & " < 1, invalid"
+      
+    Dim lenBSubStr As Long: lenBSubStr = LenB(subStr)
+    Dim i As Long:          i = InStrB(lStart, bytes, subStr, lCompare)
+    
+    CountSubstringB = 0
+    Do Until i = 0
+        CountSubstringB = CountSubstringB + 1
+        i = InStrB(i + lenBSubStr, bytes, subStr, lCompare)
+    Loop
+End Function
+
+'Works like the inbuilt 'Replace', but parses the string bitwise, not charwise.
+'Example illustrating the difference:
+'bytes = HexToString("0x00610061")
+'sFind = HexToString("0x6100")
+'? StringToHex(ReplaceB(bytes, sFind, "")) -> "0x0061"
+'? StringToHex(Replace(bytes, sFind, "")) -> "0x00610061"
+Public Function ReplaceB(ByRef bytes As String, _
+                         ByRef sFind As String, _
+                         ByRef sReplace As String, _
+                Optional ByVal lStart As Long = 1, _
+                Optional ByVal lCount As Long = -1, _
+                Optional ByVal lCompare As VbCompareMethod _
+                                        = vbBinaryCompare) As String
+    Const methodName As String = "ReplaceB"
+    If lStart < 1 Then Err.Raise 5, methodName, _
+        "Argument 'lStart' = " & lStart & " < 1, invalid"
+    If lCount < -1 Then Err.Raise 5, methodName, _
+        "Argument 'lCount' = " & lCount & " < -1, invalid"
+    
+    If LenB(bytes) = 0 Or LenB(sFind) = 0 Then
+        ReplaceB = bytes
+        Exit Function
+    End If
+    
+    Dim lenBFind As Long:    lenBFind = LenB(sFind)
+    Dim lenBReplace As Long: lenBReplace = LenB(sReplace)
+    Dim numRepl As Long:     numRepl = CountSubstringB(bytes, sFind, _
+                                                       lStart, lCompare)
+    If (lCount And &H7FFFFFFF) < numRepl Then numRepl = lCount
+    
+    Dim buffer() As Byte
+    ReDim buffer(0 To LenB(bytes) - lStart + numRepl * (lenBReplace - lenBFind))
+    ReplaceB = buffer
+    
+    Dim i As Long:                i = InStrB(lStart, bytes, sFind, lCompare)
+    Dim j As Long:                j = 1
+    Dim lastOccurrence As Long:   lastOccurrence = lStart
+    
+    Do Until i = 0
+        Dim diff As Long: diff = i - lastOccurrence
+        MidB$(ReplaceB, j, diff) = MidB$(bytes, lastOccurrence, diff)
+        j = j + diff
+        If lenBReplace <> 0 Then
+            MidB$(ReplaceB, j, lenBReplace) = sReplace
+            j = j + lenBReplace
+        End If
+        lastOccurrence = i + lenBFind
+        i = InStrB(lastOccurrence, bytes, sFind, lCompare)
+    Loop
+    MidB$(ReplaceB, j) = MidB$(bytes, lastOccurrence)
+End Function
+
+'Replaces repeated occurrences of consecutive 'substring' with a single one
+'E.g.: LimitConsecutiveSubstringRepetition("aaaabaaac", "a", 1)  -> "abac"
+'      LimitConsecutiveSubstringRepetition("aaaabaaac", "aa", 1) -> "aabaaac"
+'      LimitConsecutiveSubstringRepetition("aaaabaaac", "a", 2)  -> "aabaac"
+'      LimitConsecutiveSubstringRepetition("aaaabaaac", "ab", 0) -> "aaaaaac"
+Public Function LimitConsecutiveSubstringRepetition( _
+                                           ByRef str As String, _
+                                  Optional ByRef subStr As String = vbNewLine, _
+                                  Optional ByVal limit As Long = 1, _
+                                  Optional ByVal compare As VbCompareMethod _
+                                                          = vbBinaryCompare) _
+                                           As String
+    Const methodName As String = "LimitConsecutiveSubstringRepetition"
+    
+    If limit < 0 Then Err.Raise 5, methodName, _
+        "Argument 'limit' = " & limit & " < 0, invalid"
+    If limit = 0 Then
+        LimitConsecutiveSubstringRepetition = Replace(str, subStr, _
+                                                      vbNullString, , , compare)
+        Exit Function
+    Else
+        LimitConsecutiveSubstringRepetition = str
+    End If
+    If Len(str) = 0 Then Exit Function
+    If Len(subStr) = 0 Then Exit Function
+
+    Dim i As Long:                i = InStr(1, str, subStr, compare)
+    Dim j As Long:                j = 1
+    Dim lenSubStr As Long:        lenSubStr = Len(subStr)
+    Dim copyChunkSize As Long:    copyChunkSize = 0
+    Dim consecutiveCount As Long: consecutiveCount = 0
+    Dim lastOccurrence As Long:   lastOccurrence = 1 - lenSubStr
+    Dim occurrenceDiff As Long
+
+    Do Until i = 0
+        occurrenceDiff = i - lastOccurrence
+        If occurrenceDiff = lenSubStr Then
+            consecutiveCount = consecutiveCount + 1
+            If consecutiveCount <= limit Then
+                copyChunkSize = copyChunkSize + occurrenceDiff
+            ElseIf consecutiveCount = limit + 1 Then
+                Mid$(LimitConsecutiveSubstringRepetition, j, copyChunkSize) = _
+                    Mid$(str, i - copyChunkSize, copyChunkSize)
+                j = j + copyChunkSize
+                copyChunkSize = 0
+            End If
+        Else
+            copyChunkSize = copyChunkSize + occurrenceDiff
+            consecutiveCount = 1
+        End If
+        lastOccurrence = i
+        i = InStr(i + lenSubStr, str, subStr, compare)
+    Loop
+
+    copyChunkSize = copyChunkSize + Len(str) - lastOccurrence - lenSubStr + 1
+    Mid$(LimitConsecutiveSubstringRepetition, j, copyChunkSize) = _
+        Mid$(str, Len(str) - copyChunkSize + 1)
+
+    LimitConsecutiveSubstringRepetition = _
+        Left$(LimitConsecutiveSubstringRepetition, j + copyChunkSize - 1)
+End Function
+
+'Same as LimitConsecutiveSubstringRepetition, but scans the string bytewise.
+'Example illustrating the difference:
+'Dim bytes As String: bytes = HexToString("0x006100610061")
+'Dim subStr As String: subStr = HexToString("0x6100")
+'StringToHex(LimitConsecutiveSubstringRepetition(bytes, subStr, 1) _
+'    -> "0x006100610061"
+'StringToHex(LimitConsecutiveSubstringRepetitionB(bytes, subStr, 1) _
+'    -> "0x00610061"
+Public Function LimitConsecutiveSubstringRepetitionB( _
+                                           ByRef bytes As String, _
+                                  Optional ByRef subStr As String = vbNewLine, _
+                                  Optional ByVal limit As Long = 1, _
+                                  Optional ByVal compare As VbCompareMethod _
+                                                          = vbBinaryCompare) _
+                                           As String
+    Const methodName As String = "LimitConsecutiveSubstringRepetitionB"
+    
+    If limit < 0 Then Err.Raise 5, methodName, _
+        "Argument 'limit' = " & limit & " < 0, invalid"
+    If limit = 0 Then
+        LimitConsecutiveSubstringRepetitionB = ReplaceB(bytes, subStr, _
+                                                      vbNullString, , , compare)
+        Exit Function
+    Else
+        LimitConsecutiveSubstringRepetitionB = bytes
+    End If
+    If LenB(bytes) = 0 Then Exit Function
+    If LenB(subStr) = 0 Then Exit Function
+
+    Dim i As Long:                i = InStrB(1, bytes, subStr, compare)
+    Dim j As Long:                j = 1
+    Dim lenBSubStr As Long:       lenBSubStr = LenB(subStr)
+    Dim copyChunkSize As Long:    copyChunkSize = 0
+    Dim consecutiveCount As Long: consecutiveCount = 0
+    Dim lastOccurrence As Long:   lastOccurrence = 1 - lenBSubStr
+    Dim occurrenceDiff As Long
+
+    Do Until i = 0
+        occurrenceDiff = i - lastOccurrence
+        If occurrenceDiff = lenBSubStr Then
+            consecutiveCount = consecutiveCount + 1
+            If consecutiveCount <= limit Then
+                copyChunkSize = copyChunkSize + occurrenceDiff
+            ElseIf consecutiveCount = limit + 1 Then
+                MidB$(LimitConsecutiveSubstringRepetitionB, j, copyChunkSize) = _
+                    MidB$(bytes, i - copyChunkSize, copyChunkSize)
+                j = j + copyChunkSize
+                copyChunkSize = 0
+            End If
+        Else
+            copyChunkSize = copyChunkSize + occurrenceDiff
+            consecutiveCount = 1
+        End If
+        lastOccurrence = i
+        i = InStrB(i + lenBSubStr, bytes, subStr, compare)
+    Loop
+
+    copyChunkSize = copyChunkSize + LenB(bytes) - lastOccurrence - lenBSubStr + 1
+    MidB$(LimitConsecutiveSubstringRepetitionB, j, copyChunkSize) = _
+        MidB$(bytes, LenB(bytes) - copyChunkSize + 1)
+
+    LimitConsecutiveSubstringRepetitionB = _
+        LeftB$(LimitConsecutiveSubstringRepetitionB, j + copyChunkSize - 1)
+End Function
+
+'Repeats the string str, repeatTimes times.
+'Works with byte strings of uneven LenB
+'E.g.: RepeatString("a", 3) -> "aaa"
+'      StrConv(RepeatString(MidB("a", 1, 1), 3), vbUnicode) -> "aaa"
+Public Function RepeatString(ByRef str As String, _
+                    Optional ByVal repeatTimes As Long = 2) As String
+    RepeatString = Space((LenB(str) * repeatTimes + 1) \ 2)
+    
+    If (LenB(str) * repeatTimes) Mod 2 = 1 Then _
+        RepeatString = MidB(RepeatString, 1, LenB(RepeatString) - 1)
+
+    Dim i As Long
+    For i = 1 To LenB(RepeatString) Step LenB(str)
+        MidB(RepeatString, i, LenB(str)) = str
+    Next i
+End Function
+
+'Adds fillerStr to the right side of a string repeatedly until the resulting
+'string reaches length 'Length'
+'E.g.: PadRight("asd", 11, "xyz") -> "asdxyzxyzxy"
+Public Function PadRight(ByVal str As String, _
+                         ByVal Length As Long, _
+                Optional ByVal fillerStr As String = " ") As String
+    PadRight = PadRightB(str, Length * 2, fillerStr)
+End Function
+
+'Adds fillerStr to the left side of a string repeatedly until the resulting
+'string reaches length 'Length'
+'E.g.: PadLeft("asd", 11, "xyz") -> "yzxyzxyzasd"
+Public Function PadLeft(ByVal str As String, _
+                        ByVal Length As Long, _
+               Optional ByVal fillerStr As String = " ") As String
+    PadLeft = PadLeftB(str, Length * 2, fillerStr)
+End Function
+
+'Adds fillerStr to the right side of a string repeatedly until the resulting
+'string reaches length 'Length' in bytes!
+'E.g.: PadRightB("asd", 16, "xyz") -> "asdxyzxy"
+Public Function PadRightB(ByVal str As String, _
+                          ByVal Length As Long, _
+                 Optional ByVal fillerStr As String = " ") As String
+    Const methodName As String = "PadRightB"
+    If Length < 0 Then Err.Raise 5, methodName, _
+        "Argument 'Length' = " & Length & " < 0, invalid"
+    If LenB(fillerStr) = 0 Then Err.Raise 5, methodName, _
+        "Argument 'fillerStr' = vbNullString, invalid"
+    
+    If Length > LenB(str) Then
+        If LenB(fillerStr) = 2 Then
+            PadRightB = str & String((Length - LenB(str) + 1) \ 2, fillerStr)
+            If Length Mod 2 = 1 Then _
+                PadRightB = LeftB$(PadRightB, LenB(PadRightB) - 1)
+        Else
+            PadRightB = str & LeftB$(RepeatString(fillerStr, (((Length - _
+                LenB(str))) + 1) \ LenB(fillerStr) + 1), Length - LenB(str))
+        End If
+    Else
+        PadRightB = LeftB$(str, Length)
+    End If
+End Function
+
+'Adds fillerStr to the left side of a string repeatedly until the resulting
+'string reaches length 'Length' in bytes!
+'Note that this can result in an invalid UTF-16 output for uneven lengths!
+'E.g.: PadLeftB("asd", 16, "xyz") -> "yzxyzasd"
+'      PadLeftB("asd", 11, "xyz") -> "?????"
+Public Function PadLeftB(ByVal str As String, _
+                         ByVal Length As Long, _
+                Optional ByVal fillerStr As String = " ") As String
+    Const methodName As String = "PadLeftB"
+    If Length < 0 Then Err.Raise 5, methodName, _
+        "Argument 'Length' = " & Length & " < 0, invalid"
+    If LenB(fillerStr) = 0 Then Err.Raise 5, methodName, _
+        "Argument 'fillerStr' = vbNullString, invalid"
+        
+    If Length > LenB(str) Then
+        If LenB(fillerStr) = 2 Then
+            PadLeftB = String((Length - LenB(str) + 1) \ 2, fillerStr) & str
+            If Length Mod 2 = 1 Then _
+                PadLeftB = RightB$(PadLeftB, LenB(PadLeftB) - 1)
+        Else
+            PadLeftB = RightB$(RepeatString(fillerStr, (((Length - LenB(str))) _
+                          + 1) \ LenB(fillerStr) + 1), Length - LenB(str)) & str
+        End If
+    Else
+        PadLeftB = RightB$(str, Length)
+    End If
 End Function
 
 'Splits a string at every occurrence of the specified delimiter "delim", unless
@@ -1379,7 +1709,7 @@ End Function
 'if only one " exists in the string, splits the string into two parts.
 'E.g. SplitUnlessInQuotes("asdf""asdf""asdf""asdf", """") returns
 '    "asdf", "asdf""asdf", and "asdf"
-Public Function SplitUnlessInQuotes(ByVal str As String, _
+Public Function SplitUnlessInQuotes(ByRef str As String, _
                            Optional ByVal delim As String = " ", _
                            Optional limit As Long = -1) As Variant
     Dim i As Long
@@ -1435,266 +1765,4 @@ Public Function SplitUnlessInQuotes(ByVal str As String, _
         End If
     Next i
     SplitUnlessInQuotes = parts
-End Function
-
-'Counts the number of times a substring exists in a string. Does not count
-'overlapping occurrences of substring.
-'E.g.: CountSubstringOccurrences("abababab", "abab") -> 2
-Public Function CountSubstringOccurrences(ByVal bytes As String, _
-                                          ByVal subStr As String, _
-                                 Optional ByVal lStart As Long = 1, _
-                                 Optional ByVal lCount As Long = -1, _
-                                 Optional ByVal lCompare As VbCompareMethod _
-                                                         = vbBinaryCompare) _
-                                          As Long
-    Const methodName As String = "CountSubstringOccurrences"
-    If lStart < 1 Then _
-        Err.Raise 5, methodName, "Argument 'Start' = " & lStart & " < 1, invalid"
-    If lCount < -1 Then _
-        Err.Raise 5, methodName, "Argument 'Count' = " & lCount & " < -1, invalid"
-        
-    Dim lenSubStr As Long: lenSubStr = Len(subStr)
-    Dim i As Long:         i = InStr(lStart, bytes, subStr, lCompare)
-    
-    CountSubstringOccurrences = 0
-    Do Until i = 0
-        CountSubstringOccurrences = CountSubstringOccurrences + 1
-        i = InStr(i + lenSubStr, bytes, subStr, lCompare)
-    Loop
-End Function
-
-'Like CountSubstringOccurrences but scans a string bytewise.
-'Example illustrating the difference to CountSubstringOccurrences:
-'                       |c1||c2|
-'bytes = HexToString("0x00610061")
-'                         |c3|
-'sFind =   HexToString("0x6100")
-'CountSubstringOccurrences(bytes, sFind) -> 0
-'CountSubstringOccurrencesB(bytes, sFind) -> 1
-Public Function CountSubstringOccurrencesB(ByVal bytes As String, _
-                                           ByVal subStr As String, _
-                                  Optional ByVal lStart As Long = 1, _
-                                  Optional ByVal lCount As Long = -1, _
-                                  Optional ByVal lCompare As VbCompareMethod _
-                                                          = vbBinaryCompare) _
-                                           As Long
-    Const methodName As String = "CountSubstringOccurrencesB"
-    If lStart < 1 Then _
-        Err.Raise 5, methodName, "Argument 'Start' = " & lStart & " < 1, invalid"
-    If lCount < -1 Then _
-        Err.Raise 5, methodName, "Argument 'Count' = " & lCount & " < -1, invalid"
-        
-    Dim lenBSubStr As Long: lenBSubStr = LenB(subStr)
-    Dim i As Long:          i = InStrB(lStart, bytes, subStr, lCompare)
-    
-    CountSubstringOccurrencesB = 0
-    Do Until i = 0
-        CountSubstringOccurrencesB = CountSubstringOccurrencesB + 1
-        i = InStrB(i + lenBSubStr, bytes, subStr, lCompare)
-    Loop
-End Function
-
-'Replaces repeated occurrences of consecutive 'substring' with a single one
-'E.g.: LimitConsecutiveSubstringRepetition("aaaabaaac", "a", 1)  -> "abac"
-'      LimitConsecutiveSubstringRepetition("aaaabaaac", "aa", 1) -> "aabaaac"
-'      LimitConsecutiveSubstringRepetition("aaaabaaac", "a", 2)  -> "aabaac"
-'      LimitConsecutiveSubstringRepetition("aaaabaaac", "ab", 0) -> "aaaaaac"
-Public Function LimitConsecutiveSubstringRepetition( _
-                                           ByVal str As String, _
-                                  Optional ByVal subStr As String = vbNewLine, _
-                                  Optional ByVal limit As Long = 1, _
-                                  Optional ByVal compare As VbCompareMethod _
-                                                          = vbBinaryCompare) _
-                                           As String
-    Const methodName As String = "LimitConsecutiveSubstringRepetition"
-    
-    If limit < 0 Then
-        Err.Raise 5, methodName, "Argument 'limit' = " & limit & " < 0, invalid"
-    ElseIf limit = 0 Then
-        LimitConsecutiveSubstringRepetition = Replace(str, subStr, _
-                                                      vbNullString, , , compare)
-        Exit Function
-    Else
-        LimitConsecutiveSubstringRepetition = str
-    End If
-    If Len(str) = 0 Then Exit Function
-    If Len(subStr) = 0 Then Exit Function
-
-    Dim i As Long:                i = InStr(1, str, subStr, compare)
-    Dim j As Long:                j = 1
-    Dim lenSubStr As Long:        lenSubStr = Len(subStr)
-    Dim copyChunkSize As Long:    copyChunkSize = 0
-    Dim consecutiveCount As Long: consecutiveCount = 0
-    Dim lastOccurrence As Long:   lastOccurrence = 1 - lenSubStr
-    Dim occurrenceDiff As Long
-
-    Do Until i = 0
-        occurrenceDiff = i - lastOccurrence
-        If occurrenceDiff = lenSubStr Then
-            consecutiveCount = consecutiveCount + 1
-            If consecutiveCount <= limit Then
-                copyChunkSize = copyChunkSize + occurrenceDiff
-            ElseIf consecutiveCount = limit + 1 Then
-                Mid$(LimitConsecutiveSubstringRepetition, j, copyChunkSize) = _
-                    Mid$(str, i - copyChunkSize, copyChunkSize)
-                j = j + copyChunkSize
-                copyChunkSize = 0
-            End If
-        Else
-            copyChunkSize = copyChunkSize + occurrenceDiff
-            consecutiveCount = 1
-        End If
-        lastOccurrence = i
-        i = InStr(i + lenSubStr, str, subStr, compare)
-    Loop
-
-    copyChunkSize = copyChunkSize + Len(str) - lastOccurrence - lenSubStr + 1
-    Mid$(LimitConsecutiveSubstringRepetition, j, copyChunkSize) = _
-        Mid$(str, Len(str) - copyChunkSize + 1)
-
-    LimitConsecutiveSubstringRepetition = _
-        Left$(LimitConsecutiveSubstringRepetition, j + copyChunkSize - 1)
-End Function
-
-
-'Same as LimitConsecutiveSubstringRepetition, but scans the string bytewise.
-'Example illustrating the difference:
-'Dim bytes As String: bytes = HexToString("0x006100610061")
-'Dim subStr As String: subStr = HexToString("0x6100")
-'StringToHex(LimitConsecutiveSubstringRepetition(bytes, subStr, 1) _
-'    -> "0x006100610061"
-'StringToHex(LimitConsecutiveSubstringRepetitionB(bytes, subStr, 1) _
-'    -> "0x00610061"
-Public Function LimitConsecutiveSubstringRepetitionB( _
-                                           ByVal str As String, _
-                                  Optional ByVal subStr As String = vbNewLine, _
-                                  Optional ByVal limit As Long = 1, _
-                                  Optional ByVal compare As VbCompareMethod _
-                                                          = vbBinaryCompare) _
-                                           As String
-    Const methodName As String = "LimitConsecutiveSubstringRepetitionB"
-    
-    If limit < 0 Then
-        Err.Raise 5, methodName, "Argument 'limit' = " & limit & " < 0, invalid"
-    ElseIf limit = 0 Then
-        LimitConsecutiveSubstringRepetitionB = ReplaceB(str, subStr, _
-                                                      vbNullString, , , compare)
-        Exit Function
-    Else
-        LimitConsecutiveSubstringRepetitionB = str
-    End If
-    If LenB(str) = 0 Then Exit Function
-    If LenB(subStr) = 0 Then Exit Function
-
-    Dim i As Long:                i = InStrB(1, str, subStr, compare)
-    Dim j As Long:                j = 1
-    Dim lenBSubStr As Long:       lenBSubStr = LenB(subStr)
-    Dim copyChunkSize As Long:    copyChunkSize = 0
-    Dim consecutiveCount As Long: consecutiveCount = 0
-    Dim lastOccurrence As Long:   lastOccurrence = 1 - lenBSubStr
-    Dim occurrenceDiff As Long
-
-    Do Until i = 0
-        occurrenceDiff = i - lastOccurrence
-        If occurrenceDiff = lenBSubStr Then
-            consecutiveCount = consecutiveCount + 1
-            If consecutiveCount <= limit Then
-                copyChunkSize = copyChunkSize + occurrenceDiff
-            ElseIf consecutiveCount = limit + 1 Then
-                MidB$(LimitConsecutiveSubstringRepetitionB, j, copyChunkSize) = _
-                    MidB$(str, i - copyChunkSize, copyChunkSize)
-                j = j + copyChunkSize
-                copyChunkSize = 0
-            End If
-        Else
-            copyChunkSize = copyChunkSize + occurrenceDiff
-            consecutiveCount = 1
-        End If
-        lastOccurrence = i
-        i = InStrB(i + lenBSubStr, str, subStr, compare)
-    Loop
-
-    copyChunkSize = copyChunkSize + LenB(str) - lastOccurrence - lenBSubStr + 1
-    MidB$(LimitConsecutiveSubstringRepetitionB, j, copyChunkSize) = _
-        MidB$(str, LenB(str) - copyChunkSize + 1)
-
-    LimitConsecutiveSubstringRepetitionB = _
-        LeftB$(LimitConsecutiveSubstringRepetitionB, j + copyChunkSize - 1)
-End Function
-
-'Repeats the string str, repeatTimes times.
-'Works with byte strings of uneven LenB
-'E.g.: RepeatString("a", 3) -> "aaa"
-'      StrConv(RepeatString(MidB("a", 1, 1), 3), vbUnicode) -> "aaa"
-Public Function RepeatString(ByRef str As String, _
-                    Optional ByVal repeatTimes As Long = 2) As String
-    RepeatString = Space((LenB(str) * repeatTimes + 1) \ 2)
-    
-    If (LenB(str) * repeatTimes) Mod 2 = 1 Then _
-        RepeatString = MidB(RepeatString, 1, LenB(RepeatString) - 1)
-
-    Dim i As Long
-    For i = 1 To LenB(RepeatString) Step LenB(str)
-        MidB(RepeatString, i, LenB(str)) = str
-    Next i
-End Function
-
-'Adds fillerStr to the right side of a string repeatedly until the resulting
-'string reaches length 'Length'
-'E.g.: PadRight("asd", 11, "xyz") -> "asdxyzxyzxy"
-Public Function PadRight(ByVal str As String, _
-                         ByVal Length As Long, _
-                Optional ByVal fillerStr As String = " ") As String
-    PadRight = PadRightB(str, Length * 2, fillerStr)
-End Function
-
-'Adds fillerStr to the left side of a string repeatedly until the resulting
-'string reaches length 'Length'
-'E.g.: PadLeft("asd", 11, "xyz") -> "yzxyzxyzasd"
-Public Function PadLeft(ByVal str As String, _
-                        ByVal Length As Long, _
-               Optional ByVal fillerStr As String = " ") As String
-    PadLeft = PadLeftB(str, Length * 2, fillerStr)
-End Function
-
-'Adds fillerStr to the right side of a string repeatedly until the resulting
-'string reaches length 'Length' in bytes!
-'E.g.: PadRightB("asd", 16, "xyz") -> "asdxyzxy"
-Public Function PadRightB(ByVal str As String, _
-                          ByVal Length As Long, _
-                 Optional ByVal fillerStr As String = " ") As String
-    If Length > LenB(str) Then
-        If LenB(fillerStr) = 2 Then
-            PadRightB = str & String((Length - LenB(str) + 1) \ 2, fillerStr)
-            If Length Mod 2 = 1 Then _
-                PadRightB = LeftB$(PadRightB, LenB(PadRightB) - 1)
-        Else
-            PadRightB = str & LeftB$(RepeatString(fillerStr, (((Length - _
-                LenB(str))) + 1) \ LenB(fillerStr) + 1), Length - LenB(str))
-        End If
-    Else
-        PadRightB = LeftB$(str, Length)
-    End If
-End Function
-
-'Adds fillerStr to the left side of a string repeatedly until the resulting
-'string reaches length 'Length' in bytes!
-'Note that this can result in an invalid UTF-16 output for uneven lengths!
-'E.g.: PadLeftB("asd", 16, "xyz") -> "yzxyzasd"
-'      PadLeftB("asd", 11, "xyz") -> "?????"
-Public Function PadLeftB(ByVal str As String, _
-                         ByVal Length As Long, _
-                Optional ByVal fillerStr As String = " ") As String
-    If Length > LenB(str) Then
-        If LenB(fillerStr) = 2 Then
-            PadLeftB = String((Length - LenB(str) + 1) \ 2, fillerStr) & str
-            If Length Mod 2 = 1 Then _
-                PadLeftB = RightB$(PadLeftB, LenB(PadLeftB) - 1)
-        Else
-            PadLeftB = RightB$(RepeatString(fillerStr, (((Length - LenB(str))) _
-                          + 1) \ LenB(fillerStr) + 1), Length - LenB(str)) & str
-        End If
-    Else
-        PadLeftB = RightB$(str, Length)
-    End If
 End Function
