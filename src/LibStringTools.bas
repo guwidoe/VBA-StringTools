@@ -58,12 +58,18 @@ Option Base 0
         
         Private Declare PtrSafe Function GetLastError Lib "kernel32" () As Long
         Private Declare PtrSafe Sub SetLastError Lib "kernel32" (ByVal dwErrCode As Long)
+    
+        Private Declare PtrSafe Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (ByVal Destination As LongPtr, ByVal source As LongPtr, ByVal Length As Long)
+        Private Declare PtrSafe Function lstrlenW Lib "kernel32" (ByVal lpString As LongPtr) As Long
     #Else
         Private Declare Function MultiByteToWideChar Lib "kernel32" Alias "MultiByteToWideChar" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As Long, ByVal cchMultiByte As Long, ByVal lpWideCharStr As Long, ByVal cchWideChar As Long) As Long
         Private Declare Function WideCharToMultiByte Lib "kernel32" Alias "WideCharToMultiByte" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As Long, ByVal cchWideChar As Long, ByVal lpMultiByteStr As Long, ByVal cchMultiByte As Long, ByVal lpDefaultChar As Long, ByVal lpUsedDefaultChar As Long) As Long
     
         Private Declare Function GetLastError Lib "kernel32" () As Long
         Private Declare Sub SetLastError Lib "kernel32" (ByVal dwErrCode As Long)
+    
+        Private Declare Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (Destination As Any, Source As Any, ByVal length As Long)
+        Private Declare Function lstrlenW Lib "kernel32" (ByVal lpString As Long) As Long
     #End If
 #End If
 
@@ -231,12 +237,12 @@ Public Enum CodePageIdentifier
     [_last]
 End Enum
 
-'Returns a Collection for converting CodePageIDs to ConversionDescriptorNames
-Private Static Function ConversionDescriptorName(ByVal cpID As Long) As String
+'Returns an array for converting CodePageIDs to ConversionDescriptorNames
+Private Static Function ConvDescriptorName(ByVal cpID As Long) As String
     Dim arr(CodePageIdentifier.[_first] To CodePageIdentifier.[_last]) As String
     
     If arr(CodePageIdentifier.[_first]) <> 0 Then
-        ConversionDescriptorName = StrConv(arr(cpID), vbFromUnicode)
+        ConvDescriptorName = StrConv(arr(cpID), vbFromUnicode)
         Exit Function
     End If
     
@@ -419,15 +425,15 @@ Private Static Function ConversionDescriptorName(ByVal cpID As Long) As String
 
     'The empty encoding name is equivalent to "char":
     'it denotes the locale dependent character encoding.
-    ConversionDescriptorName = arr(cpID)
+    ConvDescriptorName = arr(cpID)
 End Function
 
 ''Returns a Collection for converting ConversionDescriptorNames to CodePageIDs
-'Private Function ConversionDescriptorNameToCodePage() As Collection
+'Private Function ConvDescriptorNameToCodePage() As Collection
 '    Static c As Collection
 '
 '    If Not c Is Nothing Then
-'        Set ConversionDescriptorNameToCodePage = c
+'        Set ConvDescriptorNameToCodePage = c
 '        Exit Function
 '    End If
 '
@@ -437,7 +443,7 @@ End Function
 '
 '    On Error Resume Next
 '    For cpID = CodePageIdentifier.[_first_] To CodePageIdentifier.[_last_]
-'        conversionDescriptor = CodePageToConversionDescriptorName(CStr(cpID))
+'        conversionDescriptor = CodePageToConvDescriptorName(CStr(cpID))
 '        If conversionDescriptor <> "" Then
 '            c.Add Item:=cpID, Key:=conversionDescriptor
 '        End If
@@ -445,14 +451,14 @@ End Function
 '    Next cpID
 '
 '    cpID = -1
-'    For Each conversionDescriptor In CodePageToConversionDescriptorName
+'    For Each conversionDescriptor In CodePageToConvDescriptorName
 '        cpID = c(conversionDescriptor)
 '        If cpID = -1 Then c.Add Item:=-1, Key:=conversionDescriptor
 '        cpID = -1
 '    Next conversionDescriptor
 '    On Error GoTo 0
 '
-'    Set ConversionDescriptorNameToCodePage = c
+'    Set ConvDescriptorNameToCodePage = c
 'End Function
 
 Private Function GetApiErrorNumber() As Long
@@ -471,32 +477,88 @@ Private Function SetApiErrorNumber(ByVal errNumber As Long) As Long
     #End If
 End Function
 
+#If Mac = 0 Then
+Public Function GetBstrFromWideStringPtr(ByVal lpwString As LongPtr) As String
+    Dim Length As Long
+    If (lpwString) Then Length = lstrlenW(lpwString)
+    If (Length) Then
+        GetBstrFromWideStringPtr = Space$(Length)
+        CopyMemory StrPtr(GetBstrFromWideStringPtr), lpwString, Length * 2
+    End If
+End Function
+#End If
+
 Public Function Transcode(ByRef str As String, _
-                          ByVal toCodePage As CodePageIdentifier, _
                           ByVal fromCodePage As CodePageIdentifier, _
+                          ByVal toCodePage As CodePageIdentifier, _
                  Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "Transcode"
+    'https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/iconv.3.html
+    Const vbErrInternalError As Long = 51
+    Const MAC_API_ERR_EILSEQ As Long = 92 'Illegal byte sequence
+    Const MAC_API_ERR_EINVAL As Long = 22 'Invalid argument
+    Const MAC_API_ERR_E2BIG  As Long = 7  'Argument list too long,buffer overrun
     #If Mac Then
         Dim inBytesLeft As LongPtr:  inBytesLeft = LenB(str)
         Dim outBytesLeft As LongPtr: outBytesLeft = inBytesLeft * 4
         Dim buffer As String:        buffer = Space$(CLng(inBytesLeft) * 2)
         Dim inBuf As LongPtr:        inBuf = StrPtr(str)
         Dim outBuf As LongPtr:       outBuf = StrPtr(buffer)
+        Dim toCpCdName As String:    toCpCdName = ConvDescriptorName(toCodePage)
+        Dim fromCpCdName As String:  fromCpCdName = ConvDescriptorName( _
+                                                                   fromCodePage)
         Dim cd As LongPtr
-        
-        cd = iconv_open( _
-            StrPtr(ConversionDescriptorName(toCodePage)), _
-            StrPtr(ConversionDescriptorName(fromCodePage)))
+        'Todo: potentially implement custom error numbers
+        If LenB(toCpCdName) = 0 Then Err.Raise 5, methodName, _
+            "No conversion descriptor name assigned to CodePage " & toCodePage
+        If LenB(fromCpCdName) = 0 Then Err.Raise 5, methodName, _
+            "No conversion descriptor name assigned to CodePage " & fromCodePage
+            
+        SetApiErrorNumber = 0 'Clear previous errors
+        cd = iconv_open(StrPtr(toCpCdName), StrPtr(fromCodePage))
 
+        Select Case GetApiErrorNumber
+            Case MAC_API_ERR_EINVAL
+                Err.Raise 5, methodName, "The conversion from CodePage " & _
+                    fromCodePage & " to CodePage " & toCodePage & " is not " & _
+                    "supported by the implementation of 'iconv' on this platform"
+            Case Is <> 0
+                Err.Raise vbErrInternalError, methodName, "Unknown error " & _
+                    "trying to create a conversion descriptor. API Error" & _
+                    "Code: " & GetApiErrorNumber
+        End Select
+        
         If iconv(cd, inBuf, inBytesLeft, outBuf, outBytesLeft) = -1 _
         And raiseErrors Then
-            'TODO: Do stuff based on GetApiErrorNumber
-            Err.Raise 5, methodName, _
-                "Input is invalid byte sequence of CodePage " & fromCodePage
+            Select Case GetApiErrorNumber
+                Case MAC_API_ERR_EILSEQ
+                    Err.Raise 5, methodName, _
+                        "Input is invalid byte sequence of CodePage " & _
+                        fromCodePage
+                Case MAC_API_ERR_EINVAL
+                    Err.Raise 5, methodName, _
+                        "Input is incomplete byte sequence of CodePage " & _
+                            fromCodePage
+            End Select
         Else
             Transcode = LeftB$(buffer, LenB(buffer) - CLng(outBytesLeft))
         End If
-        iconv_close cd
+        'These errors are bugs and should be raised even if raiseErrors = False:
+        Select Case GetApiErrorNumber
+            Case MAC_API_ERR_E2BIG
+                Err.Raise vbErrInternalError, methodName, _
+                    "Output buffer overrun while transcoding from CodePage " _
+                    & fromCodePage & " to CodePage " & toCodePage
+            Case Is <> 0
+                Err.Raise vbErrInternalError, methodName, "Unknown error " & _
+                    "occurred during transcoding with 'iconv'. API Error" & _
+                    "Code: " & GetApiErrorNumber
+        End Select
+        If iconv_close(cd) = 0 Then
+            Err.Raise GetApiErrorNumber, methodName, "Unknown error occurred" _
+                & " when calling 'iconv_close'. API ErrorCode: " & _
+                GetApiErrorNumber
+        End If
     #Else
         If toCodePage = cpUTF_16 Then
             Transcode = Decode(str, fromCodePage, raiseErrors)
@@ -517,7 +579,7 @@ Public Function Encode(ByRef utf16leStr As String, _
     Const methodName As String = "Encode"
     If utf16leStr = vbNullString Then Exit Function
     #If Mac Then
-        Encode = Transcode(utf16leStr, toCodePage, cpUTF_16, raiseErrors)
+        Encode = Transcode(utf16leStr, cpUTF_16, toCodePage, raiseErrors)
     #Else
         If raiseErrors Then SetLastError 0
     
@@ -554,7 +616,7 @@ Public Function Decode(ByRef str As String, _
     Const methodName As String = "Decode"
     If str = vbNullString Then Exit Function
     #If Mac Then
-        Decode = Transcode(str, cpUTF_16, fromCodePage, raiseErrors)
+        Decode = Transcode(str, fromCodePage, cpUTF_16, raiseErrors)
     #Else
         If raiseErrors Then SetLastError 0
         
@@ -750,6 +812,9 @@ End Function
              Optional ByVal allowSingleSurrogates As Boolean = False) _
                       As String
     Const methodName As String = "ChrU"
+    
+    If codepoint < &H8000 Then Err.Raise 5, methodName, _
+        "Argument 'codepoint' = " & codepoint & " < -32768, invalid"
     
     If codepoint < 0 Then codepoint = codepoint And &HFFFF& 'Incase of uInt input
     
@@ -1466,10 +1531,10 @@ Public Function ReplaceB(ByRef bytes As String, _
     ReDim buffer(0 To LenB(bytes) - lStart + numRepl * (lenBReplace - lenBFind))
     ReplaceB = buffer
     
-    Dim i As Long:                i = InStrB(lStart, bytes, sFind, lCompare)
-    Dim j As Long:                j = 1
-    Dim lastOccurrence As Long:   lastOccurrence = lStart
-    Dim count As Long:            count = 1
+    Dim i As Long:              i = InStrB(lStart, bytes, sFind, lCompare)
+    Dim j As Long:              j = 1
+    Dim lastOccurrence As Long: lastOccurrence = lStart
+    Dim count As Long:          count = 1
     
     Do Until i = 0 Or count > lCount
         Dim diff As Long: diff = i - lastOccurrence
@@ -1763,8 +1828,8 @@ Public Function SplitUnlessInQuotes(ByRef str As String, _
     Dim ub As Long:         ub = -1
     Dim parts As Variant:   ReDim parts(0 To 0)
     Dim doSplit As Boolean: doSplit = True
-
-    If delim = """" Then
+    
+    If delim = """" Then 'Handle this special case
         i = InStr(1, str, """", vbBinaryCompare)
         If i <> 0 Then
             Dim j As Long: j = InStrRev(str, """", , vbBinaryCompare)
@@ -1800,11 +1865,10 @@ Public Function SplitUnlessInQuotes(ByRef str As String, _
         
         If Mid(str, i, Len(delim)) = delim And doSplit Or i = Len(str) Then
             If i = Len(str) Then s = s & Mid(str, i, 1)
-            
             ub = ub + 1
             ReDim Preserve parts(0 To ub)
             parts(ub) = s
-            s = ""
+            s = vbNullString
             i = i + Len(delim) - 1
         Else
             s = s & Mid(str, i, 1)
