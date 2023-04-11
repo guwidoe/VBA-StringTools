@@ -632,8 +632,9 @@ Public Function Transcode(ByRef str As String, _
                         If raiseErrors Then Err.Raise 5, methodName, _
                             "Input is invalid byte sequence of " & _
                             "CodePage " & fromCodePage
-                            
-                        CopyMemory ByVal outBuf, replacementChar(0), 3
+
+                        CopyMemory ByVal outBuf, replacementChar(0), _
+                                   LenB(replacementChar)
                         outBuf = outBuf + LenB(replacementChar)
                         outBytesLeft = outBytesLeft - LenB(replacementChar)
                         inBuf = inBuf + 1
@@ -642,8 +643,9 @@ Public Function Transcode(ByRef str As String, _
                         If raiseErrors Then Err.Raise 5, methodName, _
                             "Input is incomplete byte sequence of" & _
                             "CodePage " & fromCodePage
-                            
-                        CopyMemory ByVal outBuf, replacementChar(0), 3
+
+                        CopyMemory ByVal outBuf, replacementChar(0), _
+                                   LenB(replacementChar)
                         outBuf = outBuf + outBytesLeft
                         inBuf = inBuf + inBytesLeft
                         outBytesLeft = 0
