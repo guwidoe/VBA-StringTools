@@ -95,8 +95,8 @@ Private Const vbErrInternalError As Long = 51
 
 'https://learn.microsoft.com/en-us/windows/win32/intl/code-page-identifiers
 Public Enum CodePageIdentifier
-    [_first]
-'Enum_Name   Identifier             '.NET Name               Additional information
+    [_first] = -1 '(Is initialized)
+  'Enum_Name   Identifier             '.NET Name               Additional information
     cpIBM037 = 37                     'IBM037                  IBM EBCDIC US-Canada
     cpIBM437 = 437                    'IBM437                  OEM United States
     cpIBM500 = 500                    'IBM500                  IBM EBCDIC International
@@ -203,7 +203,7 @@ Public Enum CodePageIdentifier
     cpX_cp20936 = 20936               'x-cp20936               Simplified Chinese (GB2312); Chinese Simplified (GB2312-80)
     cpX_cp20949 = 20949               'x-cp20949               Korean Wansung
     cpCp1025 = 21025                  'cp1025                  IBM EBCDIC Cyrillic Serbian-Bulgarian
-    cpD = 21027                       '                        (deprecated)
+    cpDeprecated = 21027                       '                        (deprecated)
     cpKoi8_u = 21866                  'koi8-u                  Ukrainian (KOI8-U); Cyrillic (KOI8-U)
     cpIso_8859_1 = 28591              'iso-8859-1              ISO 8859-1 Latin 1; Western European (ISO)
     cpIso_8859_2 = 28592              'iso-8859-2              ISO 8859-2 Central European; Central European (ISO)
@@ -247,10 +247,18 @@ Public Enum CodePageIdentifier
     cpX_iscii_gu = 57010              'x-iscii-gu              ISCII Gujarati
     cpX_iscii_pa = 57011              'x-iscii-pa              ISCII Punjabi
     cpUTF_7 = 65000                   'utf-7                   Unicode (UTF-7)
-    cpUTF_8 = 65001                  'utf-8                   Unicode (UTF-8)
+    cpUTF_8 = 65001                   'utf-8                   Unicode (UTF-8)
     [_last]
 End Enum
 
+
+
+'According to documentation:
+'https://learn.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-widechartomultibyte
+'https://learn.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-multibytetowidechar
+'Note: The documentation doesn't seem to list all codepages for which certain
+'      flags are disallowed. This can lead to 'Library implementation erroneous'
+'      errors when calling Encode, Decode or Transcode with 'raiseErrors = True'
 Private Static Function CodePageAllowsFlags(ByVal cpID As Long) As Boolean
     Dim arr(CodePageIdentifier.[_first] To CodePageIdentifier.[_last]) As Boolean
     
@@ -264,6 +272,7 @@ Private Static Function CodePageAllowsFlags(ByVal cpID As Long) As Boolean
         arr(i) = True
     Next i
     
+    'According to docs:
     arr(cpIso_2022_jp) = False
     arr(cpCsISO2022JP) = False
     arr(cpIso_2022_jp_w_1b_Kana) = False
@@ -274,9 +283,22 @@ Private Static Function CodePageAllowsFlags(ByVal cpID As Long) As Boolean
         arr(i) = False
     Next i
     arr(cpUTF_7) = False
-    CodePageAllowsFlags = CodePageAllowsFlags(cpID)
+
+    'According to trial and error, it is easier to whitelist:
+    For i = CodePageIdentifier.[_first] + 1 To CodePageIdentifier.[_last]
+        arr(i) = False
+    Next i
+    arr(cpUTF_32) = True   'Not sure about this one
+    arr(cpUTF_32BE) = True 'Not sure about this one
+    arr(cpGB18030) = True  'This one is definitely allowed
+    arr(cpUTF_8) = True    'This one is definitely allowed
+    
+    CodePageAllowsFlags = arr(cpID)
 End Function
 
+'According to documentation:
+'https://learn.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-widechartomultibyte
+'https://learn.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-multibytetowidechar
 Private Static Function CodePageAllowsQueryReversible(ByVal cpID As Long) As Boolean
     Dim arr(CodePageIdentifier.[_first] To CodePageIdentifier.[_last]) As Boolean
     
@@ -289,10 +311,32 @@ Private Static Function CodePageAllowsQueryReversible(ByVal cpID As Long) As Boo
     For i = CodePageIdentifier.[_first] To CodePageIdentifier.[_last]
         arr(i) = True
     Next i
-
+    
+    'According to docs:
     arr(cpUTF_7) = False
     arr(cpUTF_8) = False
-    CodePageAllowsQueryReversible = CodePageAllowsFlags(cpID)
+    
+    'According to trial and error there are a bunch more:
+    arr(cpIso_2022_jp) = False
+    arr(cpCsISO2022JP) = False
+    arr(cpIso_2022_jp_w_1b_Kana) = False
+    arr(cpIso_2022_kr) = False
+    arr(cpX_cp50227) = False
+    arr(cpISO_2022_Trad_Chinese) = False
+    arr(cpHz_gb_2312) = False
+    arr(cpGB18030) = False
+    arr(cpX_iscii_de) = False
+    arr(cpX_iscii_be) = False
+    arr(cpX_iscii_ta) = False
+    arr(cpX_iscii_te) = False
+    arr(cpX_iscii_as) = False
+    arr(cpX_iscii_or) = False
+    arr(cpX_iscii_ka) = False
+    arr(cpX_iscii_ma) = False
+    arr(cpX_iscii_gu) = False
+    arr(cpX_iscii_pa) = False
+    
+    CodePageAllowsQueryReversible = arr(cpID)
 End Function
 
 'Returns an array for converting CodePageIDs to ConversionDescriptorNames
@@ -551,8 +595,7 @@ End Function
 Public Function Transcode(ByRef str As String, _
                           ByVal fromCodePage As CodePageIdentifier, _
                           ByVal toCodePage As CodePageIdentifier, _
-                 Optional ByVal raiseErrors As Boolean = False, _
-                 Optional ByVal allowIrreversible As Boolean = True) As String
+                 Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "Transcode"
     'https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/iconv.3.html
     #If Mac Then
@@ -572,10 +615,7 @@ Public Function Transcode(ByRef str As String, _
             If irrevConvCount = -1 Then 'Error occurred
                 If StrPtr(replacementChar) = 0 Then _
                     replacementChar = GetReplacementCharForCodePage(toCodePage)
-                    
-                If Not allowIrreversible Then Err.Raise 5, methodName, _
-                    "Default char would be used, encoding would be irreversible"
-                    
+                
                 Select Case GetApiErrorNumber
                     Case MAC_API_ERR_EILSEQ
                         If raiseErrors Then Err.Raise 5, methodName, _
@@ -591,6 +631,7 @@ Public Function Transcode(ByRef str As String, _
                         If raiseErrors Then Err.Raise 5, methodName, _
                             "Input is incomplete byte sequence of" & _
                             "CodePage " & fromCodePage
+                            
                         CopyMemory ByVal outBuf, replacementChar(0), 3
                         outBuf = outBuf + outBytesLeft
                         inBuf = inBuf + inBytesLeft
@@ -600,7 +641,7 @@ Public Function Transcode(ByRef str As String, _
             End If
         Loop
         
-        If irrevConvCount > 0 And Not allowIrreversible Then Err.Raise 5, _
+        If irrevConvCount > 0 And raiseErrors Then Err.Raise 5, _
             methodName, "Default char would be used, encoding would be irreversible"
 
         Transcode = LeftB$(buffer, LenB(buffer) - CLng(outBytesLeft))
@@ -698,6 +739,9 @@ Public Function Encode(ByRef utf16leStr As String, _
               Optional ByVal allowIrreversible As Boolean = True) As String
     Const methodName As String = "Encode"
     
+    If toCodePage = cpUTF_16 Then Err.Raise 5, methodName, _
+        "Input string should already be UTF-16. Can't encode UTF-16 to UTF-16."
+    
     If utf16leStr = vbNullString Then Exit Function
     #If Mac Then
         Encode = Transcode(utf16leStr, cpUTF_16, toCodePage, raiseErrors, _
@@ -707,14 +751,13 @@ Public Function Encode(ByRef utf16leStr As String, _
         Dim dwFlags As Long
         Dim usedDefaultChar As Boolean
         Dim lpUsedDefaultChar As LongPtr
-        If Not allowIrreversible _
-        And CodePageAllowsQueryReversible(toCodePage) Then _
+        If raiseErrors And CodePageAllowsQueryReversible(toCodePage) Then _
             lpUsedDefaultChar = VarPtr(usedDefaultChar)
             
-        SetApiErrorNumber 0
         If raiseErrors And CodePageAllowsFlags(toCodePage) Then _
             dwFlags = WC_ERR_INVALID_CHARS
 
+        SetApiErrorNumber 0
         byteCount = WideCharToMultiByte(toCodePage, dwFlags, StrPtr(utf16leStr), _
                                     Len(utf16leStr), 0, 0, 0, lpUsedDefaultChar)
         If byteCount = 0 Then
@@ -728,26 +771,29 @@ Public Function Encode(ByRef utf16leStr As String, _
                         "supported by the API on this platform."
                 Case ERROR_INSUFFICIENT_BUFFER, ERROR_INVALID_FLAGS
                     Err.Raise vbErrInternalError, methodName, _
-                        "Library implementation erroneous."
+                        "Library implementation erroneous. API Error: " & _
+                        GetApiErrorNumber
                 Case Else
                     Err.Raise vbErrInternalError, methodName, _
-                        "Completely unexpected error."
+                        "Completely unexpected error. API Error: " & _
+                        GetApiErrorNumber
             End Select
         End If
         
-        If Not allowIrreversible And usedDefaultChar Then _
+        If raiseErrors And usedDefaultChar Then _
             Err.Raise 5, methodName, "Default char would be used, encoding " & _
                 "would be irreversible."
     
         Dim b() As Byte: ReDim b(0 To byteCount - 1)
         Encode = b
-
         WideCharToMultiByte toCodePage, dwFlags, StrPtr(utf16leStr), _
                 Len(utf16leStr), StrPtr(Encode), byteCount, 0, lpUsedDefaultChar
+                
         Select Case GetApiErrorNumber
             Case Is <> 0
                 Err.Raise vbErrInternalError, methodName, _
-                        "Completely unexpected error."
+                        "Completely unexpected error. API Error: " & _
+                        GetApiErrorNumber
         End Select
     #End If
 End Function
@@ -758,6 +804,10 @@ Public Function Decode(ByRef str As String, _
                        ByVal fromCodePage As CodePageIdentifier, _
               Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "Decode"
+    
+    If fromCodePage = cpUTF_16 Then Err.Raise 5, methodName, _
+        "VBA strings are UTF-16 by default. No need to decode string from UTF-16."
+        
     If str = vbNullString Then Exit Function
     #If Mac Then
         Decode = Transcode(str, fromCodePage, cpUTF_16, raiseErrors)
@@ -782,20 +832,24 @@ Public Function Decode(ByRef str As String, _
                         & " supported by the API on this platform."
                 Case ERROR_INSUFFICIENT_BUFFER, ERROR_INVALID_FLAGS
                     Err.Raise vbErrInternalError, methodName, _
-                        "Library implementation erroneous."
+                        "Library implementation erroneous. API Error: " & _
+                        GetApiErrorNumber
                 Case Else
                     Err.Raise vbErrInternalError, methodName, _
-                        "Completely unexpected error."
+                        "Completely unexpected error. API Error: " & _
+                        GetApiErrorNumber
             End Select
         End If
     
         Decode = Space$(charCount)
         MultiByteToWideChar fromCodePage, dwFlags, StrPtr(str), LenB(str), _
                             StrPtr(Decode), charCount
+                            
         Select Case GetApiErrorNumber
             Case Is <> 0
                 Err.Raise vbErrInternalError, methodName, _
-                        "Completely unexpected error."
+                        "Completely unexpected error. API Error: " & _
+                        GetApiErrorNumber
         End Select
     #End If
 End Function
@@ -917,13 +971,13 @@ Public Function ReplaceUnicodeLiterals(ByRef str As String) As String
     
     For Each match In mc
         mv = match.Value
-        If Left(mv, 1) = "&" Then
-            codepoint = CLng(Mid(mv, 3, Len(mv) - 3))
+        If Left$(mv, 1) = "&" Then
+            codepoint = CLng(Mid$(mv, 3, Len(mv) - 3))
         Else
-            If Mid(mv, 3, 1) = "{" Then
-                codepoint = CLng("&H" & Mid(mv, 4, Len(mv) - 4))
+            If Mid$(mv, 3, 1) = "{" Then
+                codepoint = CLng("&H" & Mid$(mv, 4, Len(mv) - 4))
             Else
-                codepoint = CLng("&H" & Mid(mv, 3))
+                codepoint = CLng("&H" & Mid$(mv, 3))
             End If
         End If
         If codepoint < &H110000 Then
@@ -948,17 +1002,17 @@ Public Function EncodeUnicodeCharacters(ByRef str As String) As String
     Dim result() As String: ReDim result(1 To Len(str))
     
     For i = 1 To Len(str)
-        codepoint = AscW(Mid(str, i, 1)) And &HFFFF&
+        codepoint = AscW(Mid$(str, i, 1)) And &HFFFF&
         
-        If codepoint >= &HD800& Then codepoint = AscU(Mid(str, i, 2))
+        If codepoint >= &HD800& Then codepoint = AscU(Mid$(str, i, 2))
         
         If codepoint > &HFFFF& Then 'Outside BMP
             result(j) = "\u" & "000" & Hex(codepoint)
             i = i + 1
         ElseIf codepoint > &HFF Then 'BMP
-            result(j) = "\u" & Right("00" & Hex(codepoint), 4)
+            result(j) = "\u" & Right$("00" & Hex(codepoint), 4)
         Else
-            result(j) = Mid(str, i, 1)
+            result(j) = Mid$(str, i, 1)
         End If
         j = j + 1
     Next i
@@ -1003,9 +1057,9 @@ Public Function AscU(ByRef char As String) As Long
     If Len(char) = 1 Then
         AscU = AscW(char) And &HFFFF&
     Else
-        s = Left(char, 2)
-        hi = AscW(Mid(s, 1, 1)) And &HFFFF&
-        lo = AscW(Mid(s, 2, 1)) And &HFFFF&
+        s = Left$(char, 2)
+        hi = AscW(Mid$(s, 1, 1)) And &HFFFF&
+        lo = AscW(Mid$(s, 2, 1)) And &HFFFF&
         
         If &HDC00& > lo Or lo > &HDFFF& Then
             AscU = hi
@@ -1086,10 +1140,10 @@ Private Function EncodeUTF8native(ByRef utf16leStr As String, _
     Dim utf8() As Byte:       ReDim utf8(Len(utf16leStr) * 4 - 1)
     
     Do While i <= Len(utf16leStr)
-        codepoint = AscW(Mid(utf16leStr, i, 1)) And &HFFFF&
+        codepoint = AscW(Mid$(utf16leStr, i, 1)) And &HFFFF&
         
         If codepoint >= &HD800& And codepoint <= &HDBFF& Then 'high surrogate
-            lowSurrogate = AscW(Mid(utf16leStr, i + 1, 1)) And &HFFFF&
+            lowSurrogate = AscW(Mid$(utf16leStr, i + 1, 1)) And &HFFFF&
             
             If &HDC00& <= lowSurrogate And lowSurrogate <= &HDFFF& Then
                 codepoint = (codepoint - &HD800&) * &H400& + _
@@ -1304,10 +1358,10 @@ Public Function EncodeUTF32LE(ByRef utf16leStr As String, _
     Dim j As Long:            j = 0
     
     Do While i <= Len(utf16leStr)
-        codepoint = AscW(Mid(utf16leStr, i, 1)) And &HFFFF&
+        codepoint = AscW(Mid$(utf16leStr, i, 1)) And &HFFFF&
         
         If codepoint >= &HD800& And codepoint <= &HDBFF& Then 'high surrogate
-            lowSurrogate = AscW(Mid(utf16leStr, i + 1, 1)) And &HFFFF&
+            lowSurrogate = AscW(Mid$(utf16leStr, i + 1, 1)) And &HFFFF&
             
             If &HDC00& <= lowSurrogate And lowSurrogate <= &HDFFF& Then
                 codepoint = (codepoint - &HD800&) * &H400& + _
@@ -1435,7 +1489,7 @@ Public Function RandomStringAlphanumeric2(ByVal length As Long) As String
     
     Randomize
     For i = 1 To length
-        Mid(result, i, 1) = a(Int(Rnd() * 62))
+        Mid$(result, i, 1) = a(Int(Rnd() * 62))
     Next i
     RandomStringAlphanumeric2 = result
 End Function
@@ -1518,7 +1572,7 @@ Public Function RandomStringUnicode(ByVal length As Long) As String
     End If
     s = b
     If CInt(b(UBound(b) - 1)) + b(UBound(b)) = 0 Then _
-        Mid(s, Len(s), 1) = ChrW(Int(Rnd() * &HFFFE& + 1))
+        Mid$(s, Len(s), 1) = ChrW(Int(Rnd() * &HFFFE& + 1))
     RandomStringUnicode = s
 End Function
 
@@ -1549,14 +1603,14 @@ Public Function CleanString(ByRef str As String, _
     Dim j As Long: j = 1
     
     For i = 1 To Len(str)
-        sChr = Mid(str, i, 1)
+        sChr = Mid$(str, i, 1)
         
         If InStr(1, inklChars, sChr, vbBinaryCompare) Then
-            Mid(str, j, 1) = sChr
+            Mid$(str, j, 1) = sChr
             j = j + 1
         End If
     Next i
-    CleanString = Left(str, j - 1)
+    CleanString = Left$(str, j - 1)
 End Function
 
 #If Mac = 0 Then
@@ -1581,11 +1635,11 @@ Public Function RemoveNonNumeric(ByVal str As String) As String
     Dim i As Long
     Dim j As Long: j = 1
     For i = 1 To Len(str)
-        sChr = Mid(str, i, 1)
+        sChr = Mid$(str, i, 1)
         If sChr Like "#" Then _
-            Mid(str, j, 1) = sChr: j = j + 1
+            Mid$(str, j, 1) = sChr: j = j + 1
     Next i
-    RemoveNonNumeric = Left(str, j - 1)
+    RemoveNonNumeric = Left$(str, j - 1)
 End Function
 
 'Inserts a string into another string at a specified position
@@ -2021,25 +2075,25 @@ Public Function SplitUnlessInQuotes(ByRef str As String, _
         If ub = limit - 2 Then
             ub = ub + 1
             ReDim Preserve parts(0 To ub)
-            parts(ub) = Mid(str, i)
+            parts(ub) = Mid$(str, i)
             Exit For
         End If
         
-        If Mid(str, i, 1) = """" Then
+        If Mid$(str, i, 1) = """" Then
             doSplit = Not doSplit
             If Not doSplit Then _
                 doSplit = InStr(i + 1, str, """", vbBinaryCompare) = 0
         End If
         
-        If Mid(str, i, Len(delim)) = delim And doSplit Or i = Len(str) Then
-            If i = Len(str) Then s = s & Mid(str, i, 1)
+        If Mid$(str, i, Len(delim)) = delim And doSplit Or i = Len(str) Then
+            If i = Len(str) Then s = s & Mid$(str, i, 1)
             ub = ub + 1
             ReDim Preserve parts(0 To ub)
             parts(ub) = s
             s = vbNullString
             i = i + Len(delim) - 1
         Else
-            s = s & Mid(str, i, 1)
+            s = s & Mid$(str, i, 1)
         End If
     Next i
     SplitUnlessInQuotes = parts
