@@ -440,4 +440,7 @@ Private Sub TestSplitB()
     Stop
 End Sub
 
+Private Sub TestEncode()
+    
+End Sub
 

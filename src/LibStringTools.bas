@@ -53,8 +53,8 @@ Option Base 0
     #End If
 #Else 'Windows
     #If VBA7 Then
-        Private Declare PtrSafe Function MultiByteToWideChar Lib "kernel32" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long) As Long
-        Private Declare PtrSafe Function WideCharToMultiByte Lib "kernel32" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpDefaultChar As LongPtr, ByVal lpUsedDefaultChar As LongPtr) As Long
+        Private Declare PtrSafe Function MultiByteToWideChar Lib "kernel32" (ByVal codePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long) As Long
+        Private Declare PtrSafe Function WideCharToMultiByte Lib "kernel32" (ByVal codePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpDefaultChar As LongPtr, ByVal lpUsedDefaultChar As LongPtr) As Long
         
         Private Declare PtrSafe Function GetLastError Lib "kernel32" () As Long
         Private Declare PtrSafe Sub SetLastError Lib "kernel32" (ByVal dwErrCode As Long)
@@ -79,7 +79,19 @@ Option Base 0
     End Enum
 #End If
 
-Const vbErrInternalError As Long = 51
+Private Const WC_ERR_INVALID_CHARS As Long = &H80&
+Private Const MB_ERR_INVALID_CHARS As Long = &H8&
+
+Private Const ERROR_INVALID_PARAMETER      As Long = 87
+Private Const ERROR_INSUFFICIENT_BUFFER    As Long = 122
+Private Const ERROR_INVALID_FLAGS          As Long = 1004
+Private Const ERROR_NO_UNICODE_TRANSLATION As Long = 1113
+
+Private Const MAC_API_ERR_EILSEQ As Long = 92 'Illegal byte sequence
+Private Const MAC_API_ERR_EINVAL As Long = 22 'Invalid argument
+Private Const MAC_API_ERR_E2BIG  As Long = 7  'Argument list too long
+
+Private Const vbErrInternalError As Long = 51
 
 'https://learn.microsoft.com/en-us/windows/win32/intl/code-page-identifiers
 Public Enum CodePageIdentifier
@@ -524,9 +536,6 @@ Public Function Transcode(ByRef str As String, _
                  Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "Transcode"
     'https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/iconv.3.html
-    Const MAC_API_ERR_EILSEQ As Long = 92 'Illegal byte sequence
-    Const MAC_API_ERR_EINVAL As Long = 22 'Invalid argument
-    Const MAC_API_ERR_E2BIG  As Long = 7  'Argument list too long,buffer overrun
     #If Mac Then
         Dim inBytesLeft As LongPtr:  inBytesLeft = LenB(str)
         Dim outBytesLeft As LongPtr: outBytesLeft = inBytesLeft * 4
@@ -589,7 +598,7 @@ Public Function Transcode(ByRef str As String, _
                     "Code: " & GetApiErrorNumber
         End Select
         If iconv_close(cd) = 0 Then
-            Err.Raise GetApiErrorNumber, methodName, "Unknown error occurred" _
+            Err.Raise vbErrInternalError, methodName, "Unknown error occurred" _
                 & " when calling 'iconv_close'. API ErrorCode: " & _
                 GetApiErrorNumber
         End If
@@ -605,6 +614,47 @@ Public Function Transcode(ByRef str As String, _
     #End If
 End Function
 
+#If Mac Then
+'On Mac, replacement character must be manually inserted when using iconv
+Private Function GetReplacementCharForCodePage(ByRef codePage As String) As String
+    Dim cd As LongPtr
+    Dim inBuf As LongPtr
+    Dim inBytesLeft As LongPtr
+    Dim outBuf As LongPtr
+    Dim outBytesLeft As LongPtr
+    Dim ret As LongPtr
+
+    cd = iconv_open(StrPtr(codePage), StrPtr("UTF-8"))
+
+    If cd = 0 Then
+        MsgBox "Error opening iconv conversion descriptor."
+        Exit Function
+    End If
+
+    ' U+FFFD (0xEF 0xBF 0xBD) in UTF-8
+    Dim inputBytes() As Byte
+    inputBytes = Array(&HEF, &HBF, &HBD)
+    inBuf = VarPtr(inputBytes(0))
+    inBytesLeft = UBound(inputBytes) + 1
+
+    Dim outputBytes(10) As Byte ' Output buffer with ample space
+    outBuf = VarPtr(outputBytes(0))
+    outBytesLeft = UBound(outputBytes) + 1
+
+    ret = iconv(cd, inBuf, inBytesLeft, outBuf, outBytesLeft)
+
+    If ret = -1 Then
+        MsgBox "Error: " & Err.LastDllError
+        Exit Function
+    End If
+
+    ReDim Preserve outputBytes(UBound(outputBytes) - outBytesLeft)
+    GetReplacementCharForCodePage = outputBytes
+
+    iconv_close cd
+End Function
+#End If
+
 'Encoding a VBA-native UTF-16LE encoded string to any CodePage passed as the
 'toCodePage argument using the appropriate Windows or MacOS API function
 Public Function Encode(ByRef utf16leStr As String, _
@@ -612,32 +662,29 @@ Public Function Encode(ByRef utf16leStr As String, _
               Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "Encode"
     
-    
     If utf16leStr = vbNullString Then Exit Function
     #If Mac Then
         Encode = Transcode(utf16leStr, cpUTF_16, toCodePage, raiseErrors)
     #Else
-        Const WC_ERR_INVALID_CHARS As Long = &H80&
-        Const ERROR_INVALID_PARAMETER As Long = 87
-        Const ERROR_INSUFFICIENT_BUFFER As Long = 122
-        Const ERROR_INVALID_FLAGS As Long = 1004
-        Const ERROR_NO_UNICODE_TRANSLATION As Long = 1113
         Dim byteCount As Long
         Dim dwFlags As Long
         
-        If raiseErrors Then
-            SetApiErrorNumber 0
-            dwFlags = IIf(CodePageAllowsFlags(toCodePage), WC_ERR_INVALID_CHARS, 0)
-        End If
+        SetApiErrorNumber 0
+        If raiseErrors And CodePageAllowsFlags(toCodePage) Then _
+            dwFlags = WC_ERR_INVALID_CHARS
+
         byteCount = WideCharToMultiByte(toCodePage, dwFlags, StrPtr(utf16leStr), _
                                         Len(utf16leStr), 0, 0, 0, 0)
-        If byteCount < 1 Then
+        If byteCount = 0 Then
             Select Case GetApiErrorNumber
                 Case ERROR_NO_UNICODE_TRANSLATION
                     Err.Raise 5, methodName, _
                         "Input is invalid byte sequence of CodePage " & cpUTF_16
-                Case ERROR_INSUFFICIENT_BUFFER, ERROR_INVALID_FLAGS, _
-                     ERROR_INVALID_PARAMETER
+                Case ERROR_INVALID_PARAMETER
+                    Err.Raise 5, methodName, _
+                        "Conversion to CodePage " & toCodePage & " is not " & _
+                        "supported by the API on this platform."
+                Case ERROR_INSUFFICIENT_BUFFER, ERROR_INVALID_FLAGS
                     Err.Raise vbErrInternalError, methodName, _
                         "Library implementation erroneous."
                 Case Else
@@ -646,10 +693,9 @@ Public Function Encode(ByRef utf16leStr As String, _
             End Select
         End If
     
-        Encode = Space$((byteCount + 1) \ 2)
-    
-        If byteCount Mod 2 = 1 Then Encode = LeftB$(Encode, byteCount)
-    
+        Dim b() As Byte: ReDim b(0 To byteCount - 1)
+        Encode = b
+
         WideCharToMultiByte toCodePage, dwFlags, StrPtr(utf16leStr), _
                             Len(utf16leStr), StrPtr(Encode), byteCount, 0, 0
         Select Case GetApiErrorNumber
@@ -670,27 +716,41 @@ Public Function Decode(ByRef str As String, _
     #If Mac Then
         Decode = Transcode(str, fromCodePage, cpUTF_16, raiseErrors)
     #Else
-        If raiseErrors Then SetApiErrorNumber 0
-        
         Dim charCount As Long
-        charCount = MultiByteToWideChar(fromCodePage, 0, StrPtr(str), _
+        Dim dwFlags As Long
+        
+        SetApiErrorNumber 0
+        If raiseErrors And CodePageAllowsFlags(fromCodePage) Then _
+            dwFlags = MB_ERR_INVALID_CHARS
+        
+        charCount = MultiByteToWideChar(fromCodePage, dwFlags, StrPtr(str), _
                                         LenB(str), 0, 0)
-        If charCount < 1 Then
-            If raiseErrors Then
-                'TODO: Do stuff based on GetApiErrorNumber
-                Err.Raise 5, methodName, _
-                    "Input is invalid byte sequence of CodePage " & fromCodePage
-            Else
-                Exit Function
-            End If
+        If charCount = 0 Then
+            Select Case GetApiErrorNumber
+                Case ERROR_NO_UNICODE_TRANSLATION
+                    Err.Raise 5, methodName, _
+                        "Input is invalid byte sequence of CodePage " & cpUTF_16
+                Case ERROR_INVALID_PARAMETER
+                    Err.Raise 5, methodName, _
+                        "Conversion from CodePage " & fromCodePage & " is not" _
+                        & " supported by the API on this platform."
+                Case ERROR_INSUFFICIENT_BUFFER, ERROR_INVALID_FLAGS
+                    Err.Raise vbErrInternalError, methodName, _
+                        "Library implementation erroneous."
+                Case Else
+                    Err.Raise vbErrInternalError, methodName, _
+                        "Completely unexpected error."
+            End Select
         End If
     
         Decode = Space$(charCount)
-        MultiByteToWideChar fromCodePage, 0, StrPtr(str), LenB(str), _
+        MultiByteToWideChar fromCodePage, dwFlags, StrPtr(str), LenB(str), _
                             StrPtr(Decode), charCount
-        If raiseErrors Then
-            'Check if GetApiErrorNumber = 0
-        End If
+        Select Case GetApiErrorNumber
+            Case Is <> 0
+                Err.Raise vbErrInternalError, methodName, _
+                        "Completely unexpected error."
+        End Select
     #End If
 End Function
 
@@ -709,7 +769,7 @@ End Function
 '   - HexToString("0x610062006300") returns "abc"
 '   - StrConv(HexToString("0x616263"), vbUnicode) returns "abc"
 '   - HexToString("0x61626t") or HexToString("0x61626") both raise error 5
-Public Function HexToString(ByVal hexStr As String) As String
+Public Function HexToString(ByRef hexStr As String) As String
     Const methodName As String = "HexToString"
     Const errPrefix As String = "Invalid Hex string literal. "
     Dim size As Long: size = Len(hexStr)
@@ -755,7 +815,7 @@ End Function
 'Converts the input string into a string of hex literals.
 'e.g.: "abc" will be turned into "0x610062006300" (UTF-16LE)
 'e.g.: StrConv("ABC", vbFromUnicode) will be turned into "0x414243"
-Public Function StringToHex(ByVal s As String) As String
+Public Function StringToHex(ByRef s As String) As String
     Static map(0 To 255) As String
     Dim b() As Byte: b = s
     Dim i As Long
@@ -791,7 +851,7 @@ End Function
 '     can be misinterpreted if adjacent to text starting with 0-9 or a-f.
 '   - This function can be slow for very long input strings with many
 '     different literals
-Public Function ReplaceUnicodeLiterals(ByVal str As String) As String
+Public Function ReplaceUnicodeLiterals(ByRef str As String) As String
     Const PATTERN_UNICODE_LITERALS As String = _
         "\\u000[0-9a-f]{5}|\\u[0-9a-f]{4}|" & _
         "\\u{[0-9a-f]{1,5}}|u\+[0-9|a-f]{4,5}|&#\d{1,6};"
@@ -835,7 +895,7 @@ End Function
 '   \uXXXXXXXX  for characters outside the basic multilingual plane
 'Where:
 '   Xes are the digits of the codepoint in hexadecimal. (X = 0-9 or A-F)
-Public Function EncodeUnicodeCharacters(ByVal str As String) As String
+Public Function EncodeUnicodeCharacters(ByRef str As String) As String
     Dim codepoint As Long
     Dim i As Long
     Dim j As Long:          j = 1
@@ -889,7 +949,7 @@ End Function
 'Returns a given characters unicode codepoint as long.
 'Note: One unicode character can consist of two VBA "characters", a so-called
 '      "surrogate pair" (input string of length 2, so Len(char) = 2!)
-Public Function AscU(ByVal char As String) As Long
+Public Function AscU(ByRef char As String) As Long
     Dim s As String
     Dim lo As Long
     Dim hi As Long
@@ -910,7 +970,7 @@ Public Function AscU(ByVal char As String) As Long
 End Function
 
 'Function transcoding an ANSI encoded string to the VBA-native UTF-16LE
-Public Function DecodeANSI(ByVal ansiStr As String) As String
+Public Function DecodeANSI(ByRef ansiStr As String) As String
     Dim i As Long
     Dim j As Long:         j = 0
     Dim ansi() As Byte:    ansi = ansiStr
@@ -925,7 +985,7 @@ End Function
 
 'Function transcoding a VBA-native UTF-16LE encoded string to an ANSI string
 'Note: Information will be lost for codepoints > 255!
-Public Function EncodeANSI(ByVal utf16leStr As String) As String
+Public Function EncodeANSI(ByRef utf16leStr As String) As String
     Dim i As Long
     Dim j As Long:         j = 0
     Dim utf16le() As Byte: utf16le = utf16leStr
@@ -944,7 +1004,7 @@ Public Function EncodeANSI(ByVal utf16leStr As String) As String
     EncodeANSI = ansi
 End Function
 
-Public Function EncodeUTF8(ByVal utf16leStr As String, _
+Public Function EncodeUTF8(ByRef utf16leStr As String, _
                   Optional ByVal raiseErrors As Boolean = False) As String
     If Len(utf16leStr) < 50 Then
         EncodeUTF8 = EncodeUTF8native(utf16leStr, raiseErrors)
@@ -953,7 +1013,7 @@ Public Function EncodeUTF8(ByVal utf16leStr As String, _
     End If
 End Function
 
-Public Function DecodeUTF8(ByVal utf8Str As String, _
+Public Function DecodeUTF8(ByRef utf8Str As String, _
                   Optional ByVal raiseErrors As Boolean = False) As String
     If Len(utf8Str) < 50 Then
         DecodeUTF8 = DecodeUTF8native(utf8Str, raiseErrors)
@@ -964,11 +1024,11 @@ End Function
 
 'Function transcoding an VBA-native UTF-16LE encoded string to UTF-8
 #If TEST_MODE Then
-Public Function EncodeUTF8native(ByVal utf16leStr As String, _
+Public Function EncodeUTF8native(ByRef utf16leStr As String, _
                          Optional ByVal raiseErrors As Boolean = False) _
                                   As String
 #Else
-Private Function EncodeUTF8native(ByVal utf16leStr As String, _
+Private Function EncodeUTF8native(ByRef utf16leStr As String, _
                          Optional ByVal raiseErrors As Boolean = False) _
                                   As String
 #End If
@@ -1035,10 +1095,10 @@ End Function
 'Function transcoding an UTF-8 encoded string to the VBA-native UTF-16LE
 'Function transcoding an VBA-native UTF-16LE encoded string to UTF-8
 #If TEST_MODE Then
-Public Function DecodeUTF8native(ByVal utf8Str As String, _
+Public Function DecodeUTF8native(ByRef utf8Str As String, _
                    Optional ByVal raiseErrors As Boolean = False) As String
 #Else
-Private Function DecodeUTF8native(ByVal utf8Str As String, _
+Private Function DecodeUTF8native(ByRef utf8Str As String, _
                    Optional ByVal raiseErrors As Boolean = False) As String
 #End If
 
@@ -1143,10 +1203,10 @@ End Function
 'Transcoding a VBA-native UTF-16LE encoded string to UTF-8 using ADODB.Stream
 'Much faster than EncodeUTF8native, but only available on Windows
 #If TEST_MODE Then
-Public Function EncodeUTF8usingAdodbStream(ByVal utf16leStr As String) _
+Public Function EncodeUTF8usingAdodbStream(ByRef utf16leStr As String) _
                                             As String
 #Else
-Private Function EncodeUTF8usingAdodbStream(ByVal utf16leStr As String) _
+Private Function EncodeUTF8usingAdodbStream(ByRef utf16leStr As String) _
                                             As String
 #End If
     With CreateObject("ADODB.Stream")
@@ -1166,9 +1226,9 @@ End Function
 'Faster than DeocdeUTF8native for some strings but only available on Windows
 'Warning: This function performs extremely slow for strings bigger than ~5MB
 #If TEST_MODE Then
-Public Function DecodeUTF8usingAdodbStream(ByVal utf8Str As String) As String
+Public Function DecodeUTF8usingAdodbStream(ByRef utf8Str As String) As String
 #Else
-Private Function DecodeUTF8usingAdodbStream(ByVal utf8Str As String) As String
+Private Function DecodeUTF8usingAdodbStream(ByRef utf8Str As String) As String
 #End If
     Dim b() As Byte: b = utf8Str
     With CreateObject("ADODB.Stream")
@@ -1185,7 +1245,7 @@ End Function
 #End If
 
 'Function transcoding an VBA-native UTF-16LE encoded string to UTF-32
-Public Function EncodeUTF32LE(ByVal utf16leStr As String, _
+Public Function EncodeUTF32LE(ByRef utf16leStr As String, _
                      Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "EncodeUTF32LE"
     
@@ -1233,7 +1293,7 @@ Public Function EncodeUTF32LE(ByVal utf16leStr As String, _
 End Function
 
 'Function transcoding an UTF-32 encoded string to the VBA-native UTF-16LE
-Public Function DecodeUTF32LE(ByVal utf32str As String, _
+Public Function DecodeUTF32LE(ByRef utf32str As String, _
                      Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "DecodeUTF32LE"
     
@@ -1418,7 +1478,7 @@ End Function
 
 'Function returning a string containing all ASCII characters equally,
 'randomly distributed.
-Public Function RandomStringASCII(length As Long) As String
+Public Function RandomStringASCII(ByVal length As Long) As String
     Const MAX_ASC As Long = &H7F&
     Dim i As Long
     Dim char As Integer
@@ -1456,7 +1516,7 @@ End Function
 #If Mac = 0 Then
 'Removes all non-numeric characters from a string.
 'Only keeps codepoints U+0030 - U+0039
-Public Function RegExNumOnly(s As String) As String
+Public Function RegExNumOnly(ByRef s As String) As String
     With CreateObject("VBScript.RegExp")
         .Global = True
         .MultiLine = True
@@ -1474,7 +1534,6 @@ Public Function RemoveNonNumeric(ByVal str As String) As String
     Dim sChr As String
     Dim i As Long
     Dim j As Long: j = 1
-    
     For i = 1 To Len(str)
         sChr = Mid(str, i, 1)
         If sChr Like "#" Then _
@@ -1761,7 +1820,7 @@ End Function
 'Adds fillerStr to the right side of a string repeatedly until the resulting
 'string reaches length 'Length'
 'E.g.: PadRight("asd", 11, "xyz") -> "asdxyzxyzxy"
-Public Function PadRight(ByVal str As String, _
+Public Function PadRight(ByRef str As String, _
                          ByVal length As Long, _
                 Optional ByVal fillerStr As String = " ") As String
     PadRight = PadRightB(str, length * 2, fillerStr)
@@ -1770,7 +1829,7 @@ End Function
 'Adds fillerStr to the left side of a string repeatedly until the resulting
 'string reaches length 'Length'
 'E.g.: PadLeft("asd", 11, "xyz") -> "yzxyzxyzasd"
-Public Function PadLeft(ByVal str As String, _
+Public Function PadLeft(ByRef str As String, _
                         ByVal length As Long, _
                Optional ByVal fillerStr As String = " ") As String
     PadLeft = PadLeftB(str, length * 2, fillerStr)
@@ -1779,7 +1838,7 @@ End Function
 'Adds fillerStr to the right side of a string repeatedly until the resulting
 'string reaches length 'Length' in bytes!
 'E.g.: PadRightB("asd", 16, "xyz") -> "asdxyzxy"
-Public Function PadRightB(ByVal str As String, _
+Public Function PadRightB(ByRef str As String, _
                           ByVal length As Long, _
                  Optional ByVal fillerStr As String = " ") As String
     Const methodName As String = "PadRightB"
@@ -1807,7 +1866,7 @@ End Function
 'Note that this can result in an invalid UTF-16 output for uneven lengths!
 'E.g.: PadLeftB("asd", 16, "xyz") -> "yzxyzasd"
 '      PadLeftB("asd", 11, "xyz") -> "?????"
-Public Function PadLeftB(ByVal str As String, _
+Public Function PadLeftB(ByRef str As String, _
                          ByVal length As Long, _
                 Optional ByVal fillerStr As String = " ") As String
     Const methodName As String = "PadLeftB"
@@ -1884,7 +1943,7 @@ End Function
 'E.g. SplitUnlessInQuotes("asdf""asdf""asdf""asdf", """") returns
 '    "asdf", "asdf""asdf", and "asdf"
 Public Function SplitUnlessInQuotes(ByRef str As String, _
-                           Optional ByVal delim As String = " ", _
+                           Optional ByRef delim As String = " ", _
                            Optional limit As Long = -1) As Variant
     Dim i As Long
     Dim s As String
