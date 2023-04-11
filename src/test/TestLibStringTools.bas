@@ -92,7 +92,7 @@ Public Sub RunAllTests()
 End Sub
 
 Private Sub TestEncodersAndDecoders()
-    Const STR_LENGTH As Long = 1000000
+    Const STR_LENGTH As Long = 1000001
     
     Dim fullUnicode As String:    fullUnicode = RandomStringUnicode(STR_LENGTH)
     Dim bmpUnicode As String:     bmpUnicode = RandomStringBMP(STR_LENGTH)
@@ -110,7 +110,6 @@ Private Sub TestEncodersAndDecoders()
 
     Debug.Print "UTF-32 Encoder/Decoder Test Basic Multilingual Plane: " & _
         IIf(DecodeUTF32LE(EncodeUTF32LE(bmpUnicode)) = bmpUnicode, "passed", "failed")
-        
         
     Debug.Print "Native UTF-8 Encoder/Decoder Test full Unicode: " & _
         IIf(DecodeUTF8native(EncodeUTF8native(fullUnicode)) = fullUnicode, "passed", "failed")
