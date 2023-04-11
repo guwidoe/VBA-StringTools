@@ -530,8 +530,6 @@ Private Static Function ConvDescriptorName(ByVal cpID As Long) As String
     ConvDescriptorName = ConvDescriptorName(cpID)
 End Function
 
-
-
 ''Returns a Collection for converting ConversionDescriptorNames to CodePageIDs
 'Private Function ConvDescriptorNameToCodePage() As Collection
 '    Static c As Collection
@@ -592,6 +590,19 @@ Public Function GetBstrFromWideStringPtr(ByVal lpwString As LongPtr) As String
 End Function
 #End If
 
+'This function attempts to transcode 'str' from codepage 'fromCodePage' to
+'codepage 'toCodePage' using the appropriate API functions on the platform.
+'Calling it with 'raiseErrors = True' will raise an error if either:
+'   - the string 'str' contains byte sequences that do not represent a valid
+'     string of codepage 'fromCodePage', or
+'   - the string contains codepoints that can not be represented in 'toCodePage'
+'     and will lead to the insertion of a "default character".
+'E.g.: Transcode("°", cpUTF_16, cpUs_ascii, True) will raise an error, because
+'      "°" is not an ASCII character.
+'Note that even calling the function with 'raiseErrors = True' doesn't guarantee
+'that the conversion is reversible, because sometimes codepoints are replaced
+'with more generic characters that aren't the default character (raise no error)
+'E.g.:Decode(Transcode("³", cpUTF_16, cpUs_ascii, True), cpUs_ascii) returns "3"
 Public Function Transcode(ByRef str As String, _
                           ByVal fromCodePage As CodePageIdentifier, _
                           ByVal toCodePage As CodePageIdentifier, _
@@ -731,12 +742,22 @@ Private Function GetReplacementCharForCodePage( _
 End Function
 #End If
 
-'Encoding a VBA-native UTF-16LE encoded string to any CodePage passed as the
-'toCodePage argument using the appropriate Windows or MacOS API function
+'This function tries to encode utf16leStr from vba-internal codepage UTF-16LE to
+'codepage 'toCodePage' using the appropriate API functions on the platform.
+'Calling it with 'raiseErrors = True' will raise an error if either:
+'   - the string 'utf16leStr' contains byte sequences that do not represent a
+'     valid UTF-16LE string, or
+'   - the string contains codepoints that can not be represented in 'toCodePage'
+'     and will lead to the insertion of a "default character".
+'E.g.: Encode("°", cpUs_ascii, True) will raise an error, because
+'      "°" is not an ASCII character.
+'Note that even calling the function with 'raiseErrors = True' doesn't guarantee
+'that the conversion is reversible, because sometimes codepoints are replaced
+'with more generic characters that aren't the default character (raise no error)
+'E.g.: Decode(Encode("³", cpUTF_16, cpUs_ascii, True), cpUs_ascii) returns "3"
 Public Function Encode(ByRef utf16leStr As String, _
                        ByVal toCodePage As CodePageIdentifier, _
-              Optional ByVal raiseErrors As Boolean = False, _
-              Optional ByVal allowIrreversible As Boolean = True) As String
+              Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "Encode"
     
     If toCodePage = cpUTF_16 Then Err.Raise 5, methodName, _
@@ -744,8 +765,7 @@ Public Function Encode(ByRef utf16leStr As String, _
     
     If utf16leStr = vbNullString Then Exit Function
     #If Mac Then
-        Encode = Transcode(utf16leStr, cpUTF_16, toCodePage, raiseErrors, _
-                           allowIrreversible)
+        Encode = Transcode(utf16leStr, cpUTF_16, toCodePage, raiseErrors)
     #Else
         Dim byteCount As Long
         Dim dwFlags As Long
@@ -798,8 +818,18 @@ Public Function Encode(ByRef utf16leStr As String, _
     #End If
 End Function
 
-'Decoding a string from any CodePage passed as the fromCodePage argument to the
-'VBA-native UTF-16LE encoding using the appropriate Windows or MacOS API function
+'This function tries to decode 'str' from codepage 'fromCodePage' to the vba-
+'internal codepage UTF-16LE using the appropriate API functions on the platform.
+'Calling it with 'raiseErrors = True' will raise an error if the string 'str'
+'contains byte sequences that does not represent a valid encoding in codepage
+'fromCodePage.
+'E.g.: If 'str' is an UTF-8 encoded string that was read from an external file
+'      using 'Open' and 'Get', you can convert it to the VBA-internal UTF-16LE
+'      like this:
+'      Decode(str, cpUTF_8)
+'      If you are afraid 'str' might contain invalid UTF-8 data, use it like so:
+'      Decode(str, cpUTF_8, True)
+'      The function will now raise an error if invalid UTF-8 data is encountered
 Public Function Decode(ByRef str As String, _
                        ByVal fromCodePage As CodePageIdentifier, _
               Optional ByVal raiseErrors As Boolean = False) As String
@@ -807,7 +837,7 @@ Public Function Decode(ByRef str As String, _
     
     If fromCodePage = cpUTF_16 Then Err.Raise 5, methodName, _
         "VBA strings are UTF-16 by default. No need to decode string from UTF-16."
-        
+
     If str = vbNullString Then Exit Function
     #If Mac Then
         Decode = Transcode(str, fromCodePage, cpUTF_16, raiseErrors)
