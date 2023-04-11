@@ -440,7 +440,13 @@ Private Sub TestSplitB()
     Stop
 End Sub
 
-Private Sub TestEncode()
-    
+Sub aslfdkjhsaf()
+   Dim inputBytes() As Byte
+   ReDim inputBytes(1 To 3)
+   asdf CStr(inputBytes)
 End Sub
-
+Private Function asdf(ByRef s As String)
+    Dim b() As Byte
+    b = s
+    Stop
+End Function

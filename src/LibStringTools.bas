@@ -53,8 +53,8 @@ Option Base 0
     #End If
 #Else 'Windows
     #If VBA7 Then
-        Private Declare PtrSafe Function MultiByteToWideChar Lib "kernel32" (ByVal codePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long) As Long
-        Private Declare PtrSafe Function WideCharToMultiByte Lib "kernel32" (ByVal codePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpDefaultChar As LongPtr, ByVal lpUsedDefaultChar As LongPtr) As Long
+        Private Declare PtrSafe Function MultiByteToWideChar Lib "kernel32" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long) As Long
+        Private Declare PtrSafe Function WideCharToMultiByte Lib "kernel32" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpDefaultChar As LongPtr, ByVal lpUsedDefaultChar As LongPtr) As Long
         
         Private Declare PtrSafe Function GetLastError Lib "kernel32" () As Long
         Private Declare PtrSafe Sub SetLastError Lib "kernel32" (ByVal dwErrCode As Long)
@@ -275,6 +275,24 @@ Private Static Function CodePageAllowsFlags(ByVal cpID As Long) As Boolean
     Next i
     arr(cpUTF_7) = False
     CodePageAllowsFlags = CodePageAllowsFlags(cpID)
+End Function
+
+Private Static Function CodePageAllowsQueryReversible(ByVal cpID As Long) As Boolean
+    Dim arr(CodePageIdentifier.[_first] To CodePageIdentifier.[_last]) As Boolean
+    
+    If arr(CodePageIdentifier.[_first]) Then
+        CodePageAllowsQueryReversible = arr(cpID)
+        Exit Function
+    End If
+    
+    Dim i As Long
+    For i = CodePageIdentifier.[_first] To CodePageIdentifier.[_last]
+        arr(i) = True
+    Next i
+
+    arr(cpUTF_7) = False
+    arr(cpUTF_8) = False
+    CodePageAllowsQueryReversible = CodePageAllowsFlags(cpID)
 End Function
 
 'Returns an array for converting CodePageIDs to ConversionDescriptorNames
@@ -533,7 +551,8 @@ End Function
 Public Function Transcode(ByRef str As String, _
                           ByVal fromCodePage As CodePageIdentifier, _
                           ByVal toCodePage As CodePageIdentifier, _
-                 Optional ByVal raiseErrors As Boolean = False) As String
+                 Optional ByVal raiseErrors As Boolean = False, _
+                 Optional ByVal allowIrreversible As Boolean = True) As String
     Const methodName As String = "Transcode"
     'https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/iconv.3.html
     #If Mac Then
@@ -542,50 +561,50 @@ Public Function Transcode(ByRef str As String, _
         Dim buffer As String:        buffer = Space$(CLng(inBytesLeft) * 2)
         Dim inBuf As LongPtr:        inBuf = StrPtr(str)
         Dim outBuf As LongPtr:       outBuf = StrPtr(buffer)
-        Dim toCpCdName As String:    toCpCdName = ConvDescriptorName(toCodePage)
-        Dim fromCpCdName As String:  fromCpCdName = ConvDescriptorName( _
-                                                                   fromCodePage)
+        Dim cd As LongPtr: cd = GetConversionDescriptor(fromCodePage, toCodePage)
         Dim irrevConvCount As Long
-        Dim cd As LongPtr
-        'Todo: potentially implement custom error numbers
-        If LenB(toCpCdName) = 0 Then Err.Raise 5, methodName, _
-            "No conversion descriptor name assigned to CodePage " & toCodePage
-        If LenB(fromCpCdName) = 0 Then Err.Raise 5, methodName, _
-            "No conversion descriptor name assigned to CodePage " & fromCodePage
-            
-        SetApiErrorNumber = 0 'Clear previous errors
-        cd = iconv_open(StrPtr(toCpCdName), StrPtr(fromCodePage))
-
-        Select Case GetApiErrorNumber
-            Case MAC_API_ERR_EINVAL
-                Err.Raise 5, methodName, "The conversion from CodePage " & _
-                    fromCodePage & " to CodePage " & toCodePage & " is not " & _
-                    "supported by the implementation of 'iconv' on this platform"
-            Case Is <> 0
-                Err.Raise vbErrInternalError, methodName, "Unknown error " & _
-                    "trying to create a conversion descriptor. API Error" & _
-                    "Code: " & GetApiErrorNumber
-        End Select
+        Dim replacementChar As String
         
-        irrevConvCount = iconv(cd, inBuf, inBytesLeft, outBuf, outBytesLeft)
-        If irrevConvCount = -1 Then 'Error occurred
-            Select Case GetApiErrorNumber
-                Case MAC_API_ERR_EILSEQ
-                    Err.Raise 5, methodName, _
-                        "Input is invalid byte sequence of CodePage " & _
-                        fromCodePage
-                Case MAC_API_ERR_EINVAL
-                    Err.Raise 5, methodName, _
-                        "Input is incomplete byte sequence of CodePage " & _
-                            fromCodePage
-            End Select
-        ElseIf irrevConvCount > 0 And raiseErrors Then
-            Err.Raise 5, methodName, _
-                "Input contains bytes that can't be converted from CodePage " _
-                & fromCodePage & " to CodePage " & toCodePage & " reversibly."
-        Else
-            Transcode = LeftB$(buffer, LenB(buffer) - CLng(outBytesLeft))
-        End If
+        Do While inBytesLeft > 0
+            SetApiErrorNumber = 0
+            irrevConvCount = iconv(cd, inBuf, inBytesLeft, outBuf, outBytesLeft)
+
+            If irrevConvCount = -1 Then 'Error occurred
+                If StrPtr(replacementChar) = 0 Then _
+                    replacementChar = GetReplacementCharForCodePage(toCodePage)
+                    
+                If Not allowIrreversible Then Err.Raise 5, methodName, _
+                    "Default char would be used, encoding would be irreversible"
+                    
+                Select Case GetApiErrorNumber
+                    Case MAC_API_ERR_EILSEQ
+                        If raiseErrors Then Err.Raise 5, methodName, _
+                            "Input is invalid byte sequence of " & _
+                            "CodePage " & fromCodePage
+                            
+                        CopyMemory ByVal outBuf, replacementChar(0), 3
+                        outBuf = outBuf + LenB(replacementChar)
+                        outBytesLeft = outBytesLeft - LenB(replacementChar)
+                        inBuf = inBuf + 1
+                        inBytesLeft = inBytesLeft - 1
+                    Case MAC_API_ERR_EINVAL
+                        If raiseErrors Then Err.Raise 5, methodName, _
+                            "Input is incomplete byte sequence of" & _
+                            "CodePage " & fromCodePage
+                        CopyMemory ByVal outBuf, replacementChar(0), 3
+                        outBuf = outBuf + outBytesLeft
+                        inBuf = inBuf + inBytesLeft
+                        outBytesLeft = 0
+                        inBytesLeft = 0
+                End Select
+            End If
+        Loop
+        
+        If irrevConvCount > 0 And Not allowIrreversible Then Err.Raise 5, _
+            methodName, "Default char would be used, encoding would be irreversible"
+
+        Transcode = LeftB$(buffer, LenB(buffer) - CLng(outBytesLeft))
+
         'These errors are bugs and should be raised even if raiseErrors = False:
         Select Case GetApiErrorNumber
             Case MAC_API_ERR_E2BIG
@@ -597,7 +616,7 @@ Public Function Transcode(ByRef str As String, _
                     "occurred during transcoding with 'iconv'. API Error" & _
                     "Code: " & GetApiErrorNumber
         End Select
-        If iconv_close(cd) = 0 Then
+        If iconv_close(cd) <> 0 Then
             Err.Raise vbErrInternalError, methodName, "Unknown error occurred" _
                 & " when calling 'iconv_close'. API ErrorCode: " & _
                 GetApiErrorNumber
@@ -615,43 +634,59 @@ Public Function Transcode(ByRef str As String, _
 End Function
 
 #If Mac Then
+Private Function GetConversionDescriptor( _
+                            ByVal fromCodePage As CodePageIdentifier, _
+                            ByVal toCodePage As CodePageIdentifier) As LongPtr
+    Dim toCpCdName As String:   toCpCdName = ConvDescriptorName(toCodePage)
+    Dim fromCpCdName As String: fromCpCdName = ConvDescriptorName(fromCodePage)
+    'Todo: potentially implement custom error numbers
+    If LenB(toCpCdName) = 0 Then Err.Raise 5, methodName, _
+        "No conversion descriptor name assigned to CodePage " & toCodePage
+    If LenB(fromCpCdName) = 0 Then Err.Raise 5, methodName, _
+        "No conversion descriptor name assigned to CodePage " & fromCodePage
+        
+    SetApiErrorNumber = 0 'Clear previous errors
+    GetConversionDescriptor = iconv_open(StrPtr(toCpCdName), StrPtr(fromCodePage))
+
+    If Not GetConversionDescriptor Then
+        Select Case GetApiErrorNumber
+            Case MAC_API_ERR_EINVAL
+                Err.Raise 5, methodName, "The conversion from CodePage " & _
+                    fromCodePage & " to CodePage " & toCodePage & " is not " & _
+                    "supported by the implementation of 'iconv' on this platform"
+            Case Is <> 0
+                Err.Raise vbErrInternalError, methodName, "Unknown error " & _
+                    "trying to create a conversion descriptor. API Error" & _
+                    "Code: " & GetApiErrorNumber
+        End Select
+    End If
+End Function
+#End If
+
+#If Mac Then
 'On Mac, replacement character must be manually inserted when using iconv
-Private Function GetReplacementCharForCodePage(ByRef codePage As String) As String
-    Dim cd As LongPtr
-    Dim inBuf As LongPtr
-    Dim inBytesLeft As LongPtr
-    Dim outBuf As LongPtr
-    Dim outBytesLeft As LongPtr
-    Dim ret As LongPtr
-
-    cd = iconv_open(StrPtr(codePage), StrPtr("UTF-8"))
-
-    If cd = 0 Then
-        MsgBox "Error opening iconv conversion descriptor."
+Private Function GetReplacementCharForCodePage( _
+                                    ByVal cpID As CodePageIdentifier) As String
+    Static replacementChars As Collection
+    If replacementChars Is Nothing Then replacementChars = New Collection
+    On Error GoTo 0
+    On Error Resume Next
+    GetReplacementCharForCodePage = replacementChars(CStr(cpID))
+    If Err.Number = 0 Then
+        On Error GoTo 0
         Exit Function
     End If
-
+    On Error GoTo 0
+    
     ' U+FFFD (0xEF 0xBF 0xBD) in UTF-8
-    Dim inputBytes() As Byte
-    inputBytes = Array(&HEF, &HBF, &HBD)
-    inBuf = VarPtr(inputBytes(0))
-    inBytesLeft = UBound(inputBytes) + 1
-
-    Dim outputBytes(10) As Byte ' Output buffer with ample space
-    outBuf = VarPtr(outputBytes(0))
-    outBytesLeft = UBound(outputBytes) + 1
-
-    ret = iconv(cd, inBuf, inBytesLeft, outBuf, outBytesLeft)
-
-    If ret = -1 Then
-        MsgBox "Error: " & Err.LastDllError
-        Exit Function
-    End If
-
-    ReDim Preserve outputBytes(UBound(outputBytes) - outBytesLeft)
-    GetReplacementCharForCodePage = outputBytes
-
-    iconv_close cd
+    Dim ReplacementCharUtf8() As Byte: ReDim ReplacementCharUtf8(0 To 2)
+    ReplacementCharUtf8(0) = &HEF
+    ReplacementCharUtf8(1) = &HBF
+    ReplacementCharUtf8(2) = &HBD
+    
+    replacementChars.Add Transcode(CStr(ReplacementCharUtf8), cpUTF_8, cpID), _
+                         CStr(cpID)
+    GetReplacementCharForCodePage = replacementChars(CStr(cpID))
 End Function
 #End If
 
@@ -659,22 +694,29 @@ End Function
 'toCodePage argument using the appropriate Windows or MacOS API function
 Public Function Encode(ByRef utf16leStr As String, _
                        ByVal toCodePage As CodePageIdentifier, _
-              Optional ByVal raiseErrors As Boolean = False) As String
+              Optional ByVal raiseErrors As Boolean = False, _
+              Optional ByVal allowIrreversible As Boolean = True) As String
     Const methodName As String = "Encode"
     
     If utf16leStr = vbNullString Then Exit Function
     #If Mac Then
-        Encode = Transcode(utf16leStr, cpUTF_16, toCodePage, raiseErrors)
+        Encode = Transcode(utf16leStr, cpUTF_16, toCodePage, raiseErrors, _
+                           allowIrreversible)
     #Else
         Dim byteCount As Long
         Dim dwFlags As Long
-        
+        Dim usedDefaultChar As Boolean
+        Dim lpUsedDefaultChar As LongPtr
+        If Not allowIrreversible _
+        And CodePageAllowsQueryReversible(toCodePage) Then _
+            lpUsedDefaultChar = VarPtr(usedDefaultChar)
+            
         SetApiErrorNumber 0
         If raiseErrors And CodePageAllowsFlags(toCodePage) Then _
             dwFlags = WC_ERR_INVALID_CHARS
 
         byteCount = WideCharToMultiByte(toCodePage, dwFlags, StrPtr(utf16leStr), _
-                                        Len(utf16leStr), 0, 0, 0, 0)
+                                    Len(utf16leStr), 0, 0, 0, lpUsedDefaultChar)
         If byteCount = 0 Then
             Select Case GetApiErrorNumber
                 Case ERROR_NO_UNICODE_TRANSLATION
@@ -692,12 +734,16 @@ Public Function Encode(ByRef utf16leStr As String, _
                         "Completely unexpected error."
             End Select
         End If
+        
+        If Not allowIrreversible And usedDefaultChar Then _
+            Err.Raise 5, methodName, "Default char would be used, encoding " & _
+                "would be irreversible."
     
         Dim b() As Byte: ReDim b(0 To byteCount - 1)
         Encode = b
 
         WideCharToMultiByte toCodePage, dwFlags, StrPtr(utf16leStr), _
-                            Len(utf16leStr), StrPtr(Encode), byteCount, 0, 0
+                Len(utf16leStr), StrPtr(Encode), byteCount, 0, lpUsedDefaultChar
         Select Case GetApiErrorNumber
             Case Is <> 0
                 Err.Raise vbErrInternalError, methodName, _
