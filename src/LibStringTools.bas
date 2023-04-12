@@ -230,7 +230,8 @@ Public Enum CodePageIdentifier
     cpEBCDIC_Simp_Chin_Ext = 50935    '                        EBCDIC Simplified Chinese Extended and Simplified Chinese
     cpEBCDIC_Simp_Chin = 50936        '                        EBCDIC Simplified Chinese
     cpEBCDIC_US_Can_Trad_Chin = 50937 '                        EBCDIC US-Canada and Traditional Chinese
-    cpEBCDIC_Jap_Latin_Ext = 50939    '                        EBCDIC Japanese (Latin) Extended and Japaneseeuc_jp = 51932                  'euc-jp                 EUC Japanese
+    cpEBCDIC_Jap_Latin_Ext = 50939    '                        EBCDIC Japanese (Latin) Extended and Japanese
+    euc_jp = 51932                    'euc-jp                  EUC Japanese
     cpEUC_CN = 51936                  'EUC-CN                  EUC Simplified Chinese; Chinese Simplified (EUC)
     cpEuc_kr = 51949                  'euc-kr                  EUC Korean
     cpEUC_Traditional_Chinese = 51950 '                        EUC Traditional Chinese
@@ -363,14 +364,14 @@ Private Static Function ConvDescriptorName(ByVal cpID As Long) As String
     arr(cpIso_8859_5) = "ISO-8859-5"
     arr(cpIso_8859_7) = "ISO-8859-7"
     arr(cpIso_8859_9) = "ISO-8859-9"
-    'arr( ) =  "ISO-8859-10"
+    arr(28600) = "ISO-8859-10"
     arr(cpIso_8859_13) = "ISO-8859-13"
-    'arr( ) =  "ISO-8859-14"
+    arr(28604) = "ISO-8859-14"
     arr(cpIso_8859_15) = "ISO-8859-15"
-    'arr( ) =  "ISO-8859-16"
-    'arr( ) =  "KOI8-R"
+    arr(28606) = "ISO-8859-16"
+    arr(20866) = "KOI8-R"
     arr(cpKoi8_u) = "KOI8-U"
-    'arr( ) =  "KOI8-RU"
+    'arr( ) =  "KOI8-RU" 'No equivalent ID, variation of KOI8-R
     arr(cpWindows_1250) = "CP1250"
     arr(cpWindows_1251) = "CP1251"
     arr(cpWindows_1252) = "CP1252"
@@ -379,7 +380,7 @@ Private Static Function ConvDescriptorName(ByVal cpID As Long) As String
     arr(cpWindows_1257) = "CP1257"
     arr(cpIbm850) = "CP850"
     arr(cpCp866) = "CP866"
-    'arr( ) =  "MacRoman"
+    arr(cpMacintosh) = "MacRoman"   'duplicate
     arr(cpX_mac_ce) = "MacCentralEurope"
     arr(cpX_mac_icelandic) = "MacIceland"
     arr(cpX_mac_croatian) = "MacCroatian"
@@ -400,64 +401,64 @@ Private Static Function ConvDescriptorName(ByVal cpID As Long) As String
     arr(cpX_mac_arabic) = "MacArabic"
 
     'Japanese
-    'arr( ) =  "EUC-JP"
+    arr(euc_jp) = "EUC-JP"
     arr(cpShift_jis) = "SHIFT_JIS"
     arr(cpShift_jis) = "CP932" '(duplicate)
-    'arr( ) =  "ISO-2022-JP"
-    'arr( ) =  "ISO-2022-JP-2"
-    'arr( ) =  "ISO-2022-JP-1"
+    arr(cpIso_2022_jp) = "ISO-2022-JP"
+    arr(cpCsISO2022JP) = "ISO-2022-JP-2"
+    arr(cpIso_2022_jp_w_1b_Kana) = "ISO-2022-JP-1"
 
     'Chinese
-    'arr( ) =  "EUC-CN"
-    'arr( ) =  "HZ"
-    'arr( ) =  "GBK"
-    'arr( ) =  "CP936"
-    'arr( ) =  "GB18030"
-    'arr( ) =  "EUC-TW"
+    arr(cpEUC_CN) = "EUC-CN"
+    'arr( ) =  "HZ" 'No equivalent ID, 7-bit encoding method for GB2312
+    arr(cpGb2312) = "GBK" 'duplicate
+    arr(cpGb2312) = "CP936"
+    arr(cpGB18030) = "GB18030"
+    'arr( ) =  "EUC-TW" 'No equivalent ID, extended UNIX Code for Traditional Chinese
     arr(cpBig5) = "BIG5"
     arr(cpBig5) = "CP950" '(duplicate)
-    'arr( ) =  "BIG5-HKSCS"
-    'arr( ) =  "BIG5-HKSCS:2001"
-    'arr( ) =  "BIG5-HKSCS:1999"
-    'arr( ) =  "ISO-2022-CN"
-    'arr( ) =  "ISO-2022-CN-EXT"
+    arr(951) = "BIG5-HKSCS"
+    arr(951) = "BIG5-HKSCS:2001"
+    arr(951) = "BIG5-HKSCS:1999"
+    arr(cpX_cp50227) = "ISO-2022-CN"
+    'arr( ) =  "ISO-2022-CN-EXT" 'No equivalent ID, extended version of ISO-2022-CN
 
     'Korean
     arr(cpEuc_kr) = "EUC-KR"
     arr(cpKs_c_5601_1987) = "CP949"
     arr(cpIso_2022_kr) = "ISO-2022-KR"
-    'arr( ) =  "JOHAB"
+    arr(cpJohab) = "JOHAB"
 
     'Armenian
-    'arr( ) =  "ARMSCII-8"
+    'arr( ) =  "ARMSCII-8" '8-bit Armenian character encoding
 
     'Georgian
-    'arr( ) =  "Georgian-Academy"
-    'arr( ) =  "Georgian-PS"
+    'arr( ) =  "Georgian-Academy" 'No equivalent ID
+    'arr( ) =  "Georgian-PS" 'No equivalent ID
 
     'Tajik
-    'arr( ) =  "KOI8-T"
+    'arr( ) =  "KOI8-T" 'No equivalent ID
 
     'Kazakh
-    'arr( ) =  "PT154"
+    'arr( ) =  "PT154" 'No equivalent ID, Paratype KZ
 
     'Thai
-    'arr( ) =  "TIS-620"
+    arr(cpWindows_874) = "TIS-620" 'duplicate
     arr(cpWindows_874) = "CP874"
     arr(cpX_mac_thai) = "MacThai"
 
     'Laotian
-    'arr( ) =  "MuleLao-1"
-    'arr( ) =  "CP1133"
+    'arr( ) =  "MuleLao-1" 'No equivalent ID, MULE (MULtilingual Enhancement to GNU Emacs) internal encoding for the Lao script
+    arr(1133) = "CP1133"
 
     'Vietnamese
-    'arr( ) =  "VISCII"
-    'arr( ) =  "TCVN"
+    'arr( ) =  "VISCII" 'No equivalent ID, 8-bit encoding for the Vietnamese alphabet
+    'arr( ) =  "TCVN" 'No equivalent ID, Vietnamese national standard for character encoding
     arr(cpWindows_1258) = "CP1258"
 
     'Platform specifics
-    'arr( ) =  "HP-ROMAN8"
-    'arr( ) =  "NEXTSTEP"
+    'arr( ) =  "HP-ROMAN8" 'No equivalent ID, 8-bit character encoding used by Hewlett-Packard for their workstations and printers.
+    'arr( ) =  "NEXTSTEP" 'No equivalent ID, encoding is associated with the NeXTSTEP operating system developed by NeXT, the company founded by Steve Jobs after leaving Apple in the 1980s.
 
     'Full Unicode
     'arr( ) =  "UCS-2"
@@ -496,7 +497,7 @@ Private Static Function ConvDescriptorName(ByVal cpID As Long) As String
     arr(cpIbm737) = "CP737"
     arr(cpIbm775) = "CP775"
     arr(cpIbm852) = "CP852"
-    'arr( ) =  "CP853"
+    arr(853) = "CP853"
     arr(cpIBM855) = "CP855"
     arr(cpIbm857) = "CP857"
     arr(cpIBM00858) = "CP858"
@@ -505,25 +506,25 @@ Private Static Function ConvDescriptorName(ByVal cpID As Long) As String
     arr(cpIBM863) = "CP863"
     arr(cpIBM865) = "CP865"
     arr(cpIbm869) = "CP869"
-    'arr( ) =  "CP1125"
+    arr(1125) = "CP1125"
 
     'Semitic languages
     arr(cpIBM864) = "CP864"
 
     'Japanese
-    'arr( ) =  "EUC-JISX0213"
-    'arr( ) =  "Shift_JISX0213"
-    'arr( ) =  "ISO-2022-JP-3"
+    'arr( ) =  "EUC-JISX0213" 'No equivalent ID
+    'arr( ) =  "Shift_JISX0213" 'No equivalent ID
+    'arr( ) =  "ISO-2022-JP-3" 'No equivalent ID
 
     'Chinese
-    'arr( ) = "BIG5-2003" '(experimental)
+    'arr( ) = "BIG5-2003" '(experimental 'No equivalent ID
 
     'Turkmen
-    'arr( ) =  "TDS565"
+    'arr( ) =  "TDS565" 'No equivalent ID
 
     'Platform specifics
-    'arr( ) =  "ATARIST"
-    'arr( ) =  "RISCOS-LATIN1"
+    'arr( ) =  "ATARIST" 'No equivalent ID, 8-bit character encoding used on Atari ST computers, which were a series of personal computers released in the 1980s.
+    'arr( ) =  "RISCOS-LATIN1" 'No equivalent ID, 8-bit character encoding used on the RISC OS operating system, which was developed by Acorn Computers in the late 1980s.
 
     'The empty encoding name is equivalent to "char":
     'it denotes the locale dependent character encoding.
@@ -993,7 +994,7 @@ Public Function ReplaceUnicodeLiterals(ByRef str As String) As String
         .Global = True
         .MultiLine = True
         .IgnoreCase = True
-        .Pattern = PATTERN_UNICODE_LITERALS
+        .pattern = PATTERN_UNICODE_LITERALS
         Set mc = .Execute(str)
     End With
     
@@ -1653,7 +1654,7 @@ Public Function RegExNumOnly(ByRef s As String) As String
         .Global = True
         .MultiLine = True
         .IgnoreCase = True
-        .Pattern = "[^0-9]+"
+        .pattern = "[^0-9]+"
          RegExNumOnly = .Replace(s, "")
     End With
 End Function
