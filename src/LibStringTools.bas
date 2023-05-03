@@ -40,14 +40,14 @@ Option Base 0
         Private Declare PtrSafe Function iconv_open Lib "/usr/lib/libiconv.dylib" (ByVal toCode As LongPtr, ByVal fromCode As LongPtr) As LongPtr
         Private Declare PtrSafe Function iconv_close Lib "/usr/lib/libiconv.dylib" (ByVal cd As LongPtr) As Long
         Private Declare PtrSafe Function iconv Lib "/usr/lib/libiconv.dylib" (ByVal cd As LongPtr, ByRef inBuf As LongPtr, ByRef inBytesLeft As LongPtr, ByRef outBuf As LongPtr, ByRef outBytesLeft As LongPtr) As LongPtr
-        
-        Private Declare PtrSafe Function CopyMemory Lib "/usr/lib/libc.dylib" Alias "memmove" (Destination As Any, source As Any, ByVal length As LongPtr) As LongPtr
+
+        Private Declare PtrSafe Function CopyMemory Lib "/usr/lib/libc.dylib" Alias "memmove" (Destination As Any, Source As Any, ByVal Length As LongPtr) As LongPtr
         Private Declare PtrSafe Function errno_location Lib "/usr/lib/libSystem.B.dylib" Alias "__error" () As LongPtr
     #Else
         Private Declare Function iconv Lib "/usr/lib/libiconv.dylib" (ByVal cd As Long, ByRef inBuf As Long, ByRef inBytesLeft As Long, ByRef outBuf As Long, ByRef outBytesLeft As Long) As Long
         Private Declare Function iconv_open Lib "/usr/lib/libiconv.dylib" (ByVal toCode As Long, ByVal fromCode As Long) As Long
         Private Declare Function iconv_close Lib "/usr/lib/libiconv.dylib" (ByVal cd As Long) As Long
-        
+
         Private Declare Function CopyMemory Lib "/usr/lib/libc.dylib" Alias "memmove" (Destination As Any, Source As Any, ByVal Length As Long) As Long
         Private Declare Function errno_location Lib "/usr/lib/libSystem.B.dylib" Alias "__error" () As Long
     #End If
@@ -55,20 +55,20 @@ Option Base 0
     #If VBA7 Then
         Private Declare PtrSafe Function MultiByteToWideChar Lib "kernel32" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long) As Long
         Private Declare PtrSafe Function WideCharToMultiByte Lib "kernel32" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpDefaultChar As LongPtr, ByVal lpUsedDefaultChar As LongPtr) As Long
-        
+
         Private Declare PtrSafe Function GetLastError Lib "kernel32" () As Long
         Private Declare PtrSafe Sub SetLastError Lib "kernel32" (ByVal dwErrCode As Long)
-    
-        Private Declare PtrSafe Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (ByVal Destination As LongPtr, ByVal source As LongPtr, ByVal length As Long)
+
+        Private Declare PtrSafe Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (Destination As Any, Source As Any, ByVal Length As Long)
         Private Declare PtrSafe Function lstrlenW Lib "kernel32" (ByVal lpString As LongPtr) As Long
     #Else
         Private Declare Function MultiByteToWideChar Lib "kernel32" Alias "MultiByteToWideChar" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As Long, ByVal cchMultiByte As Long, ByVal lpWideCharStr As Long, ByVal cchWideChar As Long) As Long
         Private Declare Function WideCharToMultiByte Lib "kernel32" Alias "WideCharToMultiByte" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As Long, ByVal cchWideChar As Long, ByVal lpMultiByteStr As Long, ByVal cchMultiByte As Long, ByVal lpDefaultChar As Long, ByVal lpUsedDefaultChar As Long) As Long
-    
+
         Private Declare Function GetLastError Lib "kernel32" () As Long
         Private Declare Sub SetLastError Lib "kernel32" (ByVal dwErrCode As Long)
-    
-        Private Declare Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (Destination As Any, Source As Any, ByVal length As Long)
+
+        Private Declare Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (Destination As Any, Source As Any, ByVal Length As Long)
         Private Declare Function lstrlenW Lib "kernel32" (ByVal lpString As Long) As Long
     #End If
 #End If
@@ -77,6 +77,41 @@ Option Base 0
     Public Enum LongPtr
         [_]
     End Enum
+#End If
+
+'Flag used to simulate ByRef Variants
+Private Const VT_BYREF As Long = &H4000
+
+Private Type SAFEARRAYBOUND
+    cElements As Long
+    lLbound As Long
+End Type
+Private Type SAFEARRAY_1D
+    cDims As Integer
+    fFeatures As Integer
+    cbElements As Long
+    cLocks As Long
+    #If Win64 Then
+        dummyPadding As Long
+        pvData As LongLong
+    #Else
+        pvData As Long
+    #End If
+    rgsabound0 As SAFEARRAYBOUND
+End Type
+Private Const FADF_HAVEVARTYPE As Long = &H80
+
+Private Const BYTE_SIZE As Long = 1
+Private Const INT_SIZE As Long = 2
+
+#If Win64 Then
+    #If Mac Then
+        Private Const vbLongLong As Long = 20 'Apparently missing for x64 on Mac
+    #End If
+    Private Const vbLongPtr As Long = vbLongLong
+#Else
+    Private Const vbLongLong As Long = 20 'Useful in Select Case logic
+    Private Const vbLongPtr As Long = vbLong
 #End If
 
 Private Const WC_ERR_INVALID_CHARS As Long = &H80&
@@ -252,8 +287,6 @@ Public Enum CodePageIdentifier
     [_last]
 End Enum
 
-
-
 'According to documentation:
 'https://learn.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-widechartomultibyte
 'https://learn.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-multibytetowidechar
@@ -262,17 +295,17 @@ End Enum
 '      errors when calling Encode, Decode or Transcode with 'raiseErrors = True'
 Private Static Function CodePageAllowsFlags(ByVal cpID As Long) As Boolean
     Dim arr(CodePageIdentifier.[_first] To CodePageIdentifier.[_last]) As Boolean
-    
+
     If arr(CodePageIdentifier.[_first]) Then
         CodePageAllowsFlags = arr(cpID)
         Exit Function
     End If
-    
+
     Dim i As Long
     For i = CodePageIdentifier.[_first] To CodePageIdentifier.[_last]
         arr(i) = True
     Next i
-    
+
     'According to docs:
     arr(cpIso_2022_jp) = False
     arr(cpCsISO2022JP) = False
@@ -293,7 +326,7 @@ Private Static Function CodePageAllowsFlags(ByVal cpID As Long) As Boolean
     arr(cpUTF_32BE) = True 'Not sure about this one
     arr(cpGB18030) = True  'This one is definitely allowed
     arr(cpUTF_8) = True    'This one is definitely allowed
-    
+
     CodePageAllowsFlags = arr(cpID)
 End Function
 
@@ -302,21 +335,21 @@ End Function
 'https://learn.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-multibytetowidechar
 Private Static Function CodePageAllowsQueryReversible(ByVal cpID As Long) As Boolean
     Dim arr(CodePageIdentifier.[_first] To CodePageIdentifier.[_last]) As Boolean
-    
+
     If arr(CodePageIdentifier.[_first]) Then
         CodePageAllowsQueryReversible = arr(cpID)
         Exit Function
     End If
-    
+
     Dim i As Long
     For i = CodePageIdentifier.[_first] To CodePageIdentifier.[_last]
         arr(i) = True
     Next i
-    
+
     'According to docs:
     arr(cpUTF_7) = False
     arr(cpUTF_8) = False
-    
+
     'According to trial and error there are a bunch more:
     arr(cpIso_2022_jp) = False
     arr(cpCsISO2022JP) = False
@@ -336,24 +369,24 @@ Private Static Function CodePageAllowsQueryReversible(ByVal cpID As Long) As Boo
     arr(cpX_iscii_ma) = False
     arr(cpX_iscii_gu) = False
     arr(cpX_iscii_pa) = False
-    
+
     CodePageAllowsQueryReversible = arr(cpID)
 End Function
 
 'Returns an array for converting CodePageIDs to ConversionDescriptorNames
 Private Static Function ConvDescriptorName(ByVal cpID As Long) As String
     Dim arr(CodePageIdentifier.[_first] To CodePageIdentifier.[_last]) As String
-    
+
     If arr(CodePageIdentifier.[_first]) Then
         ConvDescriptorName = StrConv(arr(cpID), vbFromUnicode)
         Exit Function
     End If
-    
+
     Dim i As Long
     For i = CodePageIdentifier.[_first] To CodePageIdentifier.[_last]
         arr(i) = -1
     Next i
-    
+
     'Source:
     'https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/iconv_open.3.html#//apple_ref/doc/man/3/iconv_open
     'European languages
@@ -582,11 +615,11 @@ End Function
 
 #If Mac = 0 Then
 Public Function GetBstrFromWideStringPtr(ByVal lpwString As LongPtr) As String
-    Dim length As Long
-    If lpwString Then length = lstrlenW(lpwString)
-    If length Then
-        GetBstrFromWideStringPtr = Space$(length)
-        CopyMemory StrPtr(GetBstrFromWideStringPtr), lpwString, length * 2
+    Dim Length As Long
+    If lpwString Then Length = lstrlenW(lpwString)
+    If Length Then
+        GetBstrFromWideStringPtr = Space$(Length)
+        CopyMemory ByVal StrPtr(GetBstrFromWideStringPtr), ByVal lpwString, Length * 2
     End If
 End Function
 #End If
@@ -619,7 +652,7 @@ Public Function Transcode(ByRef str As String, _
         Dim cd As LongPtr: cd = GetConversionDescriptor(fromCodePage, toCodePage)
         Dim irrevConvCount As Long
         Dim replacementChar As String
-        
+
         Do While inBytesLeft > 0
             SetApiErrorNumber = 0
             irrevConvCount = iconv(cd, inBuf, inBytesLeft, outBuf, outBytesLeft)
@@ -627,7 +660,7 @@ Public Function Transcode(ByRef str As String, _
             If irrevConvCount = -1 Then 'Error occurred
                 If StrPtr(replacementChar) = 0 Then _
                     replacementChar = GetReplacementCharForCodePage(toCodePage)
-                
+
                 Select Case GetApiErrorNumber
                     Case MAC_API_ERR_EILSEQ
                         If raiseErrors Then Err.Raise 5, methodName, _
@@ -654,7 +687,7 @@ Public Function Transcode(ByRef str As String, _
                 End Select
             End If
         Loop
-        
+
         If irrevConvCount > 0 And raiseErrors Then Err.Raise 5, _
             methodName, "Default char would be used, encoding would be irreversible"
 
@@ -699,7 +732,7 @@ Private Function GetConversionDescriptor( _
         "No conversion descriptor name assigned to CodePage " & toCodePage
     If LenB(fromCpCdName) = 0 Then Err.Raise 5, methodName, _
         "No conversion descriptor name assigned to CodePage " & fromCodePage
-        
+
     SetApiErrorNumber = 0 'Clear previous errors
     GetConversionDescriptor = iconv_open(StrPtr(toCpCdName), StrPtr(fromCodePage))
 
@@ -732,13 +765,13 @@ Private Function GetReplacementCharForCodePage( _
         Exit Function
     End If
     On Error GoTo 0
-    
+
     ' U+FFFD (0xEF 0xBF 0xBD) in UTF-8
     Dim ReplacementCharUtf8() As Byte: ReDim ReplacementCharUtf8(0 To 2)
     ReplacementCharUtf8(0) = &HEF
     ReplacementCharUtf8(1) = &HBF
     ReplacementCharUtf8(2) = &HBD
-    
+
     replacementChars.Add Transcode(CStr(ReplacementCharUtf8), cpUTF_8, cpID), _
                          CStr(cpID)
     GetReplacementCharForCodePage = replacementChars(CStr(cpID))
@@ -762,10 +795,10 @@ Public Function Encode(ByRef utf16leStr As String, _
                        ByVal toCodePage As CodePageIdentifier, _
               Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "Encode"
-    
+
     If toCodePage = cpUTF_16 Then Err.Raise 5, methodName, _
         "Input string should already be UTF-16. Can't encode UTF-16 to UTF-16."
-    
+
     If utf16leStr = vbNullString Then Exit Function
     #If Mac Then
         Encode = Transcode(utf16leStr, cpUTF_16, toCodePage, raiseErrors)
@@ -776,7 +809,7 @@ Public Function Encode(ByRef utf16leStr As String, _
         Dim lpUsedDefaultChar As LongPtr
         If raiseErrors And CodePageAllowsQueryReversible(toCodePage) Then _
             lpUsedDefaultChar = VarPtr(usedDefaultChar)
-            
+
         If raiseErrors And CodePageAllowsFlags(toCodePage) Then _
             dwFlags = WC_ERR_INVALID_CHARS
 
@@ -802,16 +835,16 @@ Public Function Encode(ByRef utf16leStr As String, _
                         GetApiErrorNumber
             End Select
         End If
-        
+
         If raiseErrors And usedDefaultChar Then _
             Err.Raise 5, methodName, "Default char would be used, encoding " & _
                 "would be irreversible."
-    
+
         Dim b() As Byte: ReDim b(0 To byteCount - 1)
         Encode = b
         WideCharToMultiByte toCodePage, dwFlags, StrPtr(utf16leStr), _
                 Len(utf16leStr), StrPtr(Encode), byteCount, 0, lpUsedDefaultChar
-                
+
         Select Case GetApiErrorNumber
             Case Is <> 0
                 Err.Raise vbErrInternalError, methodName, _
@@ -837,7 +870,7 @@ Public Function Decode(ByRef str As String, _
                        ByVal fromCodePage As CodePageIdentifier, _
               Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "Decode"
-    
+
     If fromCodePage = cpUTF_16 Then Err.Raise 5, methodName, _
         "VBA strings are UTF-16 by default. No need to decode string from UTF-16."
 
@@ -847,11 +880,11 @@ Public Function Decode(ByRef str As String, _
     #Else
         Dim charCount As Long
         Dim dwFlags As Long
-        
+
         SetApiErrorNumber 0
         If raiseErrors And CodePageAllowsFlags(fromCodePage) Then _
             dwFlags = MB_ERR_INVALID_CHARS
-        
+
         charCount = MultiByteToWideChar(fromCodePage, dwFlags, StrPtr(str), _
                                         LenB(str), 0, 0)
         If charCount = 0 Then
@@ -873,11 +906,11 @@ Public Function Decode(ByRef str As String, _
                         GetApiErrorNumber
             End Select
         End If
-    
+
         Decode = Space$(charCount)
         MultiByteToWideChar fromCodePage, dwFlags, StrPtr(str), LenB(str), _
                             StrPtr(Decode), charCount
-                            
+
         Select Case GetApiErrorNumber
             Case Is <> 0
                 Err.Raise vbErrInternalError, methodName, _
@@ -906,14 +939,14 @@ Public Function HexToString(ByRef hexStr As String) As String
     Const methodName As String = "HexToString"
     Const errPrefix As String = "Invalid Hex string literal. "
     Dim size As Long: size = Len(hexStr)
-    
+
     If size = 0 Then Exit Function
     If size Mod 2 = 1 Then Err.Raise 5, methodName, errPrefix & "Uneven length"
-    
+
     Static nibbleMap(0 To 255) As Long 'Nibble: 0 to F. Byte: 00 to FF
     Static charMap(0 To 255) As String
     Dim i As Long
-    
+
     If nibbleMap(0) = 0 Then
         For i = 0 To 255
             nibbleMap(i) = -256 'To force invalid character code
@@ -927,13 +960,13 @@ Public Function HexToString(ByRef hexStr As String) As String
             nibbleMap(i + 87) = i 'Asc("a") to Asc("f")
         Next i
     End If
-    
+
     Dim prefix As String: prefix = Left$(hexStr, 2)
     Dim startPos As Long: startPos = -4 * CLng(prefix = "0x" Or prefix = "&H")
     Dim b() As Byte:      b = hexStr
     Dim j As Long
     Dim charCode As Long
-    
+
     HexToString = MidB$(hexStr, 1, size / 2 - Sgn(startPos))
     For i = startPos To UBound(b) Step 4
         j = j + 1
@@ -952,16 +985,16 @@ Public Function StringToHex(ByRef s As String) As String
     Static map(0 To 255) As String
     Dim b() As Byte: b = s
     Dim i As Long
-    
+
     If LenB(map(0)) = 0 Then
         For i = 0 To 255
             map(i) = Right$("0" & Hex$(i), 2)
         Next i
     End If
-    
+
     StringToHex = Space$(LenB(s) * 2 + 2)
     Mid$(StringToHex, 1, 2) = "0x"
-    
+
     For i = LBound(b) To UBound(b)
         Mid$(StringToHex, (i + 1) * 2 + 1, 2) = map(b(i))
     Next i
@@ -989,7 +1022,7 @@ Public Function ReplaceUnicodeLiterals(ByRef str As String) As String
         "\\u000[0-9a-f]{5}|\\u[0-9a-f]{4}|" & _
         "\\u{[0-9a-f]{1,5}}|u\+[0-9|a-f]{4,5}|&#\d{1,6};"
     Dim mc As Object
-    
+
     With CreateObject("VBScript.RegExp")
         .Global = True
         .MultiLine = True
@@ -997,11 +1030,11 @@ Public Function ReplaceUnicodeLiterals(ByRef str As String) As String
         .pattern = PATTERN_UNICODE_LITERALS
         Set mc = .Execute(str)
     End With
-    
+
     Dim match As Variant
     Dim mv As String
     Dim codepoint As Long
-    
+
     For Each match In mc
         mv = match.Value
         If Left$(mv, 1) = "&" Then
@@ -1033,12 +1066,12 @@ Public Function EncodeUnicodeCharacters(ByRef str As String) As String
     Dim i As Long
     Dim j As Long:          j = 1
     Dim result() As String: ReDim result(1 To Len(str))
-    
+
     For i = 1 To Len(str)
         codepoint = AscW(Mid$(str, i, 1)) And &HFFFF&
-        
+
         If codepoint >= &HD800& Then codepoint = AscU(Mid$(str, i, 2))
-        
+
         If codepoint > &HFFFF& Then 'Outside BMP
             result(j) = "\u" & "000" & Hex(codepoint)
             i = i + 1
@@ -1057,12 +1090,12 @@ End Function
              Optional ByVal allowSingleSurrogates As Boolean = False) _
                       As String
     Const methodName As String = "ChrU"
-    
+
     If codepoint < &H8000 Then Err.Raise 5, methodName, _
         "Argument 'codepoint' = " & codepoint & " < -32768, invalid"
-    
+
     If codepoint < 0 Then codepoint = codepoint And &HFFFF& 'Incase of uInt input
-    
+
     If codepoint < &HD800& Then
         ChrU = ChrW$(codepoint)
     ElseIf codepoint < &HE000& And Not allowSingleSurrogates Then
@@ -1086,14 +1119,14 @@ Public Function AscU(ByRef char As String) As Long
     Dim s As String
     Dim lo As Long
     Dim hi As Long
-    
+
     If Len(char) = 1 Then
         AscU = AscW(char) And &HFFFF&
     Else
         s = Left$(char, 2)
         hi = AscW(Mid$(s, 1, 1)) And &HFFFF&
         lo = AscW(Mid$(s, 2, 1)) And &HFFFF&
-        
+
         If &HDC00& > lo Or lo > &HDFFF& Then
             AscU = hi
             Exit Function
@@ -1108,7 +1141,7 @@ Public Function DecodeANSI(ByRef ansiStr As String) As String
     Dim j As Long:         j = 0
     Dim ansi() As Byte:    ansi = ansiStr
     Dim utf16le() As Byte: ReDim utf16le(0 To LenB(ansiStr) * 2 - 1)
-    
+
     For i = LBound(ansi) To UBound(ansi)
         utf16le(j) = ansi(i)
         j = j + 2
@@ -1171,13 +1204,13 @@ Private Function EncodeUTF8native(ByRef utf16leStr As String, _
     Dim i As Long:            i = 1
     Dim j As Long:            j = 0
     Dim utf8() As Byte:       ReDim utf8(Len(utf16leStr) * 4 - 1)
-    
+
     Do While i <= Len(utf16leStr)
         codepoint = AscW(Mid$(utf16leStr, i, 1)) And &HFFFF&
-        
+
         If codepoint >= &HD800& And codepoint <= &HDBFF& Then 'high surrogate
             lowSurrogate = AscW(Mid$(utf16leStr, i + 1, 1)) And &HFFFF&
-            
+
             If &HDC00& <= lowSurrogate And lowSurrogate <= &HDFFF& Then
                 codepoint = (codepoint - &HD800&) * &H400& + _
                             (lowSurrogate - &HDC00&) + &H10000
@@ -1189,7 +1222,7 @@ Private Function EncodeUTF8native(ByRef utf16leStr As String, _
                 codepoint = &HFFFD&
             End If
         End If
-        
+
         If codepoint < &H80& Then
             utf8(j) = codepoint
             j = j + 1
@@ -1219,7 +1252,7 @@ Private Function EncodeUTF8native(ByRef utf16leStr As String, _
             utf8(j + 3) = &H80& Or (codepoint And &H3F&)
             j = j + 4
         End If
-        
+
         i = i + 1
     Loop
     EncodeUTF8native = MidB$(utf8, 1, j)
@@ -1238,11 +1271,11 @@ Private Function DecodeUTF8native(ByRef utf8Str As String, _
     Const methodName As String = "DecodeUTF8native"
     Dim i As Long
     Dim numBytesOfCodePoint As Byte
-    
+
     Static numBytesOfCodePoints(0 To 255) As Byte
     Static mask(2 To 4) As Long
     Static minCp(2 To 4) As Long
-    
+
     If numBytesOfCodePoints(0) = 0 Then
         For i = &H0& To &H7F&: numBytesOfCodePoints(i) = 1: Next i '0xxxxxxx
         '110xxxxx - C0 and C1 are invalid (overlong encoding)
@@ -1253,7 +1286,7 @@ Private Function DecodeUTF8native(ByRef utf8Str As String, _
         For i = 2 To 4: mask(i) = (2 ^ (7 - i) - 1): Next i
         minCp(2) = &H80&: minCp(3) = &H800&: minCp(4) = &H10000
     End If
-    
+
     Dim codepoint As Long
     Dim currByte As Byte
     Dim utf8() As Byte:  utf8 = utf8Str
@@ -1265,7 +1298,7 @@ Private Function DecodeUTF8native(ByRef utf8Str As String, _
     Do While i <= UBound(utf8)
         codepoint = utf8(i)
         numBytesOfCodePoint = numBytesOfCodePoints(codepoint)
-        
+
         If numBytesOfCodePoint = 0 Then
             If raiseErrors Then Err.Raise 5, methodName, "Invalid byte"
             GoTo insertErrChar
@@ -1278,10 +1311,10 @@ Private Function DecodeUTF8native(ByRef utf8Str As String, _
             GoTo insertErrChar
         Else
             codepoint = utf8(i) And mask(numBytesOfCodePoint)
-            
+
             For k = 1 To numBytesOfCodePoint - 1
                 currByte = utf8(i + k)
-                
+
                 If (currByte And &HC0&) = &H80& Then
                     codepoint = (codepoint * &H40&) + (currByte And &H3F)
                 Else
@@ -1311,7 +1344,7 @@ Private Function DecodeUTF8native(ByRef utf8Str As String, _
                 Dim m As Long:           m = codepoint - &H10000
                 Dim loSurrogate As Long: loSurrogate = &HDC00& Or (m And &H3FF)
                 Dim hiSurrogate As Long: hiSurrogate = &HD800& Or (m \ &H400&)
-                
+
                 utf16(j) = hiSurrogate And &HFF&
                 utf16(j + 1) = hiSurrogate \ &H100&
                 utf16(j + 2) = loSurrogate And &HFF&
@@ -1323,7 +1356,7 @@ Private Function DecodeUTF8native(ByRef utf8Str As String, _
 insertErrChar:  utf16(j) = &HFD
                 utf16(j + 1) = &HFF
                 j = j + 2
-                
+
                 If numBytesOfCodePoint = 0 Then numBytesOfCodePoint = 1
             End If
         End If
@@ -1381,21 +1414,21 @@ End Function
 Public Function EncodeUTF32LE(ByRef utf16leStr As String, _
                      Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "EncodeUTF32LE"
-    
+
     If utf16leStr = "" Then Exit Function
-    
+
     Dim codepoint As Long
     Dim lowSurrogate As Long
     Dim utf32() As Byte:      ReDim utf32(Len(utf16leStr) * 4 - 1)
     Dim i As Long:            i = 1
     Dim j As Long:            j = 0
-    
+
     Do While i <= Len(utf16leStr)
         codepoint = AscW(Mid$(utf16leStr, i, 1)) And &HFFFF&
-        
+
         If codepoint >= &HD800& And codepoint <= &HDBFF& Then 'high surrogate
             lowSurrogate = AscW(Mid$(utf16leStr, i + 1, 1)) And &HFFFF&
-            
+
             If &HDC00& <= lowSurrogate And lowSurrogate <= &HDFFF& Then
                 codepoint = (codepoint - &HD800&) * &H400& + _
                             (lowSurrogate - &HDC00&) + &H10000
@@ -1406,7 +1439,7 @@ Public Function EncodeUTF32LE(ByRef utf16leStr As String, _
                 codepoint = &HFFFD&
             End If
         End If
-        
+
         If codepoint >= &HD800& And codepoint < &HE000& Then
             If raiseErrors Then Err.Raise 5, methodName, _
                 "Invalid Unicode codepoint. (Lonely low surrogate)"
@@ -1416,7 +1449,7 @@ Public Function EncodeUTF32LE(ByRef utf16leStr As String, _
                 "Codepoint outside of valid Unicode range"
             codepoint = &HFFFD&
         End If
-        
+
         utf32(j) = codepoint And &HFF&
         utf32(j + 1) = (codepoint \ &H100&) And &HFF&
         utf32(j + 2) = (codepoint \ &H10000) And &HFF&
@@ -1429,15 +1462,15 @@ End Function
 Public Function DecodeUTF32LE(ByRef utf32str As String, _
                      Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "DecodeUTF32LE"
-    
+
     If utf32str = "" Then Exit Function
-    
+
     Dim codepoint As Long
     Dim utf32() As Byte:   utf32 = utf32str
     Dim utf16() As Byte:   ReDim utf16(LBound(utf32) To UBound(utf32))
     Dim i As Long: i = LBound(utf32)
     Dim j As Long: j = i
-    
+
     Do While i < UBound(utf32)
         If utf32(i + 2) = 0 And utf32(i + 3) = 0 Then
             utf16(j) = utf32(i): utf16(j + 1) = utf32(i + 1): j = j + 2
@@ -1463,11 +1496,11 @@ Public Function DecodeUTF32LE(ByRef utf32str As String, _
                     codepoint = &HFFFD&
                 End If
             End If
-            
+
             Dim n As Long:             n = codepoint - &H10000
             Dim highSurrogate As Long: highSurrogate = &HD800& Or (n \ &H400&)
             Dim lowSurrogate As Long:  lowSurrogate = &HDC00& Or (n And &H3FF)
-            
+
             utf16(j) = highSurrogate And &HFF&
             utf16(j + 1) = highSurrogate \ &H100&
             utf16(j + 2) = lowSurrogate And &HFF&
@@ -1481,15 +1514,15 @@ End Function
 
 'Function returning a string containing all alphanumeric characters equally
 'distributed. (0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ)
-Public Function RandomStringAlphanumeric(ByVal length As Long) As String
-    If length < 1 Then Exit Function
-    
+Public Function RandomStringAlphanumeric(ByVal Length As Long) As String
+    If Length < 1 Then Exit Function
+
     Dim i As Long
     Dim char As Long
-    Dim b() As Byte: ReDim b(0 To length * 2 - 1)
-    
+    Dim b() As Byte: ReDim b(0 To Length * 2 - 1)
+
     Randomize
-    For i = 0 To length - 1
+    For i = 0 To Length - 1
         Select Case Rnd
             Case Is < 0.41935
                 Do: char = 25 * Rnd + 65: Loop Until char <> 0
@@ -1498,7 +1531,7 @@ Public Function RandomStringAlphanumeric(ByVal length As Long) As String
             Case Else
                 Do: char = 9 * Rnd + 48: Loop Until char <> 0
         End Select
-        
+
         b(2 * i) = (Int(char)) And &HFF
     Next i
     RandomStringAlphanumeric = b
@@ -1506,7 +1539,7 @@ End Function
 
 'Alternative function returning a string containing all alphanumeric characters
 'equally, randomly distributed.
-Public Function RandomStringAlphanumeric2(ByVal length As Long) As String
+Public Function RandomStringAlphanumeric2(ByVal Length As Long) As String
     Static a As Variant
     If IsEmpty(a) Then
         a = Array("A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", _
@@ -1516,12 +1549,12 @@ Public Function RandomStringAlphanumeric2(ByVal length As Long) As String
                   "w", "x", "y", "z", _
                   "0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
     End If
-    
+
     Dim i As Long
-    Dim result As String: result = Space$(length)
-    
+    Dim result As String: result = Space$(Length)
+
     Randomize
-    For i = 1 To length
+    For i = 1 To Length
         Mid$(result, i, 1) = a(Int(Rnd() * 62))
     Next i
     RandomStringAlphanumeric2 = result
@@ -1530,23 +1563,23 @@ End Function
 'Function returning a string containing all characters from the BMP
 '(Basic Multilingual Plane, all 2 byte UTF-16 chars) equally, randomly
 'distributed. Excludes surrogate range and BOM.
-Public Function RandomStringBMP(ByVal length As Long) As String
+Public Function RandomStringBMP(ByVal Length As Long) As String
     Const MAX_UINT As Long = &HFFFF&
-    
-    If length < 1 Then Exit Function
-    
+
+    If Length < 1 Then Exit Function
+
     Dim i As Long
     Dim char As Long
-    Dim b() As Byte:  ReDim b(0 To length * 2 - 1)
-    
+    Dim b() As Byte:  ReDim b(0 To Length * 2 - 1)
+
     Randomize
-    For i = 0 To length - 1
+    For i = 0 To Length - 1
         Do
             char = MAX_UINT * Rnd
         Loop Until (char <> 0) _
                And (char < &HD800& Or char > &HDFFF&) _
                And (char <> &HFEFF&)
-               
+
         b(2 * i) = (Int(char)) And &HFF
         b(2 * i + 1) = (Int(char / (&H100))) And &HFF
     Next i
@@ -1566,27 +1599,27 @@ End Function
 
 'Function returning a string containing all valid unicode characters equally,
 'randomly distributed. Excludes surrogate range and BOM.
-Public Function RandomStringUnicode(ByVal length As Long) As String
+Public Function RandomStringUnicode(ByVal Length As Long) As String
     'Length in UTF-16 codepoints, not unicode codepoints!
     Const MAX_UNICODE As Long = &H10FFFF
-    
-    If length < 1 Then Exit Function
-    
+
+    If Length < 1 Then Exit Function
+
     Dim s As String
     Dim i As Long
-    
+
     Dim char As Long
-    Dim b() As Byte: ReDim b(0 To length * 2 - 1)
-    
+    Dim b() As Byte: ReDim b(0 To Length * 2 - 1)
+
     Randomize
-    If length > 1 Then
-        For i = 0 To length - 2
+    If Length > 1 Then
+        For i = 0 To Length - 2
             Do
                 char = MAX_UNICODE * Rnd
             Loop Until (char <> 0) _
                    And (char < &HD800& Or char > &HDFFF&) _
                    And (char <> &HFEFF&)
-                   
+
             If char < &H10000 Then
                 b(2 * i) = (Int(char)) And &HFF
                 b(2 * i + 1) = (Int(char / (&H100))) And &HFF
@@ -1594,7 +1627,7 @@ Public Function RandomStringUnicode(ByVal length As Long) As String
                 Dim m As Long: m = char - &H10000
                 Dim highSurrogate As Long: highSurrogate = &HD800& + (m \ &H400&)
                 Dim lowSurrogate As Long: lowSurrogate = &HDC00& + (m And &H3FF)
-                
+
                 b(2 * i) = highSurrogate And &HFF&
                 b(2 * i + 1) = highSurrogate \ &H100&
                 i = i + 1
@@ -1611,14 +1644,14 @@ End Function
 
 'Function returning a string containing all ASCII characters equally,
 'randomly distributed.
-Public Function RandomStringASCII(ByVal length As Long) As String
+Public Function RandomStringASCII(ByVal Length As Long) As String
     Const MAX_ASC As Long = &H7F&
     Dim i As Long
     Dim char As Integer
-    Dim b() As Byte: ReDim b(0 To length * 2 - 1)
-    
+    Dim b() As Byte: ReDim b(0 To Length * 2 - 1)
+
     Randomize
-    For i = 0 To length - 1
+    For i = 0 To Length - 1
         Do: char = MAX_ASC * Rnd: Loop Until char <> 0
         b(2 * i) = (char) And &HFF
     Next i
@@ -1634,10 +1667,10 @@ Public Function CleanString(ByRef str As String, _
     Dim sChr As String
     Dim i As Long
     Dim j As Long: j = 1
-    
+
     For i = 1 To Len(str)
         sChr = Mid$(str, i, 1)
-        
+
         If InStr(1, inklChars, sChr, vbBinaryCompare) Then
             Mid$(str, j, 1) = sChr
             j = j + 1
@@ -1686,8 +1719,8 @@ Public Function Insert(ByRef str As String, _
                        ByRef afterPos As Long) As String
     Const methodName As String = "Insert"
     If afterPos < 0 Then Err.Raise 5, methodName, _
-        "Argument 'Start' = " & lStart & " < 1, invalid"
-    
+        "Argument 'afterPos' = " & afterPos & " < 0, invalid"
+
     Insert = Mid$(str, 1, afterPos) & strToInsert & Mid$(str, afterPos + 1)
 End Function
 
@@ -1698,7 +1731,7 @@ Public Function InsertB(ByRef str As String, _
                         ByRef afterPos As Long) As String
     Const methodName As String = "InsertB"
     If afterPos < 0 Then afterPos = 0
-    
+
     InsertB = MidB$(str, 1, afterPos) & strToInsert & MidB$(str, afterPos + 1)
 End Function
 
@@ -1713,10 +1746,10 @@ Public Function CountSubstring(ByRef str As String, _
     Const methodName As String = "CountSubstring"
     If lStart < 1 Then Err.Raise 5, methodName, _
         "Argument 'Start' = " & lStart & " < 1, invalid"
- 
+
     Dim lenSubStr As Long: lenSubStr = Len(subStr)
     Dim i As Long:         i = InStr(lStart, str, subStr, lCompare)
-    
+
     CountSubstring = 0
     Do Until i = 0
         CountSubstring = CountSubstring + 1
@@ -1740,10 +1773,10 @@ Public Function CountSubstringB(ByRef bytes As String, _
     Const methodName As String = "CountSubstringB"
     If lStart < 1 Then Err.Raise 5, methodName, _
         "Argument 'Start' = " & lStart & " < 1, invalid"
-      
+
     Dim lenBSubStr As Long: lenBSubStr = LenB(subStr)
     Dim i As Long:          i = InStrB(lStart, bytes, subStr, lCompare)
-    
+
     CountSubstringB = 0
     Do Until i = 0
         CountSubstringB = CountSubstringB + 1
@@ -1770,27 +1803,27 @@ Public Function ReplaceB(ByRef bytes As String, _
     If lCount < -1 Then Err.Raise 5, methodName, _
         "Argument 'lCount' = " & lCount & " < -1, invalid"
     lCount = lCount And &H7FFFFFFF
-    
+
     If LenB(bytes) = 0 Or LenB(sFind) = 0 Then
         ReplaceB = bytes
         Exit Function
     End If
-    
+
     Dim lenBFind As Long:    lenBFind = LenB(sFind)
     Dim lenBReplace As Long: lenBReplace = LenB(sReplace)
     Dim numRepl As Long:     numRepl = CountSubstringB(bytes, sFind, _
                                                        lStart, lCompare)
     If lCount < numRepl Then numRepl = lCount
-    
+
     Dim buffer() As Byte
     ReDim buffer(0 To LenB(bytes) - lStart + numRepl * (lenBReplace - lenBFind))
     ReplaceB = buffer
-    
+
     Dim i As Long:              i = InStrB(lStart, bytes, sFind, lCompare)
     Dim j As Long:              j = 1
     Dim lastOccurrence As Long: lastOccurrence = lStart
     Dim count As Long:          count = 1
-    
+
     Do Until i = 0 Or count > lCount
         Dim diff As Long: diff = i - lastOccurrence
         MidB$(ReplaceB, j, diff) = MidB$(bytes, lastOccurrence, diff)
@@ -1819,7 +1852,7 @@ Public Function LimitConsecutiveSubstringRepetition( _
                                                           = vbBinaryCompare) _
                                            As String
     Const methodName As String = "LimitConsecutiveSubstringRepetition"
-    
+
     If limit < 0 Then Err.Raise 5, methodName, _
         "Argument 'limit' = " & limit & " < 0, invalid"
     If limit = 0 Then
@@ -1884,7 +1917,7 @@ Public Function LimitConsecutiveSubstringRepetitionB( _
                                                           = vbBinaryCompare) _
                                            As String
     Const methodName As String = "LimitConsecutiveSubstringRepetitionB"
-    
+
     If limit < 0 Then Err.Raise 5, methodName, _
         "Argument 'limit' = " & limit & " < 0, invalid"
     If limit = 0 Then
@@ -1940,7 +1973,7 @@ End Function
 Public Function RepeatString(ByRef str As String, _
                     Optional ByVal repeatTimes As Long = 2) As String
     RepeatString = Space$((LenB(str) * repeatTimes + 1) \ 2)
-    
+
     If (LenB(str) * repeatTimes) Mod 2 = 1 Then _
         RepeatString = MidB$(RepeatString, 1, LenB(RepeatString) - 1)
 
@@ -1954,43 +1987,43 @@ End Function
 'string reaches length 'Length'
 'E.g.: PadRight("asd", 11, "xyz") -> "asdxyzxyzxy"
 Public Function PadRight(ByRef str As String, _
-                         ByVal length As Long, _
+                         ByVal Length As Long, _
                 Optional ByVal fillerStr As String = " ") As String
-    PadRight = PadRightB(str, length * 2, fillerStr)
+    PadRight = PadRightB(str, Length * 2, fillerStr)
 End Function
 
 'Adds fillerStr to the left side of a string repeatedly until the resulting
 'string reaches length 'Length'
 'E.g.: PadLeft("asd", 11, "xyz") -> "yzxyzxyzasd"
 Public Function PadLeft(ByRef str As String, _
-                        ByVal length As Long, _
+                        ByVal Length As Long, _
                Optional ByVal fillerStr As String = " ") As String
-    PadLeft = PadLeftB(str, length * 2, fillerStr)
+    PadLeft = PadLeftB(str, Length * 2, fillerStr)
 End Function
 
 'Adds fillerStr to the right side of a string repeatedly until the resulting
 'string reaches length 'Length' in bytes!
 'E.g.: PadRightB("asd", 16, "xyz") -> "asdxyzxy"
 Public Function PadRightB(ByRef str As String, _
-                          ByVal length As Long, _
+                          ByVal Length As Long, _
                  Optional ByVal fillerStr As String = " ") As String
     Const methodName As String = "PadRightB"
-    If length < 0 Then Err.Raise 5, methodName, _
-        "Argument 'Length' = " & length & " < 0, invalid"
+    If Length < 0 Then Err.Raise 5, methodName, _
+        "Argument 'Length' = " & Length & " < 0, invalid"
     If LenB(fillerStr) = 0 Then Err.Raise 5, methodName, _
         "Argument 'fillerStr' = vbNullString, invalid"
-    
-    If length > LenB(str) Then
+
+    If Length > LenB(str) Then
         If LenB(fillerStr) = 2 Then
-            PadRightB = str & String((length - LenB(str) + 1) \ 2, fillerStr)
-            If length Mod 2 = 1 Then _
+            PadRightB = str & String((Length - LenB(str) + 1) \ 2, fillerStr)
+            If Length Mod 2 = 1 Then _
                 PadRightB = LeftB$(PadRightB, LenB(PadRightB) - 1)
         Else
-            PadRightB = str & LeftB$(RepeatString(fillerStr, (((length - _
-                LenB(str))) + 1) \ LenB(fillerStr) + 1), length - LenB(str))
+            PadRightB = str & LeftB$(RepeatString(fillerStr, (((Length - _
+                LenB(str))) + 1) \ LenB(fillerStr) + 1), Length - LenB(str))
         End If
     Else
-        PadRightB = LeftB$(str, length)
+        PadRightB = LeftB$(str, Length)
     End If
 End Function
 
@@ -2000,25 +2033,25 @@ End Function
 'E.g.: PadLeftB("asd", 16, "xyz") -> "yzxyzasd"
 '      PadLeftB("asd", 11, "xyz") -> "?????"
 Public Function PadLeftB(ByRef str As String, _
-                         ByVal length As Long, _
+                         ByVal Length As Long, _
                 Optional ByVal fillerStr As String = " ") As String
     Const methodName As String = "PadLeftB"
-    If length < 0 Then Err.Raise 5, methodName, _
-        "Argument 'Length' = " & length & " < 0, invalid"
+    If Length < 0 Then Err.Raise 5, methodName, _
+        "Argument 'Length' = " & Length & " < 0, invalid"
     If LenB(fillerStr) = 0 Then Err.Raise 5, methodName, _
         "Argument 'fillerStr' = vbNullString, invalid"
-        
-    If length > LenB(str) Then
+
+    If Length > LenB(str) Then
         If LenB(fillerStr) = 2 Then
-            PadLeftB = String((length - LenB(str) + 1) \ 2, fillerStr) & str
-            If length Mod 2 = 1 Then _
+            PadLeftB = String((Length - LenB(str) + 1) \ 2, fillerStr) & str
+            If Length Mod 2 = 1 Then _
                 PadLeftB = RightB$(PadLeftB, LenB(PadLeftB) - 1)
         Else
-            PadLeftB = RightB$(RepeatString(fillerStr, (((length - LenB(str))) _
-                          + 1) \ LenB(fillerStr) + 1), length - LenB(str)) & str
+            PadLeftB = RightB$(RepeatString(fillerStr, (((Length - LenB(str))) _
+                          + 1) \ LenB(fillerStr) + 1), Length - LenB(str)) & str
         End If
     Else
-        PadLeftB = RightB$(str, length)
+        PadLeftB = RightB$(str, Length)
     End If
 End Function
 
@@ -2038,17 +2071,17 @@ Public Function SplitB(ByRef bytes As String, _
     If lLimit < -1 Then Err.Raise 5, methodName, _
         "Argument 'lLimit' = " & lLimit & " < -1, invalid"
     lLimit = lLimit And &H7FFFFFFF
-    
+
     If LenB(bytes) = 0 Or LenB(sDelimiter) = 0 Or lLimit < 2 Then
         SplitB = VBA.Array(bytes) 'Ignores Option Base 1, like inbuilt 'Split'
         Exit Function
     End If
-    
+
     Dim lenBDelim As Long:  lenBDelim = LenB(sDelimiter)
     Dim numParts As Long:   numParts = CountSubstringB(bytes, sDelimiter, _
                                                        1, lCompare) + 1
     If lLimit < numParts Then numParts = lLimit
-    
+
     Dim arr As Variant:         ReDim arr(0 To numParts - 1)
     Dim i As Long:              i = InStrB(1, bytes, sDelimiter, lCompare)
     Dim lastOccurrence As Long: lastOccurrence = 1
@@ -2083,7 +2116,7 @@ Public Function SplitUnlessInQuotes(ByRef str As String, _
     Dim ub As Long:         ub = -1
     Dim parts As Variant:   ReDim parts(0 To 0)
     Dim doSplit As Boolean: doSplit = True
-    
+
     If delim = """" Then 'Handle this special case
         i = InStr(1, str, """", vbBinaryCompare)
         If i <> 0 Then
@@ -2103,7 +2136,7 @@ Public Function SplitUnlessInQuotes(ByRef str As String, _
         SplitUnlessInQuotes = parts
         Exit Function
     End If
-    
+
     For i = 1 To Len(str)
         If ub = limit - 2 Then
             ub = ub + 1
@@ -2111,13 +2144,13 @@ Public Function SplitUnlessInQuotes(ByRef str As String, _
             parts(ub) = Mid$(str, i)
             Exit For
         End If
-        
+
         If Mid$(str, i, 1) = """" Then
             doSplit = Not doSplit
             If Not doSplit Then _
                 doSplit = InStr(i + 1, str, """", vbBinaryCompare) = 0
         End If
-        
+
         If Mid$(str, i, Len(delim)) = delim And doSplit Or i = Len(str) Then
             If i = Len(str) Then s = s & Mid$(str, i, 1)
             ub = ub + 1
@@ -2131,3 +2164,112 @@ Public Function SplitUnlessInQuotes(ByRef str As String, _
     Next i
     SplitUnlessInQuotes = parts
 End Function
+
+'Reads the memory of a String to an Array of Integers
+'Notes:
+'   - Ignores the last byte if input has an odd number of bytes
+'   - If 'outLength' is -1 (default) then the remaining length is returned
+'   - Excess length is ignored
+Public Function StringToIntegers(ByRef s As String, _
+                        Optional ByVal startIndex As Long = 1, _
+                        Optional ByVal outLength As Long = -1, _
+                        Optional ByVal outLowBound As Long = 0) As Integer()
+    Static sArr As SAFEARRAY_1D
+    Static memValue As Variant
+    Static remoteVT As Variant
+    Const methodName As String = "StringToIntegers"
+    Dim cLen As Long: cLen = Len(s)
+
+    If startIndex < 1 Or startIndex > cLen Then
+        Err.Raise 9, methodName, "Invalid Start Index"
+    ElseIf outLength < -1 Then
+        Err.Raise 5, methodName, "Invalid Length for output"
+    ElseIf outLength = -1 Or startIndex + outLength - 1 > cLen Then
+        outLength = cLen - startIndex + 1
+    End If
+    If IsEmpty(memValue) Then
+        remoteVT = VarPtr(memValue)
+        CopyMemory remoteVT, vbInteger + VT_BYREF, 2
+        With sArr
+            .cDims = 1
+            .fFeatures = FADF_HAVEVARTYPE
+            .cbElements = INT_SIZE
+        End With
+        memValue = VarPtr(sArr)
+    End If
+    With sArr
+        .pvData = StrPtr(s) + (startIndex - 1) * INT_SIZE
+        .rgsabound0.lLbound = outLowBound
+        .rgsabound0.cElements = outLength
+    End With
+    RemoteAssign remoteVT, vbArray + vbInteger, StringToIntegers, memValue
+End Function
+
+'This method assures the required redirection for both the remote varType and
+'   the remote value at the same time thus removing any additional stack frames
+'It can be used to both read from and write to memory by swapping the order of
+'   the last 2 parameters
+Private Sub RemoteAssign(ByRef remoteVT As Variant, _
+                         ByVal newVT As VbVarType, _
+                         ByRef targetVariable As Variant, _
+                         ByRef newValue As Variant)
+    remoteVT = newVT
+    targetVariable = newValue
+    remoteVT = vbLongPtr 'Stop linking to remote address, for safety
+End Sub
+
+'Reads the memory of an Array of Integers into a String
+'Notes:
+'   - If 'outLength' is -1 (default) then the remaining length is returned
+'   - Excess length is ignored
+Public Function IntegersToString(ByRef ints() As Integer, _
+                        Optional ByVal startIndex As Long = 0, _
+                        Optional ByVal outLength As Long = -1) As String
+    Static sArr As SAFEARRAY_1D
+    Static memValue As Variant
+    Static remoteVT As Variant
+    Const methodName As String = "IntegersToString"
+
+    If GetArrayDimsCount(ints) <> 1 Then
+        Err.Raise 5, methodName, "Expected 1D Array of Integers"
+    ElseIf startIndex < LBound(ints) Or startIndex > UBound(ints) Then
+        Err.Raise 9, methodName, "Invalid Start Index"
+    ElseIf outLength < -1 Then
+        Err.Raise 5, methodName, "Invalid Length for output"
+    ElseIf outLength = -1 Or startIndex + outLength - 1 > UBound(ints) Then
+        outLength = UBound(ints) - startIndex + 1
+    End If
+    If IsEmpty(memValue) Then
+        remoteVT = VarPtr(memValue)
+        CopyMemory remoteVT, vbInteger + VT_BYREF, 2
+        With sArr
+            .cDims = 1
+            .fFeatures = FADF_HAVEVARTYPE
+            .cbElements = BYTE_SIZE
+            .rgsabound0.lLbound = 0
+        End With
+        memValue = VarPtr(sArr)
+    End If
+    With sArr
+        .pvData = VarPtr(ints(startIndex))
+        .rgsabound0.cElements = outLength * INT_SIZE
+    End With
+    RemoteAssign remoteVT, vbArray + vbByte, IntegersToString, memValue
+End Function
+
+'Returns the Number of dimensions for an input array
+'Returns 0 if array is uninitialized or input not an array
+'Note that a zero-length array has 1 dimension! Ex. Array() bounds are (0 to -1)
+Private Function GetArrayDimsCount(ByRef arr As Variant) As Long
+    Const MAX_DIMENSION As Long = 60 'VB limit
+    Dim dimension As Long
+    Dim tempBound As Long
+
+    On Error GoTo FinalDimension
+    For dimension = 1 To MAX_DIMENSION
+        tempBound = LBound(arr, dimension)
+    Next dimension
+FinalDimension:
+    GetArrayDimsCount = dimension - 1
+End Function
+
