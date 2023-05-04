@@ -358,10 +358,10 @@ Private Sub TestHexToString()
 End Sub
 
 
-Private Function LimitConsecutiveSubstringRepetitionCheck(ByVal str As String, _
+Public Function LimitConsecutiveSubstringRepetitionCheck(ByVal str As String, _
                                            Optional ByVal subStr As String = vbNewLine, _
                                            Optional ByVal limit As Long = 1, _
-                                           Optional ByVal compare As VbCompareMethod) _
+                                           Optional ByVal Compare As VbCompareMethod) _
                                                     As String
     Dim sReplace As String:     sReplace = RepeatString(subStr, limit)
     Dim sCompare As String:     sCompare = str
@@ -369,11 +369,26 @@ Private Function LimitConsecutiveSubstringRepetitionCheck(ByVal str As String, _
         Dim sFind As String:    sFind = sReplace & subStr
         Do
             LimitConsecutiveSubstringRepetitionCheck = sCompare
-            sCompare = Replace(sCompare, sFind, sReplace, , , compare)
+            sCompare = Replace(sCompare, sFind, sReplace, , , Compare)
             sFind = sFind & subStr 'This together with outer loop should
                                    'improve worst-case runtime a lot
         Loop Until sCompare = LimitConsecutiveSubstringRepetitionCheck
     Loop Until sFind = sReplace & subStr & subStr
+End Function
+
+
+Public Function LimitConsecutiveSubstringRepetitionCheck2(ByVal str As String, _
+                                           Optional ByVal subStr As String = vbNewLine, _
+                                           Optional ByVal limit As Long = 1, _
+                                           Optional ByVal Compare As VbCompareMethod) _
+                                                    As String
+    Dim sReplace As String:     sReplace = RepeatString(subStr, limit)
+    Dim sCompare As String:     sCompare = str
+    Dim sFind As String:        sFind = sReplace & subStr
+    Do
+        LimitConsecutiveSubstringRepetitionCheck2 = sCompare
+        sCompare = Replace(sCompare, sFind, sReplace, , , Compare)
+    Loop Until sCompare = LimitConsecutiveSubstringRepetitionCheck2
 End Function
 
 Sub RunLimitConsecutiveSubstringRepetitionTests()
@@ -411,15 +426,22 @@ End Sub
 Private Sub TestLimitConsecutiveSubstringRepetition(ByVal str As String, _
                                   Optional ByVal subStr As String = vbNewLine, _
                                   Optional ByVal limit As Long = 1, _
-                                  Optional ByVal compare As VbCompareMethod)
-    If LimitConsecutiveSubstringRepetition(str, subStr, limit, compare) _
-    <> LimitConsecutiveSubstringRepetitionCheck(str, subStr, limit, compare) Then _
+                                  Optional ByVal Compare As VbCompareMethod)
+    If LimitConsecutiveSubstringRepetition(str, subStr, limit, Compare) _
+    <> LimitConsecutiveSubstringRepetitionCheck(str, subStr, limit, Compare) Then _
         Err.Raise vbObjectError + 43233, "TestLimitConsecutiveSubstringRepetition", _
         "TestLimitConsecutiveSubstringRepetition failed for: " & vbNewLine & _
-        "vbCompareMethod: " & compare & vbNewLine & _
+        "vbCompareMethod: " & Compare & vbNewLine & _
         "limit: " & limit & vbNewLine & _
         "subStr: " & subStr & _
         "str: " & str
+End Sub
+
+Sub TestLimitConsecutiveSubstringRepetitionB()
+    Dim bytes As String: bytes = HexToString("0x006100610061")
+    Dim subStr As String: subStr = HexToString("0x6100")
+    Debug.Print StringToHex(LimitConsecutiveSubstringRepetition(bytes, subStr, 1))
+    Debug.Print StringToHex(LimitConsecutiveSubstringRepetitionB(bytes, subStr, 0))
 End Sub
 
 Private Sub TestReplaceB()
@@ -434,7 +456,7 @@ Private Sub TestSplitB()
     Dim sFind As String: sFind = HexToString("0x6100")
     Dim v As Variant
     v = SplitB(bytes, sFind)
-    Debug.Print StringToHex(v(0)), StringToHex(v(1)), StringToHex(v(2))
+    Debug.Print StringToHex(CStr(v(0))), StringToHex(CStr(v(1))), StringToHex(CStr(v(2)))
     Stop
     v = Split(bytes, sFind)
     Stop
@@ -633,7 +655,7 @@ End Sub
 Sub teasdfst()
     Dim c As Collection
     Set c = AllCodePages
-    Debug.Print Encode(RandomBytes(1000), cpIso_2022_jp_w_1b_Kana, True, True)
+    Debug.Print Encode(RandomBytes(1000), cpIso_2022_jp_w_1b_Kana, True)
     Debug.Print Err.Number
     
 End Sub
