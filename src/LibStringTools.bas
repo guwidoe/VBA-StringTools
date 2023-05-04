@@ -1972,6 +1972,7 @@ End Function
 '      StrConv(RepeatString(MidB("a", 1, 1), 3), vbUnicode) -> "aaa"
 Public Function RepeatString(ByRef str As String, _
                     Optional ByVal repeatTimes As Long = 2) As String
+    If repeatTimes = 0 Then Exit Function
     If LenB(str) = 2 Then
         RepeatString = String$(repeatTimes, str)
         Exit Function
