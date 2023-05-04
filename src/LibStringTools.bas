@@ -637,17 +637,17 @@ End Function
 'that the conversion is reversible, because sometimes codepoints are replaced
 'with more generic characters that aren't the default character (raise no error)
 'E.g.:Decode(Transcode("³", cpUTF_16, cpUs_ascii, True), cpUs_ascii) returns "3"
-Public Function Transcode(ByRef Str As String, _
+Public Function Transcode(ByRef str As String, _
                           ByVal fromCodePage As CodePageIdentifier, _
                           ByVal toCodePage As CodePageIdentifier, _
                  Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "Transcode"
     'https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/iconv.3.html
     #If Mac Then
-        Dim inBytesLeft As LongPtr:  inBytesLeft = LenB(Str)
+        Dim inBytesLeft As LongPtr:  inBytesLeft = LenB(str)
         Dim outBytesLeft As LongPtr: outBytesLeft = inBytesLeft * 4
         Dim buffer As String:        buffer = Space$(CLng(inBytesLeft) * 2)
-        Dim inBuf As LongPtr:        inBuf = StrPtr(Str)
+        Dim inBuf As LongPtr:        inBuf = StrPtr(str)
         Dim outBuf As LongPtr:       outBuf = StrPtr(buffer)
         Dim cd As LongPtr: cd = GetConversionDescriptor(fromCodePage, toCodePage)
         Dim irrevConvCount As Long
@@ -711,11 +711,11 @@ Public Function Transcode(ByRef Str As String, _
         End If
     #Else
         If toCodePage = cpUTF_16 Then
-            Transcode = Decode(Str, fromCodePage, raiseErrors)
+            Transcode = Decode(str, fromCodePage, raiseErrors)
         ElseIf fromCodePage = cpUTF_16 Then
-            Transcode = Encode(Str, toCodePage, raiseErrors)
+            Transcode = Encode(str, toCodePage, raiseErrors)
         Else
-            Transcode = Encode(Decode(Str, fromCodePage, raiseErrors), _
+            Transcode = Encode(Decode(str, fromCodePage, raiseErrors), _
                                toCodePage, raiseErrors)
         End If
     #End If
@@ -866,7 +866,7 @@ End Function
 '      If you are afraid 'str' might contain invalid UTF-8 data, use it like so:
 '      Decode(str, cpUTF_8, True)
 '      The function will now raise an error if invalid UTF-8 data is encountered
-Public Function Decode(ByRef Str As String, _
+Public Function Decode(ByRef str As String, _
                        ByVal fromCodePage As CodePageIdentifier, _
               Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "Decode"
@@ -874,9 +874,9 @@ Public Function Decode(ByRef Str As String, _
     If fromCodePage = cpUTF_16 Then Err.Raise 5, methodName, _
         "VBA strings are UTF-16 by default. No need to decode string from UTF-16."
 
-    If Str = vbNullString Then Exit Function
+    If str = vbNullString Then Exit Function
     #If Mac Then
-        Decode = Transcode(Str, fromCodePage, cpUTF_16, raiseErrors)
+        Decode = Transcode(str, fromCodePage, cpUTF_16, raiseErrors)
     #Else
         Dim charCount As Long
         Dim dwFlags As Long
@@ -885,8 +885,8 @@ Public Function Decode(ByRef Str As String, _
         If raiseErrors And CodePageAllowsFlags(fromCodePage) Then _
             dwFlags = MB_ERR_INVALID_CHARS
 
-        charCount = MultiByteToWideChar(fromCodePage, dwFlags, StrPtr(Str), _
-                                        LenB(Str), 0, 0)
+        charCount = MultiByteToWideChar(fromCodePage, dwFlags, StrPtr(str), _
+                                        LenB(str), 0, 0)
         If charCount = 0 Then
             Select Case GetApiErrorNumber
                 Case ERROR_NO_UNICODE_TRANSLATION
@@ -908,7 +908,7 @@ Public Function Decode(ByRef Str As String, _
         End If
 
         Decode = Space$(charCount)
-        MultiByteToWideChar fromCodePage, dwFlags, StrPtr(Str), LenB(Str), _
+        MultiByteToWideChar fromCodePage, dwFlags, StrPtr(str), LenB(str), _
                             StrPtr(Decode), charCount
 
         Select Case GetApiErrorNumber
@@ -1017,7 +1017,7 @@ End Function
 '     can be misinterpreted if adjacent to text starting with 0-9 or a-f.
 '   - This function can be slow for very long input strings with many
 '     different literals
-Public Function ReplaceUnicodeLiterals(ByRef Str As String) As String
+Public Function ReplaceUnicodeLiterals(ByRef str As String) As String
     Const PATTERN_UNICODE_LITERALS As String = _
         "\\u000[0-9a-f]{5}|\\u[0-9a-f]{4}|" & _
         "\\u{[0-9a-f]{1,5}}|u\+[0-9|a-f]{4,5}|&#\d{1,6};"
@@ -1028,7 +1028,7 @@ Public Function ReplaceUnicodeLiterals(ByRef Str As String) As String
         .MultiLine = True
         .IgnoreCase = True
         .pattern = PATTERN_UNICODE_LITERALS
-        Set mc = .Execute(Str)
+        Set mc = .Execute(str)
     End With
 
     Dim match As Variant
@@ -1048,10 +1048,10 @@ Public Function ReplaceUnicodeLiterals(ByRef Str As String) As String
         End If
         If codepoint < &H110000 Then
             If codepoint < &HD800& Or codepoint >= &HE000& Then _
-                Str = Replace(Str, mv, ChrU(codepoint))
+                str = Replace(str, mv, ChrU(codepoint))
         End If
     Next match
-    ReplaceUnicodeLiterals = Str
+    ReplaceUnicodeLiterals = str
 End Function
 #End If
 
@@ -1061,16 +1061,16 @@ End Function
 '   \uXXXXXXXX  for characters outside the basic multilingual plane
 'Where:
 '   Xes are the digits of the codepoint in hexadecimal. (X = 0-9 or A-F)
-Public Function EncodeUnicodeCharacters(ByRef Str As String) As String
+Public Function EncodeUnicodeCharacters(ByRef str As String) As String
     Dim codepoint As Long
     Dim i As Long
     Dim j As Long:          j = 1
-    Dim result() As String: ReDim result(1 To Len(Str))
+    Dim result() As String: ReDim result(1 To Len(str))
 
-    For i = 1 To Len(Str)
-        codepoint = AscW(Mid$(Str, i, 1)) And &HFFFF&
+    For i = 1 To Len(str)
+        codepoint = AscW(Mid$(str, i, 1)) And &HFFFF&
 
-        If codepoint >= &HD800& Then codepoint = AscU(Mid$(Str, i, 2))
+        If codepoint >= &HD800& Then codepoint = AscU(Mid$(str, i, 2))
 
         If codepoint > &HFFFF& Then 'Outside BMP
             result(j) = "\u" & "000" & Hex(codepoint)
@@ -1078,7 +1078,7 @@ Public Function EncodeUnicodeCharacters(ByRef Str As String) As String
         ElseIf codepoint > &HFF Then 'BMP
             result(j) = "\u" & Right$("00" & Hex(codepoint), 4)
         Else
-            result(j) = Mid$(Str, i, 1)
+            result(j) = Mid$(str, i, 1)
         End If
         j = j + 1
     Next i
@@ -1660,7 +1660,7 @@ End Function
 
 'Removes all characters from a string (str) that are not in the string inklChars
 'Default inklChars are all alphanumeric characters including dot and space
-Public Function CleanString(ByRef Str As String, _
+Public Function CleanString(ByRef str As String, _
                    Optional ByVal inklChars As String = _
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890. ") _
                             As String
@@ -1668,15 +1668,15 @@ Public Function CleanString(ByRef Str As String, _
     Dim i As Long
     Dim j As Long: j = 1
 
-    For i = 1 To Len(Str)
-        sChr = Mid$(Str, i, 1)
+    For i = 1 To Len(str)
+        sChr = Mid$(str, i, 1)
 
         If InStr(1, inklChars, sChr, vbBinaryCompare) Then
-            Mid$(Str, j, 1) = sChr
+            Mid$(str, j, 1) = sChr
             j = j + 1
         End If
     Next i
-    CleanString = Left$(Str, j - 1)
+    CleanString = Left$(str, j - 1)
 End Function
 
 #If Mac = 0 Then
@@ -1696,16 +1696,16 @@ End Function
 'Removes all non-numeric characters from a string.
 'Keeps only codepoints U+0030 - U+0039 AND ALSO
 'keeps the Unicode "Fullwidth Digits" (U+FF10 - U+FF19)!
-Public Function RemoveNonNumeric(ByVal Str As String) As String
+Public Function RemoveNonNumeric(ByVal str As String) As String
     Dim sChr As String
     Dim i As Long
     Dim j As Long: j = 1
-    For i = 1 To Len(Str)
-        sChr = Mid$(Str, i, 1)
+    For i = 1 To Len(str)
+        sChr = Mid$(str, i, 1)
         If sChr Like "#" Then _
-            Mid$(Str, j, 1) = sChr: j = j + 1
+            Mid$(str, j, 1) = sChr: j = j + 1
     Next i
-    RemoveNonNumeric = Left$(Str, j - 1)
+    RemoveNonNumeric = Left$(str, j - 1)
 End Function
 
 'Inserts a string into another string at a specified position
@@ -1714,31 +1714,31 @@ End Function
 'Insert("abcd", "ff", 3) = "abcffd"
 'Insert("abcd", "ff", 4) = "abcdff"
 'Insert("abcd", "ff", 9) = "abcdff"
-Public Function Insert(ByRef Str As String, _
+Public Function Insert(ByRef str As String, _
                        ByRef strToInsert As String, _
                        ByRef afterPos As Long) As String
     Const methodName As String = "Insert"
     If afterPos < 0 Then Err.Raise 5, methodName, _
         "Argument 'afterPos' = " & afterPos & " < 0, invalid"
 
-    Insert = Mid$(Str, 1, afterPos) & strToInsert & Mid$(Str, afterPos + 1)
+    Insert = Mid$(str, 1, afterPos) & strToInsert & Mid$(str, afterPos + 1)
 End Function
 
 'Works like Insert but interprets 'afterPos' as byte-index, not char-index
 'Inserting at uneven byte positions likely invalidates an utf-16 string!
-Public Function InsertB(ByRef Str As String, _
+Public Function InsertB(ByRef str As String, _
                         ByRef strToInsert As String, _
                         ByRef afterPos As Long) As String
     Const methodName As String = "InsertB"
     If afterPos < 0 Then afterPos = 0
 
-    InsertB = MidB$(Str, 1, afterPos) & strToInsert & MidB$(Str, afterPos + 1)
+    InsertB = MidB$(str, 1, afterPos) & strToInsert & MidB$(str, afterPos + 1)
 End Function
 
 'Counts the number of times a substring exists in a string. Does not count
 'overlapping occurrences of substring.
 'E.g.: CountSubstring("abababab", "abab") -> 2
-Public Function CountSubstring(ByRef Str As String, _
+Public Function CountSubstring(ByRef str As String, _
                                ByRef subStr As String, _
                       Optional ByVal lStart As Long = 1, _
                       Optional ByVal lCompare As VbCompareMethod _
@@ -1748,12 +1748,12 @@ Public Function CountSubstring(ByRef Str As String, _
         "Argument 'Start' = " & lStart & " < 1, invalid"
 
     Dim lenSubStr As Long: lenSubStr = Len(subStr)
-    Dim i As Long:         i = InStr(lStart, Str, subStr, lCompare)
+    Dim i As Long:         i = InStr(lStart, str, subStr, lCompare)
 
     CountSubstring = 0
     Do Until i = 0
         CountSubstring = CountSubstring + 1
-        i = InStr(i + lenSubStr, Str, subStr, lCompare)
+        i = InStr(i + lenSubStr, str, subStr, lCompare)
     Loop
 End Function
 
@@ -1845,7 +1845,7 @@ End Function
 '      LimitConsecutiveSubstringRepetition("aaaabaaac", "a", 2)  -> "aabaac"
 '      LimitConsecutiveSubstringRepetition("aaaabaaac", "ab", 0) -> "aaaaaac"
 Public Function LimitConsecutiveSubstringRepetition( _
-                                           ByRef Str As String, _
+                                           ByRef str As String, _
                                   Optional ByRef subStr As String = vbNewLine, _
                                   Optional ByVal limit As Long = 1, _
                                   Optional ByVal compare As VbCompareMethod _
@@ -1856,16 +1856,16 @@ Public Function LimitConsecutiveSubstringRepetition( _
     If limit < 0 Then Err.Raise 5, methodName, _
         "Argument 'limit' = " & limit & " < 0, invalid"
     If limit = 0 Then
-        LimitConsecutiveSubstringRepetition = Replace(Str, subStr, _
+        LimitConsecutiveSubstringRepetition = Replace(str, subStr, _
                                                       vbNullString, , , compare)
         Exit Function
     Else
-        LimitConsecutiveSubstringRepetition = Str
+        LimitConsecutiveSubstringRepetition = str
     End If
-    If Len(Str) = 0 Then Exit Function
+    If Len(str) = 0 Then Exit Function
     If Len(subStr) = 0 Then Exit Function
 
-    Dim i As Long:                i = InStr(1, Str, subStr, compare)
+    Dim i As Long:                i = InStr(1, str, subStr, compare)
     Dim j As Long:                j = 1
     Dim lenSubStr As Long:        lenSubStr = Len(subStr)
     Dim copyChunkSize As Long:    copyChunkSize = 0
@@ -1881,7 +1881,7 @@ Public Function LimitConsecutiveSubstringRepetition( _
                 copyChunkSize = copyChunkSize + occurrenceDiff
             ElseIf consecutiveCount = limit + 1 Then
                 Mid$(LimitConsecutiveSubstringRepetition, j, copyChunkSize) = _
-                    Mid$(Str, i - copyChunkSize, copyChunkSize)
+                    Mid$(str, i - copyChunkSize, copyChunkSize)
                 j = j + copyChunkSize
                 copyChunkSize = 0
             End If
@@ -1890,12 +1890,12 @@ Public Function LimitConsecutiveSubstringRepetition( _
             consecutiveCount = 1
         End If
         lastOccurrence = i
-        i = InStr(i + lenSubStr, Str, subStr, compare)
+        i = InStr(i + lenSubStr, str, subStr, compare)
     Loop
 
-    copyChunkSize = copyChunkSize + Len(Str) - lastOccurrence - lenSubStr + 1
+    copyChunkSize = copyChunkSize + Len(str) - lastOccurrence - lenSubStr + 1
     Mid$(LimitConsecutiveSubstringRepetition, j, copyChunkSize) = _
-        Mid$(Str, Len(Str) - copyChunkSize + 1)
+        Mid$(str, Len(str) - copyChunkSize + 1)
 
     LimitConsecutiveSubstringRepetition = _
         Left$(LimitConsecutiveSubstringRepetition, j + copyChunkSize - 1)
@@ -1970,9 +1970,8 @@ End Function
 'Works with byte strings of uneven LenB
 'E.g.: RepeatString("a", 3) -> "aaa"
 '      StrConv(RepeatString(MidB("a", 1, 1), 3), vbUnicode) -> "aaa"
-Public Function RepeatString(ByRef Str As String, _
+Public Function RepeatString(ByRef str As String, _
                     Optional ByVal repeatTimes As Long = 2) As String
-<<<<<<< Updated upstream
     If repeatTimes = 0 Then Exit Function
     If LenB(str) = 2 Then
         RepeatString = String$(repeatTimes, str)
@@ -1980,19 +1979,10 @@ Public Function RepeatString(ByRef Str As String, _
     End If
 
     RepeatString = Space$((LenB(str) * repeatTimes + 1) \ 2)
-=======
-    If LenB(Str) = 2 Then
-        RepeatString = String$(repeatTimes, Str)
-        Exit Function
-    End If
-    
-    RepeatString = Space$((LenB(Str) * repeatTimes + 1) \ 2)
->>>>>>> Stashed changes
 
-    If (LenB(Str) * repeatTimes) Mod 2 = 1 Then _
+    If (LenB(str) * repeatTimes) Mod 2 = 1 Then _
         RepeatString = MidB$(RepeatString, 1, LenB(RepeatString) - 1)
 
-<<<<<<< Updated upstream
     Dim totalLen As Long: totalLen = LenB(RepeatString)
     Dim chunkLen As Long: chunkLen = LenB(str)
     Dim i As Long:        i = chunkLen + 1
@@ -2003,36 +1993,30 @@ Public Function RepeatString(ByRef Str As String, _
         i = i + chunkLen
         chunkLen = chunkLen * 2
     Loop
-=======
-    Dim i As Long
-    For i = 1 To LenB(RepeatString) Step LenB(Str)
-        MidB$(RepeatString, i, LenB(Str)) = Str
-    Next i
->>>>>>> Stashed changes
 End Function
 
 'Adds fillerStr to the right side of a string repeatedly until the resulting
 'string reaches length 'Length'
 'E.g.: PadRight("asd", 11, "xyz") -> "asdxyzxyzxy"
-Public Function PadRight(ByRef Str As String, _
+Public Function PadRight(ByRef str As String, _
                          ByVal Length As Long, _
                 Optional ByVal fillerStr As String = " ") As String
-    PadRight = PadRightB(Str, Length * 2, fillerStr)
+    PadRight = PadRightB(str, Length * 2, fillerStr)
 End Function
 
 'Adds fillerStr to the left side of a string repeatedly until the resulting
 'string reaches length 'Length'
 'E.g.: PadLeft("asd", 11, "xyz") -> "yzxyzxyzasd"
-Public Function PadLeft(ByRef Str As String, _
+Public Function PadLeft(ByRef str As String, _
                         ByVal Length As Long, _
                Optional ByVal fillerStr As String = " ") As String
-    PadLeft = PadLeftB(Str, Length * 2, fillerStr)
+    PadLeft = PadLeftB(str, Length * 2, fillerStr)
 End Function
 
 'Adds fillerStr to the right side of a string repeatedly until the resulting
 'string reaches length 'Length' in bytes!
 'E.g.: PadRightB("asd", 16, "xyz") -> "asdxyzxy"
-Public Function PadRightB(ByRef Str As String, _
+Public Function PadRightB(ByRef str As String, _
                           ByVal Length As Long, _
                  Optional ByVal fillerStr As String = " ") As String
     Const methodName As String = "PadRightB"
@@ -2041,17 +2025,17 @@ Public Function PadRightB(ByRef Str As String, _
     If LenB(fillerStr) = 0 Then Err.Raise 5, methodName, _
         "Argument 'fillerStr' = vbNullString, invalid"
 
-    If Length > LenB(Str) Then
+    If Length > LenB(str) Then
         If LenB(fillerStr) = 2 Then
-            PadRightB = Str & String((Length - LenB(Str) + 1) \ 2, fillerStr)
+            PadRightB = str & String((Length - LenB(str) + 1) \ 2, fillerStr)
             If Length Mod 2 = 1 Then _
                 PadRightB = LeftB$(PadRightB, LenB(PadRightB) - 1)
         Else
-            PadRightB = Str & LeftB$(RepeatString(fillerStr, (((Length - _
-                LenB(Str))) + 1) \ LenB(fillerStr) + 1), Length - LenB(Str))
+            PadRightB = str & LeftB$(RepeatString(fillerStr, (((Length - _
+                LenB(str))) + 1) \ LenB(fillerStr) + 1), Length - LenB(str))
         End If
     Else
-        PadRightB = LeftB$(Str, Length)
+        PadRightB = LeftB$(str, Length)
     End If
 End Function
 
@@ -2060,7 +2044,7 @@ End Function
 'Note that this can result in an invalid UTF-16 output for uneven lengths!
 'E.g.: PadLeftB("asd", 16, "xyz") -> "yzxyzasd"
 '      PadLeftB("asd", 11, "xyz") -> "?????"
-Public Function PadLeftB(ByRef Str As String, _
+Public Function PadLeftB(ByRef str As String, _
                          ByVal Length As Long, _
                 Optional ByVal fillerStr As String = " ") As String
     Const methodName As String = "PadLeftB"
@@ -2069,17 +2053,17 @@ Public Function PadLeftB(ByRef Str As String, _
     If LenB(fillerStr) = 0 Then Err.Raise 5, methodName, _
         "Argument 'fillerStr' = vbNullString, invalid"
 
-    If Length > LenB(Str) Then
+    If Length > LenB(str) Then
         If LenB(fillerStr) = 2 Then
-            PadLeftB = String((Length - LenB(Str) + 1) \ 2, fillerStr) & Str
+            PadLeftB = String((Length - LenB(str) + 1) \ 2, fillerStr) & str
             If Length Mod 2 = 1 Then _
                 PadLeftB = RightB$(PadLeftB, LenB(PadLeftB) - 1)
         Else
-            PadLeftB = RightB$(RepeatString(fillerStr, (((Length - LenB(Str))) _
-                          + 1) \ LenB(fillerStr) + 1), Length - LenB(Str)) & Str
+            PadLeftB = RightB$(RepeatString(fillerStr, (((Length - LenB(str))) _
+                          + 1) \ LenB(fillerStr) + 1), Length - LenB(str)) & str
         End If
     Else
-        PadLeftB = RightB$(Str, Length)
+        PadLeftB = RightB$(str, Length)
     End If
 End Function
 
@@ -2136,7 +2120,7 @@ End Function
 'if only one " exists in the string, splits the string into two parts.
 'E.g. SplitUnlessInQuotes("asdf""asdf""asdf""asdf", """") returns
 '    "asdf", "asdf""asdf", and "asdf"
-Public Function SplitUnlessInQuotes(ByRef Str As String, _
+Public Function SplitUnlessInQuotes(ByRef str As String, _
                            Optional ByRef delim As String = " ", _
                            Optional limit As Long = -1) As Variant
     Dim i As Long
@@ -2146,48 +2130,48 @@ Public Function SplitUnlessInQuotes(ByRef Str As String, _
     Dim doSplit As Boolean: doSplit = True
 
     If delim = """" Then 'Handle this special case
-        i = InStr(1, Str, """", vbBinaryCompare)
+        i = InStr(1, str, """", vbBinaryCompare)
         If i <> 0 Then
-            Dim j As Long: j = InStrRev(Str, """", , vbBinaryCompare)
+            Dim j As Long: j = InStrRev(str, """", , vbBinaryCompare)
             If i = j Then
-                SplitUnlessInQuotes = Split(Str, """", , vbBinaryCompare)
+                SplitUnlessInQuotes = Split(str, """", , vbBinaryCompare)
                 Exit Function
             Else
                 ReDim parts(0 To 2)
-                parts(0) = Left$(Str, i - 1)
-                parts(1) = Mid$(Str, i + 1, j)
-                parts(2) = Mid$(Str, j + 1)
+                parts(0) = Left$(str, i - 1)
+                parts(1) = Mid$(str, i + 1, j)
+                parts(2) = Mid$(str, j + 1)
             End If
         Else
-            parts(0) = Str
+            parts(0) = str
         End If
         SplitUnlessInQuotes = parts
         Exit Function
     End If
 
-    For i = 1 To Len(Str)
+    For i = 1 To Len(str)
         If ub = limit - 2 Then
             ub = ub + 1
             ReDim Preserve parts(0 To ub)
-            parts(ub) = Mid$(Str, i)
+            parts(ub) = Mid$(str, i)
             Exit For
         End If
 
-        If Mid$(Str, i, 1) = """" Then
+        If Mid$(str, i, 1) = """" Then
             doSplit = Not doSplit
             If Not doSplit Then _
-                doSplit = InStr(i + 1, Str, """", vbBinaryCompare) = 0
+                doSplit = InStr(i + 1, str, """", vbBinaryCompare) = 0
         End If
 
-        If Mid$(Str, i, Len(delim)) = delim And doSplit Or i = Len(Str) Then
-            If i = Len(Str) Then s = s & Mid$(Str, i, 1)
+        If Mid$(str, i, Len(delim)) = delim And doSplit Or i = Len(str) Then
+            If i = Len(str) Then s = s & Mid$(str, i, 1)
             ub = ub + 1
             ReDim Preserve parts(0 To ub)
             parts(ub) = s
             s = vbNullString
             i = i + Len(delim) - 1
         Else
-            s = s & Mid$(Str, i, 1)
+            s = s & Mid$(str, i, 1)
         End If
     Next i
     SplitUnlessInQuotes = parts

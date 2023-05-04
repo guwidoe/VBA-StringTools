@@ -329,21 +329,21 @@ End Sub
 
 Private Sub TestDifferentWaysOfGettingNumericalValuesFromStrings()
     Dim t As Single:   t = Timer()
-    Dim Str As String: Str = RandomStringAlphanumeric(5000000)
+    Dim str As String: str = RandomStringAlphanumeric(5000000)
 
     Debug.Print "Creating string took " & Timer - t & " seconds"
     
     t = Timer()
-    RemoveNonNumeric Str
+    RemoveNonNumeric str
     Debug.Print "RemoveNonNumeric took " & Timer - t & " seconds"
 
     t = Timer()
-    CleanString Str, "0123456789"
+    CleanString str, "0123456789"
     Debug.Print "CleanString took " & Timer - t & " seconds"
     
     #If Mac = 0 Then
         t = Timer()
-        RegExNumOnly Str
+        RegExNumOnly str
         Debug.Print "RegExNumOnly took " & Timer - t & " seconds"
     #End If
 End Sub
@@ -358,13 +358,13 @@ Private Sub TestHexToString()
 End Sub
 
 
-Public Function LimitConsecutiveSubstringRepetitionCheck(ByVal Str As String, _
+Public Function LimitConsecutiveSubstringRepetitionCheck(ByVal str As String, _
                                            Optional ByVal subStr As String = vbNewLine, _
                                            Optional ByVal limit As Long = 1, _
                                            Optional ByVal compare As VbCompareMethod) _
                                                     As String
     Dim sReplace As String:     sReplace = RepeatString(subStr, limit)
-    Dim sCompare As String:     sCompare = Str
+    Dim sCompare As String:     sCompare = str
     Do
         Dim sFind As String:    sFind = sReplace & subStr
         Do
@@ -377,13 +377,13 @@ Public Function LimitConsecutiveSubstringRepetitionCheck(ByVal Str As String, _
 End Function
 
 
-Public Function LimitConsecutiveSubstringRepetitionCheck2(ByVal Str As String, _
+Public Function LimitConsecutiveSubstringRepetitionCheck2(ByVal str As String, _
                                            Optional ByVal subStr As String = vbNewLine, _
                                            Optional ByVal limit As Long = 1, _
                                            Optional ByVal compare As VbCompareMethod) _
                                                     As String
     Dim sReplace As String:     sReplace = RepeatString(subStr, limit)
-    Dim sCompare As String:     sCompare = Str
+    Dim sCompare As String:     sCompare = str
     Dim sFind As String:        sFind = sReplace & subStr
     Do
         LimitConsecutiveSubstringRepetitionCheck2 = sCompare
@@ -423,18 +423,18 @@ errh:
     End If
 End Sub
 
-Private Sub TestLimitConsecutiveSubstringRepetition(ByVal Str As String, _
+Private Sub TestLimitConsecutiveSubstringRepetition(ByVal str As String, _
                                   Optional ByVal subStr As String = vbNewLine, _
                                   Optional ByVal limit As Long = 1, _
                                   Optional ByVal compare As VbCompareMethod)
-    If LimitConsecutiveSubstringRepetition(Str, subStr, limit, compare) _
-    <> LimitConsecutiveSubstringRepetitionCheck(Str, subStr, limit, compare) Then _
+    If LimitConsecutiveSubstringRepetition(str, subStr, limit, compare) _
+    <> LimitConsecutiveSubstringRepetitionCheck(str, subStr, limit, compare) Then _
         Err.Raise vbObjectError + 43233, "TestLimitConsecutiveSubstringRepetition", _
         "TestLimitConsecutiveSubstringRepetition failed for: " & vbNewLine & _
         "vbCompareMethod: " & compare & vbNewLine & _
         "limit: " & limit & vbNewLine & _
         "subStr: " & subStr & _
-        "str: " & Str
+        "str: " & str
 End Sub
 
 Sub TestLimitConsecutiveSubstringRepetitionB()
