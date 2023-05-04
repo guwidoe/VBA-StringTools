@@ -1036,7 +1036,7 @@ Public Function ReplaceUnicodeLiterals(ByRef str As String) As String
     Dim codepoint As Long
 
     For Each match In mc
-        mv = match.Value
+        mv = match.value
         If Left$(mv, 1) = "&" Then
             codepoint = CLng(Mid$(mv, 3, Len(mv) - 3))
         Else
@@ -1972,6 +1972,11 @@ End Function
 '      StrConv(RepeatString(MidB("a", 1, 1), 3), vbUnicode) -> "aaa"
 Public Function RepeatString(ByRef str As String, _
                     Optional ByVal repeatTimes As Long = 2) As String
+    If LenB(str) = 2 Then
+        RepeatString = String$(repeatTimes, str)
+        Exit Function
+    End If
+    
     RepeatString = Space$((LenB(str) * repeatTimes + 1) \ 2)
 
     If (LenB(str) * repeatTimes) Mod 2 = 1 Then _

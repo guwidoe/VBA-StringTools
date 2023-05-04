@@ -358,7 +358,7 @@ Private Sub TestHexToString()
 End Sub
 
 
-Private Function LimitConsecutiveSubstringRepetitionCheck(ByVal str As String, _
+Public Function LimitConsecutiveSubstringRepetitionCheck(ByVal str As String, _
                                            Optional ByVal subStr As String = vbNewLine, _
                                            Optional ByVal limit As Long = 1, _
                                            Optional ByVal compare As VbCompareMethod) _
@@ -376,8 +376,6 @@ Private Function LimitConsecutiveSubstringRepetitionCheck(ByVal str As String, _
     Loop Until sFind = sReplace & subStr & subStr
 End Function
 
-<<<<<<< Updated upstream
-=======
 
 Public Function LimitConsecutiveSubstringRepetitionCheck2(ByVal str As String, _
                                            Optional ByVal subStr As String = vbNewLine, _
@@ -393,7 +391,6 @@ Public Function LimitConsecutiveSubstringRepetitionCheck2(ByVal str As String, _
     Loop Until sCompare = LimitConsecutiveSubstringRepetitionCheck2
 End Function
 
->>>>>>> Stashed changes
 Sub RunLimitConsecutiveSubstringRepetitionTests()
     Dim failedTests As Long
     On Error GoTo errh:
@@ -440,6 +437,13 @@ Private Sub TestLimitConsecutiveSubstringRepetition(ByVal str As String, _
         "str: " & str
 End Sub
 
+Sub TestLimitConsecutiveSubstringRepetitionB()
+    Dim bytes As String: bytes = HexToString("0x006100610061")
+    Dim subStr As String: subStr = HexToString("0x6100")
+    Debug.Print StringToHex(LimitConsecutiveSubstringRepetition(bytes, subStr, 1))
+    Debug.Print StringToHex(LimitConsecutiveSubstringRepetitionB(bytes, subStr, 0))
+End Sub
+
 Private Sub TestReplaceB()
     Dim bytes As String: bytes = HexToString("0x006100610061")
     Dim sFind As String: sFind = HexToString("0x6100")
@@ -452,7 +456,7 @@ Private Sub TestSplitB()
     Dim sFind As String: sFind = HexToString("0x6100")
     Dim v As Variant
     v = SplitB(bytes, sFind)
-    Debug.Print StringToHex(v(0)), StringToHex(v(1)), StringToHex(v(2))
+    Debug.Print StringToHex(CStr(v(0))), StringToHex(CStr(v(1))), StringToHex(CStr(v(2)))
     Stop
     v = Split(bytes, sFind)
     Stop
@@ -651,7 +655,7 @@ End Sub
 Sub teasdfst()
     Dim c As Collection
     Set c = AllCodePages
-    Debug.Print Encode(RandomBytes(1000), cpIso_2022_jp_w_1b_Kana, True, True)
+    Debug.Print Encode(RandomBytes(1000), cpIso_2022_jp_w_1b_Kana, True)
     Debug.Print Err.Number
     
 End Sub
