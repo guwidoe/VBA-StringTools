@@ -1976,16 +1976,22 @@ Public Function RepeatString(ByRef str As String, _
         RepeatString = String$(repeatTimes, str)
         Exit Function
     End If
-    
+
     RepeatString = Space$((LenB(str) * repeatTimes + 1) \ 2)
 
     If (LenB(str) * repeatTimes) Mod 2 = 1 Then _
         RepeatString = MidB$(RepeatString, 1, LenB(RepeatString) - 1)
 
-    Dim i As Long
-    For i = 1 To LenB(RepeatString) Step LenB(str)
-        MidB$(RepeatString, i, LenB(str)) = str
-    Next i
+    Dim totalLen As Long: totalLen = LenB(RepeatString)
+    Dim chunkLen As Long: chunkLen = LenB(str)
+    Dim i As Long:        i = chunkLen + 1
+    '
+    MidB$(RepeatString, 1, chunkLen) = str
+    Do Until i > totalLen
+        MidB$(RepeatString, i, chunkLen) = RepeatString
+        i = i + chunkLen
+        chunkLen = chunkLen * 2
+    Loop
 End Function
 
 'Adds fillerStr to the right side of a string repeatedly until the resulting
