@@ -376,6 +376,24 @@ Private Function LimitConsecutiveSubstringRepetitionCheck(ByVal str As String, _
     Loop Until sFind = sReplace & subStr & subStr
 End Function
 
+<<<<<<< Updated upstream
+=======
+
+Public Function LimitConsecutiveSubstringRepetitionCheck2(ByVal str As String, _
+                                           Optional ByVal subStr As String = vbNewLine, _
+                                           Optional ByVal limit As Long = 1, _
+                                           Optional ByVal compare As VbCompareMethod) _
+                                                    As String
+    Dim sReplace As String:     sReplace = RepeatString(subStr, limit)
+    Dim sCompare As String:     sCompare = str
+    Dim sFind As String:        sFind = sReplace & subStr
+    Do
+        LimitConsecutiveSubstringRepetitionCheck2 = sCompare
+        sCompare = Replace(sCompare, sFind, sReplace, , , compare)
+    Loop Until sCompare = LimitConsecutiveSubstringRepetitionCheck2
+End Function
+
+>>>>>>> Stashed changes
 Sub RunLimitConsecutiveSubstringRepetitionTests()
     Dim failedTests As Long
     On Error GoTo errh:
