@@ -1087,20 +1087,16 @@ End Function
 
 'Returns the given unicode codepoint as standard VBA UTF-16LE string
  Public Function ChrU(ByVal codepoint As Long, _
-             Optional ByVal allowSingleSurrogates As Boolean = False) _
-                      As String
+             Optional ByVal allowSingleSurrogates As Boolean = False) As String
     Const methodName As String = "ChrU"
 
-    If codepoint < &H8000 Then Err.Raise 5, methodName, _
-        "Argument 'codepoint' = " & codepoint & " < -32768, invalid"
-
+    If codepoint < &H8000 Then Err.Raise 5, methodName, "Codepoint < -32768"
     If codepoint < 0 Then codepoint = codepoint And &HFFFF& 'Incase of uInt input
 
     If codepoint < &HD800& Then
         ChrU = ChrW$(codepoint)
     ElseIf codepoint < &HE000& And Not allowSingleSurrogates Then
-        Err.Raise 5, methodName, _
-            "Invalid Unicode codepoint. (Range reserved for surrogate pairs)"
+        Err.Raise 5, methodName, "Range reserved for surrogate pairs"
     ElseIf codepoint < &H10000 Then
         ChrU = ChrW$(codepoint)
     ElseIf codepoint < &H110000 Then
