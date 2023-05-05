@@ -1116,22 +1116,11 @@ End Function
 'Note: One unicode character can consist of two VBA "characters", a so-called
 '      "surrogate pair" (input string of length 2, so Len(char) = 2!)
 Public Function AscU(ByRef char As String) As Long
-    Dim s As String
-    Dim lo As Long
-    Dim hi As Long
-
-    If Len(char) = 1 Then
-        AscU = AscW(char) And &HFFFF&
-    Else
-        s = Left$(char, 2)
-        hi = AscW(Mid$(s, 1, 1)) And &HFFFF&
-        lo = AscW(Mid$(s, 2, 1)) And &HFFFF&
-
-        If &HDC00& > lo Or lo > &HDFFF& Then
-            AscU = hi
-            Exit Function
-        End If
-        AscU = (hi - &HD800&) * &H400& + (lo - &HDC00&) + &H10000
+    AscU = AscW(char) And &HFFFF&
+    If Len(char) > 1 Then
+        Dim lo As Long: lo = AscW(Mid$(char, 2, 1)) And &HFFFF&
+        If &HDC00& > lo Or lo > &HDFFF& Then Exit Function
+        AscU = (AscU - &HD800&) * &H400& + (lo - &HDC00&) + &H10000
     End If
 End Function
 
