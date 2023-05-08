@@ -401,14 +401,14 @@ Sub RunLimitConsecutiveSubstringRepetitionTests()
     TestLimitConsecutiveSubstringRepetition "aaaaababaca", "ab", 1
     TestLimitConsecutiveSubstringRepetition "bbbaaababbb", "ab", 1
     TestLimitConsecutiveSubstringRepetition _
-        ReplaceUnicodeLiterals("\u6100\u6100\u6100"), "a", 1
+        UnescapeUnicode("\u6100\u6100\u6100"), "a", 1
     'Add more tests here
-    Debug.Print ReplaceUnicodeLiterals("\u6100\u6100\u6100")
-    Debug.Print LenB(ReplaceUnicodeLiterals("\u6100\u6100\u6100"))
+    Debug.Print UnescapeUnicode("\u6100\u6100\u6100")
+    Debug.Print LenB(UnescapeUnicode("\u6100\u6100\u6100"))
     Debug.Print LimitConsecutiveSubstringRepetition( _
-                    ReplaceUnicodeLiterals("\u6100\u6100\u6100"), "a", 1)
+                    UnescapeUnicode("\u6100\u6100\u6100"), "a", 1)
     Debug.Print LenB(LimitConsecutiveSubstringRepetition( _
-                    ReplaceUnicodeLiterals("\u6100\u6100\u6100"), "a", 1))
+                    UnescapeUnicode("\u6100\u6100\u6100"), "a", 1))
                     
     If failedTests = 0 Then _
         Debug.Print "LimitConsecutiveSubstringRepetition PASSED all tests"

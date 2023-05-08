@@ -28,7 +28,7 @@ Attribute VB_Name = "LibStringTools"
 '===============================================================================
 
 'TODO:
-'Make ReplaceUnicodeLiterals Mac compatible by removing Regex
+'Make UnescapeUnicode Mac compatible by removing Regex
 
 Option Explicit
 Option Base 0
@@ -1017,26 +1017,23 @@ End Function
 '     can be misinterpreted if adjacent to text starting with 0-9 or a-f.
 '   - This function can be slow for very long input strings with many
 '     different literals
-Public Function ReplaceUnicodeLiterals(ByRef str As String) As String
+Public Function UnescapeUnicode(ByRef str As String) As String
     Const PATTERN_UNICODE_LITERALS As String = _
         "\\u000[0-9a-f]{5}|\\u[0-9a-f]{4}|" & _
         "\\u{[0-9a-f]{1,5}}|u\+[0-9|a-f]{4,5}|&#\d{1,6};"
-    Dim mc As Object
-
+    
     With CreateObject("VBScript.RegExp")
         .Global = True
         .MultiLine = True
         .IgnoreCase = True
         .pattern = PATTERN_UNICODE_LITERALS
-        Set mc = .Execute(str)
+        Dim mc As Object: Set mc = .Execute(str)
     End With
 
     Dim match As Variant
-    Dim mv As String
     Dim codepoint As Long
-
     For Each match In mc
-        mv = match.value
+        Dim mv As String: mv = match.value
         If Left$(mv, 1) = "&" Then
             codepoint = CLng(Mid$(mv, 3, Len(mv) - 3))
         Else
@@ -1051,17 +1048,19 @@ Public Function ReplaceUnicodeLiterals(ByRef str As String) As String
                 str = Replace(str, mv, ChrU(codepoint))
         End If
     Next match
-    ReplaceUnicodeLiterals = str
+    UnescapeUnicode = str
 End Function
 #End If
 
-'Replaces all occurences of unicode characters outside the ANSI codePoint range
-'(which the VBA-IDE can not display) with literals of the following formattings:
+'Replaces all occurences of unicode characters outside the codePoint range
+'defined by maxNonEncodedCharCode with literals of the following formattings:
 '   \uXXXX      for characters inside the basic multilingual plane
 '   \uXXXXXXXX  for characters outside the basic multilingual plane
 'Where:
 '   Xes are the digits of the codepoint in hexadecimal. (X = 0-9 or A-F)
-Public Function EncodeUnicodeCharacters(ByRef str As String) As String
+Public Function EscapeUnicode(ByRef str As String, _
+                     Optional ByVal maxNonEncodedCharCode As Long = &HFF) _
+                              As String
     Dim codepoint As Long
     Dim i As Long
     Dim j As Long:          j = 1
@@ -1075,14 +1074,14 @@ Public Function EncodeUnicodeCharacters(ByRef str As String) As String
         If codepoint > &HFFFF& Then 'Outside BMP
             result(j) = "\u" & "000" & Hex(codepoint)
             i = i + 1
-        ElseIf codepoint > &HFF Then 'BMP
+        ElseIf codepoint > maxNonEncodedCharCode Then 'BMP
             result(j) = "\u" & Right$("00" & Hex(codepoint), 4)
         Else
             result(j) = Mid$(str, i, 1)
         End If
         j = j + 1
     Next i
-    EncodeUnicodeCharacters = Join(result, "")
+    EscapeUnicode = Join(result, "")
 End Function
 
 'Returns the given unicode codepoint as standard VBA UTF-16LE string

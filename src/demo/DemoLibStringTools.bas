@@ -55,13 +55,13 @@ Sub DemonstrateHexString()
     Debug.Assert s = ThisWorkbook.Worksheets("Sheet1").Cells(1, 1)
 
     'Convert all characters outside the ANSI range to Unicode literals:
-    s = EncodeUnicodeCharacters(s)
+    s = EscapeUnicode(s)
     
     'Print the encoded string
     Debug.Print s
     
     'Convert back and check if it stayed the same
-    s = ReplaceUnicodeLiterals(s)
+    s = UnescapeUnicode(s)
     Debug.Assert s = ThisWorkbook.Worksheets("Sheet1").Cells(1, 1)
 End Sub
 
