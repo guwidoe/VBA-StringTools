@@ -1000,6 +1000,38 @@ Public Function StringToHex(ByRef s As String) As String
     Next i
 End Function
 
+'Replaces all occurences of unicode characters outside the codePoint range
+'defined by maxNonEncodedCharCode with literals of the following formattings:
+'   \uXXXX      for characters inside the basic multilingual plane
+'   \uXXXXXXXX  for characters outside the basic multilingual plane
+'Where:
+'   Xes are the digits of the codepoint in hexadecimal. (X = 0-9 or A-F)
+Public Function EscapeUnicode(ByRef str As String, _
+                     Optional ByVal maxNonEncodedCharCode As Long = &HFF) _
+                              As String
+    Dim codepoint As Long
+    Dim i As Long
+    Dim j As Long:          j = 1
+    Dim result() As String: ReDim result(1 To Len(str))
+
+    For i = 1 To Len(str)
+        codepoint = AscW(Mid$(str, i, 1)) And &HFFFF&
+
+        If codepoint >= &HD800& Then codepoint = AscU(Mid$(str, i, 2))
+
+        If codepoint > &HFFFF& Then 'Outside BMP
+            result(j) = "\u" & "000" & Hex(codepoint)
+            i = i + 1
+        ElseIf codepoint > maxNonEncodedCharCode Then 'BMP
+            result(j) = "\u" & Right$("00" & Hex(codepoint), 4)
+        Else
+            result(j) = Mid$(str, i, 1)
+        End If
+        j = j + 1
+    Next i
+    EscapeUnicode = Join(result, "")
+End Function
+
 #If Mac = 0 Then
 'Replaces all occurences of unicode literals
 'Accepts the following formattings:
@@ -1052,40 +1084,8 @@ Public Function UnescapeUnicode(ByRef str As String) As String
 End Function
 #End If
 
-'Replaces all occurences of unicode characters outside the codePoint range
-'defined by maxNonEncodedCharCode with literals of the following formattings:
-'   \uXXXX      for characters inside the basic multilingual plane
-'   \uXXXXXXXX  for characters outside the basic multilingual plane
-'Where:
-'   Xes are the digits of the codepoint in hexadecimal. (X = 0-9 or A-F)
-Public Function EscapeUnicode(ByRef str As String, _
-                     Optional ByVal maxNonEncodedCharCode As Long = &HFF) _
-                              As String
-    Dim codepoint As Long
-    Dim i As Long
-    Dim j As Long:          j = 1
-    Dim result() As String: ReDim result(1 To Len(str))
-
-    For i = 1 To Len(str)
-        codepoint = AscW(Mid$(str, i, 1)) And &HFFFF&
-
-        If codepoint >= &HD800& Then codepoint = AscU(Mid$(str, i, 2))
-
-        If codepoint > &HFFFF& Then 'Outside BMP
-            result(j) = "\u" & "000" & Hex(codepoint)
-            i = i + 1
-        ElseIf codepoint > maxNonEncodedCharCode Then 'BMP
-            result(j) = "\u" & Right$("00" & Hex(codepoint), 4)
-        Else
-            result(j) = Mid$(str, i, 1)
-        End If
-        j = j + 1
-    Next i
-    EscapeUnicode = Join(result, "")
-End Function
-
 'Returns the given unicode codepoint as standard VBA UTF-16LE string
- Public Function ChrU(ByVal codepoint As Long, _
+Public Function ChrU(ByVal codepoint As Long, _
              Optional ByVal allowSingleSurrogates As Boolean = False) As String
     Const methodName As String = "ChrU"
 
@@ -1810,7 +1810,8 @@ Public Function ReplaceB(ByRef bytes As String, _
 
     Do Until i = 0 Or count > lCount
         Dim diff As Long: diff = i - lastOccurrence
-        MidB$(ReplaceB, j, diff) = MidB$(bytes, lastOccurrence, diff)
+        If diff > 0 Then _
+            MidB$(ReplaceB, j, diff) = MidB$(bytes, lastOccurrence, diff)
         j = j + diff
         If lenBReplace <> 0 Then
             MidB$(ReplaceB, j, lenBReplace) = sReplace
@@ -1820,7 +1821,7 @@ Public Function ReplaceB(ByRef bytes As String, _
         lastOccurrence = i + lenBFind
         i = InStrB(lastOccurrence, bytes, sFind, lCompare)
     Loop
-    MidB$(ReplaceB, j) = MidB$(bytes, lastOccurrence)
+    If j <= LenB(ReplaceB) Then MidB$(ReplaceB, j) = MidB$(bytes, lastOccurrence)
 End Function
 
 'Replaces repeated occurrences of consecutive 'substring' with a single one
@@ -2097,7 +2098,7 @@ End Function
 'Splits a string at every occurrence of the specified delimiter "delim", unless
 'that delimiter occurs between non-escaped quotes. e.g. (" asf delim asdf ")
 'will not be split. Quotes will not be removed.
-'Quotes can be excaped by repetition.
+'Quotes can be escaped by repetition.
 'E.g.: SplitUnlessInQuotes("Hello "" ""World" "Goodbye World") returns
 '      "Hello "" "" World", and "Goodbye World"
 'If " is chosen as delimiter, splits at the outermost two occurrences of ", or
