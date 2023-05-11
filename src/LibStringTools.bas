@@ -1020,7 +1020,7 @@ Public Function EscapeUnicode(ByRef str As String, _
         If codepoint >= &HD800& Then codepoint = AscU(Mid$(str, i, 2))
 
         If codepoint > &HFFFF& Then 'Outside BMP
-            result(j) = "\u" & "000" & Hex(codepoint)
+            result(j) = "\u" & "00" & Right$("0" & Hex(codepoint), 6)
             i = i + 1
         ElseIf codepoint > maxNonEncodedCharCode Then 'BMP
             result(j) = "\u" & Right$("00" & Hex(codepoint), 4)
@@ -1051,7 +1051,7 @@ End Function
 '     different literals
 Public Function UnescapeUnicode(ByRef str As String) As String
     Const PATTERN_UNICODE_LITERALS As String = _
-        "\\u000[0-9a-f]{5}|\\u[0-9a-f]{4}|" & _
+        "\\u00[01][0-9a-f]{5}|\\u[0-9a-f]{4}|" & _
         "\\u{[0-9a-f]{1,5}}|u\+[0-9|a-f]{4,5}|&#\d{1,6};"
     
     With CreateObject("VBScript.RegExp")
