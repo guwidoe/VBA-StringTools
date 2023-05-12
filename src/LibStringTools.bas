@@ -1016,11 +1016,20 @@ Public Function StringToHex(ByRef s As String) As String
 End Function
 
 'Replaces all occurences of unicode characters outside the codePoint range
-'defined by maxNonEncodedCharCode with literals of the following formattings:
-'   \uXXXX      for characters inside the basic multilingual plane
-'   \uXXXXXXXX  for characters outside the basic multilingual plane
+'defined by maxNonEncodedCharCode with literals of the following formats
+'specified by `escapeFormat`:
+'   efPython = 1 ... \uXXXX \u000XXXXX    (4 or 8 hex digits, 8 for chars outside BMP)
+'   efRust   = 2 ... \u{XXXX} \U{XXXXXXX} (1 to 6 hex digits)
+'   efUPlus  = 4 ... u+XXXX u+XXXXXX      (4 or 6 hex digits)
+'   efMarkup = 8 ... &#ddddddd;           (1 to 7 decimal digits)
+'Where:
+'   - prefixes \u is case insensitive
+'   - X = 0-9 or a-f or A-F (also case insensitive)
 'Where:
 '   Xes are the digits of the codepoint in hexadecimal. (X = 0-9 or A-F)
+'Note:
+'   - If `escapeFormat` is set to efAll, it will replace every character in the
+'     scope with a randomly chosen format of the 4 available fotrmats.
 Public Function EscapeUnicode(ByRef str As String, _
                      Optional ByVal maxNonEncodedCharCode As Long = &HFF, _
                      Optional ByVal escapeType As UnicodeEscapeFormat _
@@ -1063,21 +1072,24 @@ Public Function EscapeUnicode(ByRef str As String, _
 End Function
 
 'Replaces all occurences of unicode literals
-'Accepts the following formattings:
-'   \uXXXX \u000XXXXX    (4 or 8 hex digits, 8 for chars outside BMP)
-'   \u{XXXX} \U{XXXXXXX} (1 to 6 hex digits)
-'   u+XXXX u+XXXXXX      (4 or 6 hex digits)
-'   &#ddddddd;           (1 to 7 decimal digits)
+'Accepts the following formattings `escapeFormat`:
+'   efPython = 1 ... \uXXXX \u000XXXXX    (4 or 8 hex digits, 8 for chars outside BMP)
+'   efRust   = 2 ... \u{XXXX} \U{XXXXXXX} (1 to 6 hex digits)
+'   efUPlus  = 4 ... u+XXXX u+XXXXXX      (4 or 6 hex digits)
+'   efMarkup = 8 ... &#ddddddd;           (1 to 7 decimal digits)
 'Where:
 '   - prefixes \u is case insensitive
 '   - X = 0-9 or a-f or A-F (also case insensitive)
 'Example:
-'   - "abcd &#97;u+0062\U0063xy\u{64}" returns "abcd abcxyd"
+'   - "abcd &#97;u+0062\U0063xy\u{64}", efAll returns "abcd abcxyd"
 'Notes:
 '   - Avoid u+XXXX syntax if string contains literals without delimiters as it
 '     can be misinterpreted if adjacent to text starting with 0-9 or a-f.
-'   - This function can be slow for very long input strings with many
-'     different literals
+'   - This function also accepts all combinations of UnicodeEscapeFormats:
+'       E.g.:
+'UnescapeUnicode("abcd &#97;u+0062\U0063xy\u{64}", efMarkup Or efRust)
+'       will return:
+'"abcd au+0062\U0063xyd"
 Public Function UnescapeUnicode(ByRef str As String, _
                        Optional ByVal escapeFormat As UnicodeEscapeFormat _
                                                     = efAll) As String
