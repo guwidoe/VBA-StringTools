@@ -1127,9 +1127,19 @@ End Function
 'UnescapeUnicode("abcd &#97;u+0062\U0063xy\u{64}", efMarkup Or efRust)
 '       will return:
 '"abcd au+0062\U0063xyd"
+'   - By default, this function will not invalidate UTF-16 strings if they are
+'     currently valid, but this can happen if `allowSingleSurrogates = True`
+'     E.g.: EscapeUnicode(ChrU(&HD801&, True)) returns "\uD801", but this string
+'     can no longer be un-escaped with UnescapeUnicode because "\uD801"
+'     represents a surrogate halve which is invalid unicode on its own.
+'     So UnescapeUnicode("\uD801") returns "\uD801" again, unless called with
+'     the optional parameter `allowSingleSurrogates = False` like this
+'     `UnescapeUnicode("\uD801", , True)`. This will return invalid UTF-16.
 Public Function UnescapeUnicode(ByRef str As String, _
                        Optional ByVal escapeFormat As UnicodeEscapeFormat _
-                                                    = efAll) As String
+                                                    = efAll, _
+                       Optional ByVal allowSingleSurrogates As Boolean = False) _
+                                As String
     Const methodName As String = "EscapeUnicode"
     If escapeFormat < 1 Or escapeFormat > efAll Then Err.Raise 5, methodName, _
         "Invalid escape format."
@@ -1139,10 +1149,11 @@ Public Function UnescapeUnicode(ByRef str As String, _
     For i = 0 To (Log(efAll + 1) / Log(2)) - 1
         nextEscape(i).Format = 2 ^ i
     Next i
-    If escapeFormat And efPython Then NextPythonEscape nextEscape(0), str
-    If escapeFormat And efRust Then NextRustEscape nextEscape(1), str
-    If escapeFormat And efUPlus Then NextUPlusEscape nextEscape(2), str
-    If escapeFormat And efMarkup Then NextMarkupEscape nextEscape(3), str
+    Dim ass As Boolean: ass = allowSingleSurrogates 'Just for shorter var name
+    If escapeFormat And efPython Then NextPythonEscape nextEscape(0), str, ass
+    If escapeFormat And efRust Then NextRustEscape nextEscape(1), str, ass
+    If escapeFormat And efUPlus Then NextUPlusEscape nextEscape(2), str, ass
+    If escapeFormat And efMarkup Then NextMarkupEscape nextEscape(3), str, ass
     For i = 0 To (Log(efAll + 1) / Log(2)) - 1
         If nextEscape(i).Position = 0 Then nextEscape(i).Position = &H7FFFFFFF
     Next i
@@ -1182,10 +1193,10 @@ Public Function UnescapeUnicode(ByRef str As String, _
         nextEscape(0).Position = lastPosOld
         
         Select Case nextEscape(0).Format
-            Case efPython: NextPythonEscape nextEscape(0), str
-            Case efRust: NextRustEscape nextEscape(0), str
-            Case efUPlus: NextUPlusEscape nextEscape(0), str
-            Case efMarkup: NextMarkupEscape nextEscape(0), str
+            Case efPython: NextPythonEscape nextEscape(0), str, ass
+            Case efRust: NextRustEscape nextEscape(0), str, ass
+            Case efUPlus: NextUPlusEscape nextEscape(0), str, ass
+            Case efMarkup: NextMarkupEscape nextEscape(0), str, ass
         End Select
         
         If nextEscape(0).Position = &H7FFFFFFF Then _
@@ -1204,7 +1215,8 @@ Public Function UnescapeUnicode(ByRef str As String, _
                 End If
             Next i
             If nextEscape(UBound(nextEscape)).Position = &H7FFFFFFF Then _
-                ReDim Preserve nextEscape(LBound(nextEscape) To UBound(nextEscape) - 1)
+                ReDim Preserve nextEscape(LBound(nextEscape) To _
+                                          UBound(nextEscape) - 1)
         End If
     Loop
     diff = Len(str) - lastPosOld + 1
@@ -1212,7 +1224,9 @@ Public Function UnescapeUnicode(ByRef str As String, _
                                             Mid$(str, lastPosOld, diff)
     UnescapeUnicode = Left$(UnescapeUnicode, lastPosNew + diff - 1)
 End Function
-Private Sub NextPythonEscape(ByRef escape As EscapeSequence, ByRef str As String)
+Private Sub NextPythonEscape(ByRef escape As EscapeSequence, _
+                             ByRef str As String, _
+                             ByVal ass As Boolean)
     Const PYTHON_ESCAPE_PATTERN_NOT_BMP As String = _
         "\[Uu]00[01][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]"
     Const PYTHON_ESCAPE_PATTERN_BMP As String = _
@@ -1261,15 +1275,17 @@ Private Sub NextPythonEscape(ByRef escape As EscapeSequence, ByRef str As String
 CheckCodepoint:
     If codepoint < &H110000 Then
 CheckNoSingleSurrogate:
-        If codepoint < &HD800& Or codepoint >= &HE000& Then
+        If codepoint < &HD800& Or codepoint >= &HE000& Or ass Then
             escape.Length = Len(potentialEscape)
-            escape.unescapedStr = ChrU(codepoint)
+            escape.unescapedStr = ChrU(codepoint, ass)
             Exit Sub
         End If
     End If
     Return
 End Sub
-Private Sub NextRustEscape(ByRef escape As EscapeSequence, ByRef str As String)
+Private Sub NextRustEscape(ByRef escape As EscapeSequence, _
+                           ByRef str As String, _
+                           ByVal ass As Boolean)
     Const RUST_ESCAPE_PATTERN_BASE As String = ""
     Const RUST_ESCAPE_PATTERN_1_DIGIT As String = "\[Uu]{[0-9A-Fa-f]}"
     Const RUST_ESCAPE_PATTERN_2_DIGITS As String = _
@@ -1346,14 +1362,16 @@ CheckCodepoint:
     escape.Length = Len(potentialEscape)
     codepoint = CLng("&H" & Mid$(potentialEscape, 4, escape.Length - 4))
     If codepoint < &H110000 Then
-        If codepoint < &HD800& Or codepoint >= &HE000& Then
-            escape.unescapedStr = ChrU(codepoint)
+        If codepoint < &HD800& Or codepoint >= &HE000& Or ass Then
+            escape.unescapedStr = ChrU(codepoint, ass)
             Exit Sub
         End If
     End If
     Return
 End Sub
-Private Sub NextUPlusEscape(ByRef escape As EscapeSequence, ByRef str As String)
+Private Sub NextUPlusEscape(ByRef escape As EscapeSequence, _
+                            ByRef str As String, _
+                            ByVal ass As Boolean)
     Const UPLUS_ESCAPE_PATTERN_4_DIGITS As String = _
         "[Uu]+[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]"
     Const UPLUS_ESCAPE_PATTERN_5_DIGITS As String = _
@@ -1404,14 +1422,16 @@ CheckCodepoint:
     escape.Length = Len(potentialEscape)
     codepoint = CLng("&H" & Mid$(potentialEscape, 3))
     If codepoint < &H110000 Then
-        If codepoint < &HD800& Or codepoint >= &HE000& Then
-            escape.unescapedStr = ChrU(codepoint)
+        If codepoint < &HD800& Or codepoint >= &HE000& Or ass Then
+            escape.unescapedStr = ChrU(codepoint, ass)
             Exit Sub
         End If
     End If
     Return
 End Sub
-Private Sub NextMarkupEscape(ByRef escape As EscapeSequence, ByRef str As String)
+Private Sub NextMarkupEscape(ByRef escape As EscapeSequence, _
+                             ByRef str As String, _
+                             ByVal ass As Boolean)
     Const MARKUP_ESCAPE_PATTERN_1_DIGIT As String = "&[#]#;"
     Const MARKUP_ESCAPE_PATTERN_2_DIGITS As String = "&[#]##;"
     Const MARKUP_ESCAPE_PATTERN_3_DIGITS As String = "&[#]###;"
@@ -1470,8 +1490,8 @@ CheckCodepoint:
     escape.Length = Len(potentialEscape)
     codepoint = CLng(Mid$(potentialEscape, 3, escape.Length - 3))
     If codepoint < &H110000 Then
-        If codepoint < &HD800& Or codepoint >= &HE000& Then
-            escape.unescapedStr = ChrU(codepoint)
+        If codepoint < &HD800& Or codepoint >= &HE000& Or ass Then
+            escape.unescapedStr = ChrU(codepoint, ass)
             Exit Sub
         End If
     End If
