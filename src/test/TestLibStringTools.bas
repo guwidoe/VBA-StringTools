@@ -80,12 +80,12 @@ Private Function GetFrequency() As Currency
 End Function
 
 'Returns time since system startup in seconds with 0.1ms (=100µs) precision
-Public Function AccurateTimer() As Currency
+Private Function AccurateTimer() As Currency
     AccurateTimer = GetTickCount / GetFrequency
 End Function
 
 'Returns time since system startup in milliseconds with 0.1µs (=100ns) precision
-Public Function AccurateTimerMs() As Currency
+Private Function AccurateTimerMs() As Currency
     'Note that this calculation will work even if 1000@ / GetFrequency < 0.0001
     AccurateTimerMs = (1000@ / GetFrequency) * GetTickCount
 End Function
@@ -93,7 +93,7 @@ End Function
 'Returns time since system startup in microseconds, up to 0.1ns =100ps precision
 'The highest precision achieved by this function depends on the system, however,
 'typically precision will be the same as for AccurateTimerMs.
-Public Function AccurateTimerUs() As Currency
+Private Function AccurateTimerUs() As Currency
     AccurateTimerUs = (1000000@ / GetFrequency) * GetTickCount
 End Function
 

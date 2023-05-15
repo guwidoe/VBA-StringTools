@@ -104,6 +104,8 @@ Private Const INT_SIZE As Long = 2
 
 Private Type EscapeSequence
     Position As Long
+    PosUCase As Long 'Next escape like "\U1234"
+    PosLCase As Long 'Next escape like "\u1234"
     Length As Long
     Format As UnicodeEscapeFormat
     unescapedStr As String
@@ -1069,7 +1071,7 @@ Public Function EscapeUnicode(ByRef str As String, _
                     If codepoint > &HFFFF& Then 'Outside BMP
                         result(j) = "\u" & "00" & Right$("0" & Hex(codepoint), 6)
                     Else 'BMP
-                        result(j) = "\u" & Right$("00" & Hex(codepoint), 4)
+                        result(j) = "\u" & Right$("000" & Hex(codepoint), 4)
                     End If
                 Case efRust
                     result(j) = "\u{" & Hex(codepoint) & "}"
@@ -1082,8 +1084,15 @@ Public Function EscapeUnicode(ByRef str As String, _
                 Case efMarkup
                     result(j) = "&#" & codepoint & ";"
             End Select
+            If rndescapeFormat Then
+                If Int(2 * Rnd) = 1 Then result(j) = UCase(result(j))
+            End If
         Else
-            result(j) = Mid$(str, i, 1)
+            If codepoint < &H10000 Then
+                result(j) = Mid$(str, i, 1)
+            Else
+                result(j) = Mid$(str, i, 2)
+            End If
         End If
         If codepoint > &HFFFF& Then i = i + 1
         j = j + 1
@@ -1118,17 +1127,19 @@ Public Function UnescapeUnicode(ByRef str As String, _
         "Invalid escape format."
         
     Dim nextEscape() As EscapeSequence: ReDim nextEscape(0 To 3)
+    Dim i As Long
+    For i = 0 To (Log(efAll + 1) / Log(2)) - 1
+        nextEscape(i).Format = 2 ^ i
+    Next i
     If escapeFormat And efPython Then NextPythonEscape nextEscape(0), str
     If escapeFormat And efRust Then NextRustEscape nextEscape(1), str
     If escapeFormat And efUPlus Then NextUPlusEscape nextEscape(2), str
     If escapeFormat And efMarkup Then NextMarkupEscape nextEscape(3), str
-    UnescapeUnicode = str 'Allocate buffer
-    Dim i As Long
-    Dim all0 As Boolean: all0 = True
-    For i = LBound(nextEscape) To UBound(nextEscape)
-        If nextEscape(i).Position <> 0 Then all0 = False
+    For i = 0 To (Log(efAll + 1) / Log(2)) - 1
+        If nextEscape(i).Position = 0 Then nextEscape(i).Position = &H7FFFFFFF
     Next i
-    If all0 Then Exit Function
+    
+    UnescapeUnicode = str 'Allocate buffer
     
     'Bubble sort because it only runs once and the array has only 4 elements
     Dim j As Long
@@ -1141,7 +1152,10 @@ Public Function UnescapeUnicode(ByRef str As String, _
             End If
         Next j
     Next i
-    GoSub RemoveLeading0s
+    Do Until nextEscape(UBound(nextEscape)).Position <> &H7FFFFFFF
+        If UBound(nextEscape) = LBound(nextEscape) Then Exit Function
+        ReDim Preserve nextEscape(LBound(nextEscape) To UBound(nextEscape) - 1)
+    Loop
     
     Dim lastPosOld As Long: lastPosOld = 1
     Dim lastPosNew As Long: lastPosNew = 1
@@ -1166,57 +1180,63 @@ Public Function UnescapeUnicode(ByRef str As String, _
             Case efMarkup: NextMarkupEscape nextEscape(0), str
         End Select
         
-        If nextEscape(0).Position = 0 Then
+        If nextEscape(0).Position = &H7FFFFFFF Then _
             If UBound(nextEscape) = 0 Then Exit Do
-            GoSub RemoveLeading0s
-        ElseIf UBound(nextEscape) > 0 Then
-            GoSub InsertionSort
+
+        If UBound(nextEscape) > 0 Then
+            'This version of insertion sort assumes that only 1 element is
+            'out of order: Complexity O(n/2), worst case O(n)
+            For i = LBound(nextEscape) To UBound(nextEscape) - 1
+                If nextEscape(i).Position > nextEscape(i + 1).Position Then
+                    temp = nextEscape(i)
+                    nextEscape(i) = nextEscape(i + 1)
+                    nextEscape(i + 1) = temp
+                Else
+                    Exit For '(List was already sorted except for one element)
+                End If
+            Next i
+            If nextEscape(UBound(nextEscape)).Position = &H7FFFFFFF Then _
+                ReDim Preserve nextEscape(LBound(nextEscape) To UBound(nextEscape) - 1)
         End If
     Loop
-    diff = Len(str) - lastPosOld
+    diff = Len(str) - lastPosOld + 1
     If diff > 0 Then Mid$(UnescapeUnicode, lastPosNew, diff) = _
                                             Mid$(str, lastPosOld, diff)
-    UnescapeUnicode = Left$(UnescapeUnicode, lastPosNew + diff)
-    Exit Function
-InsertionSort:
-    'This version of insertion sort assumes that only 1 element is out of order
-    'Complexity O(n/2), worst case O(n)
-    For i = LBound(nextEscape) To UBound(nextEscape) - 1
-        If nextEscape(i).Position > nextEscape(i + 1).Position Then
-            temp = nextEscape(i)
-            nextEscape(i) = nextEscape(i + 1)
-            nextEscape(i + 1) = temp
-        Else
-            Return 'List was already sorted except for this one element
-        End If
-    Next i
-    Return
-RemoveLeading0s:
-    Do While nextEscape(LBound(nextEscape)).Position = 0
-        For i = LBound(nextEscape) To UBound(nextEscape) - 1
-            nextEscape(i) = nextEscape(i + 1)
-        Next i
-        ReDim Preserve nextEscape(LBound(nextEscape) To UBound(nextEscape) - 1)
-    Loop
-    Return
+    UnescapeUnicode = Left$(UnescapeUnicode, lastPosNew + diff - 1)
 End Function
-
 Private Sub NextPythonEscape(ByRef escape As EscapeSequence, ByRef str As String)
     Const PYTHON_ESCAPE_PATTERN_NOT_BMP As String = _
         "\[Uu]00[01][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]"
     Const PYTHON_ESCAPE_PATTERN_BMP As String = _
         "\[Uu][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]"
+    Const SIG_UCASE As String = "\U"
+    Const SIG_LCASE As String = "\u"
     Dim potentialEscape As String
     Dim codepoint As Long
-    escape.Format = efPython
-    If escape.Position = 0 Then escape.Position = 1
-    Do
-        escape.Position = InStr(escape.Position, str, "\u", vbTextCompare)
-        If escape.Position = 0 Then
-            escape.unescapedStr = vbNullString
-            escape.Length = 0
-            Exit Sub
+    With escape
+        If .Format <> efPython Then Err.Raise 5
+        If .Position = 0 Then
+            .PosLCase = InStr(1, str, SIG_LCASE, vbBinaryCompare)
+            If .PosLCase = 0 Then .PosLCase = &H7FFFFFFF
+            .PosUCase = InStr(1, str, SIG_UCASE, vbBinaryCompare)
+            If .PosUCase = 0 Then .PosUCase = &H7FFFFFFF
+            .Position = IIf(.PosUCase < .PosLCase, .PosUCase, .PosLCase)
+            If .Position = &H7FFFFFFF Then Exit Sub
         End If
+    End With
+    
+    Do
+        With escape
+            If .PosUCase < .PosLCase Then
+                .PosUCase = InStr(.Position, str, SIG_UCASE, vbBinaryCompare)
+                If .PosUCase = 0 Then .PosUCase = &H7FFFFFFF
+            Else
+                .PosLCase = InStr(.Position, str, SIG_LCASE, vbBinaryCompare)
+                If .PosLCase = 0 Then .PosLCase = &H7FFFFFFF
+            End If
+            .Position = IIf(.PosUCase < .PosLCase, .PosUCase, .PosLCase)
+            If .Position = &H7FFFFFFF Then Exit Sub
+        End With
         potentialEscape = Mid$(str, escape.Position, 10)
         If potentialEscape Like PYTHON_ESCAPE_PATTERN_NOT_BMP Then
             codepoint = CLng("&H" & Mid$(potentialEscape, 5))
@@ -1229,6 +1249,7 @@ Private Sub NextPythonEscape(ByRef escape As EscapeSequence, ByRef str As String
         End If
         escape.Position = escape.Position + 2
     Loop
+    Exit Sub
 CheckCodepoint:
     If codepoint < &H110000 Then
 CheckNoSingleSurrogate:
@@ -1253,17 +1274,34 @@ Private Sub NextRustEscape(ByRef escape As EscapeSequence, ByRef str As String)
                 "\[Uu]{[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]}"
     Const RUST_ESCAPE_PATTERN_6_DIGITS As String = _
                          "\[Uu]{10[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]}"
+    Const SIG_UCASE As String = "\U{"
+    Const SIG_LCASE As String = "\u{"
     Dim potentialEscape As String
     Dim codepoint As Long
-    escape.Format = efRust
-    If escape.Position = 0 Then escape.Position = 1
-    Do
-        escape.Position = InStr(escape.Position, str, "\u{", vbTextCompare)
-        If escape.Position = 0 Then
-            escape.unescapedStr = vbNullString
-            escape.Length = 0
-            Exit Sub
+    With escape
+        If .Format <> efRust Then Err.Raise 5
+        If .Position = 0 Then
+            .PosLCase = InStr(1, str, SIG_LCASE, vbBinaryCompare)
+            If .PosLCase = 0 Then .PosLCase = &H7FFFFFFF
+            .PosUCase = InStr(1, str, SIG_UCASE, vbBinaryCompare)
+            If .PosUCase = 0 Then .PosUCase = &H7FFFFFFF
+            .Position = IIf(.PosUCase < .PosLCase, .PosUCase, .PosLCase)
+            If .Position = &H7FFFFFFF Then Exit Sub
         End If
+    End With
+    
+    Do
+        With escape
+            If .PosUCase < .PosLCase Then
+                .PosUCase = InStr(.Position, str, SIG_UCASE, vbBinaryCompare)
+                If .PosUCase = 0 Then .PosUCase = &H7FFFFFFF
+            Else
+                .PosLCase = InStr(.Position, str, SIG_LCASE, vbBinaryCompare)
+                If .PosLCase = 0 Then .PosLCase = &H7FFFFFFF
+            End If
+            .Position = IIf(.PosUCase < .PosLCase, .PosUCase, .PosLCase)
+            If .Position = &H7FFFFFFF Then Exit Sub
+        End With
         
         potentialEscape = Mid$(str, escape.Position, 10)
         Dim nextClosingBrace As Long
@@ -1314,17 +1352,35 @@ Private Sub NextUPlusEscape(ByRef escape As EscapeSequence, ByRef str As String)
         "[Uu]+[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]"
     Const UPLUS_ESCAPE_PATTERN_6_DIGITS As String = _
         "[Uu]+10[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]"
+    Const SIG_UCASE As String = "U+"
+    Const SIG_LCASE As String = "u+"
     Dim potentialEscape As String
     Dim codepoint As Long
-    escape.Format = efUPlus
-    If escape.Position = 0 Then escape.Position = 1
-    Do
-        escape.Position = InStr(escape.Position, str, "u+", vbTextCompare)
-        If escape.Position = 0 Then
-            escape.unescapedStr = vbNullString
-            escape.Length = 0
-            Exit Sub
+    With escape
+        If .Format <> efUPlus Then Err.Raise 5
+        If .Position = 0 Then
+            .PosLCase = InStr(1, str, SIG_LCASE, vbBinaryCompare)
+            If .PosLCase = 0 Then .PosLCase = &H7FFFFFFF
+            .PosUCase = InStr(1, str, SIG_UCASE, vbBinaryCompare)
+            If .PosUCase = 0 Then .PosUCase = &H7FFFFFFF
+            .Position = IIf(.PosUCase < .PosLCase, .PosUCase, .PosLCase)
+            If .Position = &H7FFFFFFF Then Exit Sub
         End If
+    End With
+    
+    Do
+        With escape
+            If .PosUCase < .PosLCase Then
+                .PosUCase = InStr(.Position, str, SIG_UCASE, vbBinaryCompare)
+                If .PosUCase = 0 Then .PosUCase = &H7FFFFFFF
+            Else
+                .PosLCase = InStr(.Position, str, SIG_LCASE, vbBinaryCompare)
+                If .PosLCase = 0 Then .PosLCase = &H7FFFFFFF
+            End If
+            .Position = IIf(.PosUCase < .PosLCase, .PosUCase, .PosLCase)
+            If .Position = &H7FFFFFFF Then Exit Sub
+        End With
+
         potentialEscape = Mid$(str, escape.Position, 8)
         If potentialEscape Like UPLUS_ESCAPE_PATTERN_6_DIGITS Then _
             GoSub CheckCodepoint
@@ -1341,7 +1397,6 @@ CheckCodepoint:
     codepoint = CLng("&H" & Mid$(potentialEscape, 3))
     If codepoint < &H110000 Then
         If codepoint < &HD800& Or codepoint >= &HE000& Then
-            escape.Length = Len(potentialEscape)
             escape.unescapedStr = ChrU(codepoint)
             Exit Sub
         End If
@@ -1358,11 +1413,12 @@ Private Sub NextMarkupEscape(ByRef escape As EscapeSequence, ByRef str As String
     Const MARKUP_ESCAPE_PATTERN_7_DIGITS As String = "&[#]1######;"
     Dim potentialEscape As String
     Dim codepoint As Long
-    escape.Format = efMarkup
+    If escape.Format <> efMarkup Then Err.Raise 5
     If escape.Position = 0 Then escape.Position = 1
     Do
         escape.Position = InStr(escape.Position, str, "&#", vbBinaryCompare)
         If escape.Position = 0 Then
+            escape.Position = &H7FFFFFFF
             escape.unescapedStr = vbNullString
             Exit Sub
         End If
@@ -1400,14 +1456,13 @@ Private Sub NextMarkupEscape(ByRef escape As EscapeSequence, ByRef str As String
                 If potentialEscape Like MARKUP_ESCAPE_PATTERN_1_DIGIT Then _
                     GoSub CheckCodepoint
         End Select
-        escape.Position = escape.Position + 3
+        escape.Position = escape.Position + 2
     Loop
 CheckCodepoint:
     escape.Length = Len(potentialEscape)
     codepoint = CLng(Mid$(potentialEscape, 3, escape.Length - 3))
     If codepoint < &H110000 Then
         If codepoint < &HD800& Or codepoint >= &HE000& Then
-            escape.Length = Len(potentialEscape)
             escape.unescapedStr = ChrU(codepoint)
             Exit Sub
         End If
@@ -1915,12 +1970,11 @@ End Function
 'Function returning a string containing all valid unicode characters equally,
 'randomly distributed. Excludes surrogate range and BOM.
 Public Function RandomStringUnicode(ByVal Length As Long) As String
-    'Length in UTF-16 codepoints, not unicode codepoints!
+    'Length in UTF-16 codepoints, not unicode codepoints or bytes!
     Const MAX_UNICODE As Long = &H10FFFF
 
     If Length < 1 Then Exit Function
 
-    Dim s As String
     Dim i As Long
 
     Dim char As Long
@@ -1951,10 +2005,17 @@ Public Function RandomStringUnicode(ByVal Length As Long) As String
             End If
         Next i
     End If
-    s = b
-    If CInt(b(UBound(b) - 1)) + b(UBound(b)) = 0 Then _
-        Mid$(s, Len(s), 1) = ChrW(Int(Rnd() * &HFFFE& + 1))
-    RandomStringUnicode = s
+    RandomStringUnicode = b
+    
+    Const MAX_UINT As Long = &HFFFF&
+    If CInt(b(UBound(b) - 1)) + b(UBound(b)) = 0 Then
+        Do
+            char = MAX_UINT * Rnd
+        Loop Until (char <> 0) _
+               And (char < &HD800& Or char > &HDFFF&) _
+               And (char <> &HFEFF&)
+        Mid$(RandomStringUnicode, Len(RandomStringUnicode), 1) = ChrW(char)
+    End If
 End Function
 
 'Function returning a string containing all ASCII characters equally,
