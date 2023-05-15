@@ -1,4 +1,4 @@
-Attribute VB_Name = "TestLibStringTools"
+Attribute VB_Name = "LibStringToolsTests"
 '===============================================================================
 ' VBA StringTools - Tests
 ' ------------------------------------------------------------------------------------
@@ -108,6 +108,7 @@ Public Sub RunAllTests()
     TestANSIEncodersAndDecodersPerformance
     TestDifferentWaysOfGettingNumericalValuesFromStrings
     RunLimitConsecutiveSubstringRepetitionTests
+    RunEscapeUnescapeUnicodeTests
 End Sub
 
 Private Sub TestEncodersAndDecoders()
@@ -421,16 +422,19 @@ Sub RunLimitConsecutiveSubstringRepetitionTests()
     TestLimitConsecutiveSubstringRepetition "bbbaaababbb", "ab", 1
     TestLimitConsecutiveSubstringRepetition _
         UnescapeUnicode("\u6100\u6100\u6100"), "a", 1
+    failedTests = failedTests + IIf(LimitConsecutiveSubstringRepetitionB( _
+                UnescapeUnicode("\u6100\u6100\u6100"), "a", 1) <> _
+            LimitConsecutiveSubstringRepetition( _
+                UnescapeUnicode("\u6100\u6100\u6100"), "a", 1), 0, 1)
     'Add more tests here
-    Debug.Print UnescapeUnicode("\u6100\u6100\u6100")
-    Debug.Print LenB(UnescapeUnicode("\u6100\u6100\u6100"))
-    Debug.Print LimitConsecutiveSubstringRepetition( _
-                    UnescapeUnicode("\u6100\u6100\u6100"), "a", 1)
-    Debug.Print LenB(LimitConsecutiveSubstringRepetition( _
-                    UnescapeUnicode("\u6100\u6100\u6100"), "a", 1))
+
+
                     
-    If failedTests = 0 Then _
+    If failedTests = 0 Then
         Debug.Print "LimitConsecutiveSubstringRepetition PASSED all tests"
+    Else
+        Debug.Print "LimitConsecutiveSubstringRepetition FAILED" & failedTests & " tests!"
+    End If
     Exit Sub
 errh:
     If Err.Number = vbObjectError + 43233 Then
@@ -671,8 +675,13 @@ Sub TestAPI()
 '    Next cpID
 End Sub
 
-Public Sub TestUnicodeFunctionality()
+Private Sub RunEscapeUnescapeUnicodeTests()
+    TestUnicodeFunctionality
+    TestEscapeAndUnescapeUnicode
+    TestEscapeUnescapeUnicodePerformance
+End Sub
 
+Private Sub TestUnicodeFunctionality()
     Dim originalStr As String
     Dim escapedStr As String
     Dim unescapedStr As String
@@ -681,8 +690,8 @@ Public Sub TestUnicodeFunctionality()
     Dim i As Integer
     
     'Test for all types of UnicodeEscapeFormat
-    For i = 0 To (Log(efAll + 1) / Log(2)) - 1
-        formatTypes = 2 ^ i
+    For i = 1 To efAll
+        formatTypes = i
         
         'Generate a random string for testing
         originalStr = RandomStringUnicode(10000)
@@ -694,16 +703,65 @@ Public Sub TestUnicodeFunctionality()
         unescapedStr = UnescapeUnicode(escapedStr, formatTypes)
         
         'Check if the unescaped string is equal to the original string
-        result = originalStr = unescapedStr
-        
-        Debug.Print "UnicodeEscapeFormat: " & formatTypes & " Test Result: " & result
+        If originalStr <> unescapedStr Then
+            Debug.Print "FAILED Escape/UnescapeUnicode Test for format " & formatTypes
+        Else
+            Debug.Print "PASSED Escape/UnescapeUnicode Test for format " & formatTypes
+        End If
     Next i
-
 End Sub
 
+Private Sub TestEscapeAndUnescapeUnicode()
+    Dim originalStr As String
+    Dim escapedStr As String
+    Dim unescapedStr As String
+    Dim formatTypes As UnicodeEscapeFormat
+    Dim result As Boolean
+    Dim i As Long
 
-Public Sub TestUnicodePerformance()
+    For i = 1 To 100000
+        'Create any random combination of formats excluding efUPlus, because
+        'efUPlus has a high likelyhood of creating strings that will convert
+        'back to a different string than the original string
+        Do Until formatTypes <> 0
+            formatTypes = Int(15 * Rnd) + 1
+            formatTypes = formatTypes And (&HFFFFFFFF - efUPlus)
+        Loop
+        
+        'Generate a random string for testing
+        Select Case i Mod 4
+        Case 0
+            originalStr = RandomStringASCII(10)
+        Case 1
+            originalStr = RandomStringAlphanumeric(10)
+        Case 2
+            originalStr = RandomStringBMP(10)
+        Case 3
+            originalStr = RandomStringUnicode(10)
+    End Select
+    
+        'Test the EscapeUnicode function
+        escapedStr = EscapeUnicode(originalStr, i Mod 127, formatTypes)
 
+        'Test the UnescapeUnicode function
+        unescapedStr = UnescapeUnicode(escapedStr, formatTypes)
+
+        'Check if the unescaped string is equal to the original string
+        If originalStr <> unescapedStr Then
+            Debug.Print i
+            Debug.Print "originalStr", originalStr
+            Debug.Print "escapedStr", escapedStr
+            Debug.Print "unescapedStr", unescapedStr
+            Debug.Print StringToHex(originalStr)
+            Debug.Print StringToHex(unescapedStr)
+            Debug.Print "FAILED Escape/UnescapeUnicode Test!"
+            Exit Sub
+        End If
+    Next i
+    Debug.Print "PASSED Escape/UnescapeUnicode Stress Test!"
+End Sub
+
+Private Sub TestEscapeUnescapeUnicodePerformance()
     Dim originalStr As String
     Dim escapedStr As String
     Dim unescapedStr As String
@@ -714,20 +772,20 @@ Public Sub TestUnicodePerformance()
     Dim i As Integer
     
     'Test for all types of UnicodeEscapeFormat
-    For i = 0 To (Log(efAll + 1) / Log(2)) - 1
-        formatTypes = 2 ^ i
+    For i = 1 To efAll '(Log(efAll + 1) / Log(2)) - 1
+        formatTypes = i '2 ^ i
         
         'Generate a large random string for testing
-        originalStr = RandomStringUnicode(10000)
+        originalStr = RandomStringASCII(100000)
         
         'Start the timer
         startTime = AccurateTimerMs()
         
         'Test the EscapeUnicode function
-        escapedStr = EscapeUnicode(originalStr, &HFF, formatTypes)
+        escapedStr = EscapeUnicode(originalStr, , formatTypes)
         
         Debug.Print "UnicodeEscapeFormat: " & formatTypes & _
-                    " Escaping took: " & AccurateTimerMs() - startTime
+                    " Escaping took: ", AccurateTimerMs() - startTime & " ms"
         
         startTime = AccurateTimerMs()
         
@@ -735,8 +793,8 @@ Public Sub TestUnicodePerformance()
         unescapedStr = UnescapeUnicode(escapedStr, formatTypes)
         
         Debug.Print "UnicodeEscapeFormat: " & formatTypes & _
-                    " Unescaping took: " & AccurateTimerMs() - startTime
+                    " Unescaping took: ", AccurateTimerMs() - startTime & " ms"
     Next i
-
 End Sub
+
 
