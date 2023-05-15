@@ -29,6 +29,9 @@ Attribute VB_Name = "TestLibStringTools"
 
 Option Explicit
 
+' For source of the timer-code see here:
+' https://gist.github.com/guwidoe/5c74c64d79c0e1cd1be458b0632b279a
+
 #If Mac Then
     #If VBA7 Then
         'https://developer.apple.com/documentation/kernel/1462446-mach_absolute_time
@@ -40,6 +43,7 @@ Option Explicit
     #End If
 #Else
     #If VBA7 Then
+        'https://learn.microsoft.com/en-us/windows/win32/api/profileapi/nf-profileapi-queryperformancecounter
         Private Declare PtrSafe Function QueryPerformanceFrequency Lib "kernel32" (ByRef Frequency As Currency) As LongPtr
         Private Declare PtrSafe Function QueryPerformanceCounter Lib "kernel32" (ByRef counter As Currency) As LongPtr
     #Else
@@ -55,6 +59,7 @@ Option Explicit
     End Type
 #End If
 
+'Returns operating system clock tick count since system startup
 Private Function GetTickCount() As Currency
     #If Mac Then
         GetTickCount = mach_continuous_time()
@@ -63,20 +68,34 @@ Private Function GetTickCount() As Currency
     #End If
 End Function
 
+'Returns frequency in ticks per second
 Private Function GetFrequency() As Currency
     #If Mac Then
-        Dim timebaseInfo As MachTimebaseInfo
-        mach_timebase_info timebaseInfo
-        GetFrequency = (timebaseInfo.Denominator / timebaseInfo.Numerator) * 100000#
+        Dim tbInfo As MachTimebaseInfo: mach_timebase_info tbInfo
+        
+        GetFrequency = (tbInfo.Denominator / tbInfo.Numerator) * 100000@
     #Else
         QueryPerformanceFrequency GetFrequency
     #End If
 End Function
 
-Private Function AccurateTimer() As Currency
+'Returns time since system startup in seconds with 0.1ms (=100µs) precision
+Public Function AccurateTimer() As Currency
     AccurateTimer = GetTickCount / GetFrequency
 End Function
 
+'Returns time since system startup in milliseconds with 0.1µs (=100ns) precision
+Public Function AccurateTimerMs() As Currency
+    'Note that this calculation will work even if 1000@ / GetFrequency < 0.0001
+    AccurateTimerMs = (1000@ / GetFrequency) * GetTickCount
+End Function
+
+'Returns time since system startup in microseconds, up to 0.1ns =100ps precision
+'The highest precision achieved by this function depends on the system, however,
+'typically precision will be the same as for AccurateTimerMs.
+Public Function AccurateTimerUs() As Currency
+    AccurateTimerUs = (1000000@ / GetFrequency) * GetTickCount
+End Function
 
 '###############################################################################
 '#########################        UNIT TESTS      ##############################
@@ -652,12 +671,72 @@ Sub TestAPI()
 '    Next cpID
 End Sub
 
-Sub teasdfst()
-    Dim c As Collection
-    Set c = AllCodePages
-    Debug.Print Encode(RandomBytes(1000), cpIso_2022_jp_w_1b_Kana, True)
-    Debug.Print Err.Number
+Public Sub TestUnicodeFunctionality()
+
+    Dim originalStr As String
+    Dim escapedStr As String
+    Dim unescapedStr As String
+    Dim formatTypes As UnicodeEscapeFormat
+    Dim result As Boolean
+    Dim i As Integer
     
+    'Test for all types of UnicodeEscapeFormat
+    For i = 0 To (Log(efAll + 1) / Log(2)) - 1
+        formatTypes = 2 ^ i
+        
+        'Generate a random string for testing
+        originalStr = RandomStringUnicode(10000)
+        
+        'Test the EscapeUnicode function
+        escapedStr = EscapeUnicode(originalStr, &HFF, formatTypes)
+        
+        'Test the UnescapeUnicode function
+        unescapedStr = UnescapeUnicode(escapedStr, formatTypes)
+        
+        'Check if the unescaped string is equal to the original string
+        result = originalStr = unescapedStr
+        
+        Debug.Print "UnicodeEscapeFormat: " & formatTypes & " Test Result: " & result
+    Next i
+
 End Sub
 
+
+Public Sub TestUnicodePerformance()
+
+    Dim originalStr As String
+    Dim escapedStr As String
+    Dim unescapedStr As String
+    Dim formatTypes As UnicodeEscapeFormat
+    Dim startTime As Currency
+    Dim endTime As Currency
+    Dim elapsedTime As Currency
+    Dim i As Integer
+    
+    'Test for all types of UnicodeEscapeFormat
+    For i = 0 To (Log(efAll + 1) / Log(2)) - 1
+        formatTypes = 2 ^ i
+        
+        'Generate a large random string for testing
+        originalStr = RandomStringUnicode(10000)
+        
+        'Start the timer
+        startTime = AccurateTimerMs()
+        
+        'Test the EscapeUnicode function
+        escapedStr = EscapeUnicode(originalStr, &HFF, formatTypes)
+        
+        Debug.Print "UnicodeEscapeFormat: " & formatTypes & _
+                    " Escaping took: " & AccurateTimerMs() - startTime
+        
+        startTime = AccurateTimerMs()
+        
+        'Test the UnescapeUnicode function
+        unescapedStr = UnescapeUnicode(escapedStr, formatTypes)
+        
+        Debug.Print "UnicodeEscapeFormat: " & formatTypes & _
+                    " Unescaping took: " & AccurateTimerMs() - startTime
+    Next i
+
+End Sub
 

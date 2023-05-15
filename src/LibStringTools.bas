@@ -105,8 +105,8 @@ Private Const INT_SIZE As Long = 2
 Private Type EscapeSequence
     Position As Long
     Length As Long
-    Format As Long
-    UnescapedStr As String
+    Format As UnicodeEscapeFormat
+    unescapedStr As String
 End Type
 
 #If Win64 Then
@@ -134,13 +134,11 @@ Private Const MAC_API_ERR_E2BIG  As Long = 7  'Argument list too long
 Private Const vbErrInternalError As Long = 51
 
 Public Enum UnicodeEscapeFormat
-    [_first] = 0
     efPython = 1 '\uXXXX \u00XXXXXX (4 or 8 hex digits, 8 for chars outside BMP)
     efRust = 2   '\u{X} \U{XXXXXX}  (1 to 6 hex digits)
     efUPlus = 4  'u+XXXX u+XXXXXX   (4 or 6 hex digits)
     efMarkup = 8 '&#ddddddd;        (1 to 7 decimal digits)
     efAll = 15
-    [_last]
 End Enum
 
 'https://learn.microsoft.com/en-us/windows/win32/intl/code-page-identifiers
@@ -1016,7 +1014,7 @@ Public Function StringToHex(ByRef s As String) As String
 End Function
 
 'Replaces all occurences of unicode characters outside the codePoint range
-'defined by maxNonEncodedCharCode with literals of the following formats
+'defined by maxNonEscapedCharCode with literals of the following formats
 'specified by `escapeFormat`:
 '   efPython = 1 ... \uXXXX \u000XXXXX    (4 or 8 hex digits, 8 for chars outside BMP)
 '   efRust   = 2 ... \u{XXXX} \U{XXXXXXX} (1 to 6 hex digits)
@@ -1028,23 +1026,45 @@ End Function
 'Where:
 '   Xes are the digits of the codepoint in hexadecimal. (X = 0-9 or A-F)
 'Note:
+'   - This function also accepts all combinations of UnicodeEscapeFormats:
+'     If called with, e.g. `escapeFormat = efRust Or efPython`, every character
+'     in the scope will be escaped with in either format, efRust or efPython,
+'     chosen at random for each replacement.
 '   - If `escapeFormat` is set to efAll, it will replace every character in the
-'     scope with a randomly chosen format of the 4 available fotrmats.
+'     scope with a randomly chosen format of all available fotrmats.
 Public Function EscapeUnicode(ByRef str As String, _
-                     Optional ByVal maxNonEncodedCharCode As Long = &HFF, _
-                     Optional ByVal escapeType As UnicodeEscapeFormat _
+                     Optional ByVal maxNonEscapedCharCode As Long = &HFF, _
+                     Optional ByVal escapeFormat As UnicodeEscapeFormat _
                                                 = efPython) As String
-    Dim codepoint As Long
+    Const methodName As String = "EscapeUnicode"
+    If maxNonEscapedCharCode < 0 Then Err.Raise 5, methodName, _
+        "`maxNonEscapedCharCode` must be greater than 0."
+    If escapeFormat < 1 Or escapeFormat > efAll Then Err.Raise 5, methodName, _
+        "Invalid escape type."
     Dim i As Long
     Dim j As Long:                j = 1
     Dim result() As String:       ReDim result(1 To Len(str))
-    Dim rndEscapeType As Boolean: rndEscapeType = escapeType = efAll
-    If rndEscapeType Then Randomize
+    Dim rndescapeFormat As Boolean
+    rndescapeFormat = ((escapeFormat And (escapeFormat - 1)) <> 0) 'eFmt <> 2^n
+    Dim numescapeFormats As Long
+    If rndescapeFormat Then
+        Dim escapeFormats() As Long
+        For i = 0 To (Log(efAll + 1) / Log(2)) - 1
+            If 2 ^ i And escapeFormat Then
+                ReDim Preserve escapeFormats(0 To numescapeFormats)
+                escapeFormats(numescapeFormats) = 2 ^ i
+                numescapeFormats = numescapeFormats + 1
+            End If
+        Next i
+        Randomize
+    End If
     For i = 1 To Len(str)
-        codepoint = AscU(Mid$(str, i, 2))
-        If codepoint > maxNonEncodedCharCode Then
-            If rndEscapeType Then escapeType = 2 ^ Int(4 * Rnd)
-            Select Case escapeType
+        Dim codepoint As Long: codepoint = AscU(Mid$(str, i, 2))
+        If codepoint > maxNonEscapedCharCode Then
+            If rndescapeFormat Then
+                escapeFormat = escapeFormats(Int(numescapeFormats * Rnd))
+            End If
+            Select Case escapeFormat
                 Case efPython
                     If codepoint > &HFFFF& Then 'Outside BMP
                         result(j) = "\u" & "00" & Right$("0" & Hex(codepoint), 6)
@@ -1093,8 +1113,11 @@ End Function
 Public Function UnescapeUnicode(ByRef str As String, _
                        Optional ByVal escapeFormat As UnicodeEscapeFormat _
                                                     = efAll) As String
-    Dim nextEscape() As EscapeSequence
-    ReDim nextEscape(0 To 3)
+    Const methodName As String = "EscapeUnicode"
+    If escapeFormat < 1 Or escapeFormat > efAll Then Err.Raise 5, methodName, _
+        "Invalid escape format."
+        
+    Dim nextEscape() As EscapeSequence: ReDim nextEscape(0 To 3)
     If escapeFormat And efPython Then NextPythonEscape nextEscape(0), str
     If escapeFormat And efRust Then NextRustEscape nextEscape(1), str
     If escapeFormat And efUPlus Then NextUPlusEscape nextEscape(2), str
@@ -1129,9 +1152,9 @@ Public Function UnescapeUnicode(ByRef str As String, _
         lastPosNew = lastPosNew + diff
         lastPosOld = lastPosOld + diff
         
-        Dim lenReplace As Long: lenReplace = Len(nextEscape(0).UnescapedStr)
+        Dim lenReplace As Long: lenReplace = Len(nextEscape(0).unescapedStr)
         Mid$(UnescapeUnicode, lastPosNew, lenReplace) = _
-            nextEscape(0).UnescapedStr
+            nextEscape(0).unescapedStr
         lastPosNew = lastPosNew + lenReplace
         lastPosOld = lastPosOld + nextEscape(0).Length
         nextEscape(0).Position = lastPosOld
@@ -1190,7 +1213,7 @@ Private Sub NextPythonEscape(ByRef escape As EscapeSequence, ByRef str As String
     Do
         escape.Position = InStr(escape.Position, str, "\u", vbTextCompare)
         If escape.Position = 0 Then
-            escape.UnescapedStr = vbNullString
+            escape.unescapedStr = vbNullString
             escape.Length = 0
             Exit Sub
         End If
@@ -1211,7 +1234,7 @@ CheckCodepoint:
 CheckNoSingleSurrogate:
         If codepoint < &HD800& Or codepoint >= &HE000& Then
             escape.Length = Len(potentialEscape)
-            escape.UnescapedStr = ChrU(codepoint)
+            escape.unescapedStr = ChrU(codepoint)
             Exit Sub
         End If
     End If
@@ -1237,7 +1260,7 @@ Private Sub NextRustEscape(ByRef escape As EscapeSequence, ByRef str As String)
     Do
         escape.Position = InStr(escape.Position, str, "\u{", vbTextCompare)
         If escape.Position = 0 Then
-            escape.UnescapedStr = vbNullString
+            escape.unescapedStr = vbNullString
             escape.Length = 0
             Exit Sub
         End If
@@ -1278,7 +1301,7 @@ CheckCodepoint:
     codepoint = CLng("&H" & Mid$(potentialEscape, 4, escape.Length - 4))
     If codepoint < &H110000 Then
         If codepoint < &HD800& Or codepoint >= &HE000& Then
-            escape.UnescapedStr = ChrU(codepoint)
+            escape.unescapedStr = ChrU(codepoint)
             Exit Sub
         End If
     End If
@@ -1298,7 +1321,7 @@ Private Sub NextUPlusEscape(ByRef escape As EscapeSequence, ByRef str As String)
     Do
         escape.Position = InStr(escape.Position, str, "u+", vbTextCompare)
         If escape.Position = 0 Then
-            escape.UnescapedStr = vbNullString
+            escape.unescapedStr = vbNullString
             escape.Length = 0
             Exit Sub
         End If
@@ -1319,7 +1342,7 @@ CheckCodepoint:
     If codepoint < &H110000 Then
         If codepoint < &HD800& Or codepoint >= &HE000& Then
             escape.Length = Len(potentialEscape)
-            escape.UnescapedStr = ChrU(codepoint)
+            escape.unescapedStr = ChrU(codepoint)
             Exit Sub
         End If
     End If
@@ -1340,7 +1363,7 @@ Private Sub NextMarkupEscape(ByRef escape As EscapeSequence, ByRef str As String
     Do
         escape.Position = InStr(escape.Position, str, "&#", vbBinaryCompare)
         If escape.Position = 0 Then
-            escape.UnescapedStr = vbNullString
+            escape.unescapedStr = vbNullString
             Exit Sub
         End If
         
@@ -1385,7 +1408,7 @@ CheckCodepoint:
     If codepoint < &H110000 Then
         If codepoint < &HD800& Or codepoint >= &HE000& Then
             escape.Length = Len(potentialEscape)
-            escape.UnescapedStr = ChrU(codepoint)
+            escape.unescapedStr = ChrU(codepoint)
             Exit Sub
         End If
     End If
