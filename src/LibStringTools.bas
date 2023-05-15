@@ -1046,10 +1046,11 @@ Public Function EscapeUnicode(ByRef str As String, _
     Dim i As Long
     Dim j As Long:                j = 1
     Dim result() As String:       ReDim result(1 To Len(str))
-    Dim rndescapeFormat As Boolean
-    rndescapeFormat = ((escapeFormat And (escapeFormat - 1)) <> 0) 'eFmt <> 2^n
+    Dim copyChunkSize As Long
+    Dim rndEscapeFormat As Boolean
+    rndEscapeFormat = ((escapeFormat And (escapeFormat - 1)) <> 0) 'eFmt <> 2^n
     Dim numescapeFormats As Long
-    If rndescapeFormat Then
+    If rndEscapeFormat Then
         Dim escapeFormats() As Long
         For i = 0 To (Log(efAll + 1) / Log(2)) - 1
             If 2 ^ i And escapeFormat Then
@@ -1063,7 +1064,12 @@ Public Function EscapeUnicode(ByRef str As String, _
     For i = 1 To Len(str)
         Dim codepoint As Long: codepoint = AscU(Mid$(str, i, 2))
         If codepoint > maxNonEscapedCharCode Then
-            If rndescapeFormat Then
+            If copyChunkSize > 0 Then
+                result(j) = Mid$(str, i - copyChunkSize, copyChunkSize)
+                copyChunkSize = 0
+                j = j + 1
+            End If
+            If rndEscapeFormat Then
                 escapeFormat = escapeFormats(Int(numescapeFormats * Rnd))
             End If
             Select Case escapeFormat
@@ -1084,19 +1090,21 @@ Public Function EscapeUnicode(ByRef str As String, _
                 Case efMarkup
                     result(j) = "&#" & codepoint & ";"
             End Select
-            If rndescapeFormat Then
+            If rndEscapeFormat Then
                 If Int(2 * Rnd) = 1 Then result(j) = UCase(result(j))
             End If
+            j = j + 1
         Else
             If codepoint < &H10000 Then
-                result(j) = Mid$(str, i, 1)
+                copyChunkSize = copyChunkSize + 1
             Else
-                result(j) = Mid$(str, i, 2)
+                copyChunkSize = copyChunkSize + 2
             End If
         End If
         If codepoint > &HFFFF& Then i = i + 1
-        j = j + 1
     Next i
+    If copyChunkSize > 0 Then _
+        result(j) = Mid$(str, i - copyChunkSize, copyChunkSize)
     EscapeUnicode = Join(result, "")
 End Function
 
