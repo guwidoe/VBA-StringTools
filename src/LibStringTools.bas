@@ -1233,17 +1233,18 @@ Private Sub NextPythonEscape(ByRef escape As EscapeSequence, _
         "\[Uu][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]"
     Const SIG_UCASE As String = "\U"
     Const SIG_LCASE As String = "\u"
+    Const MAX_LONG As Long = &H7FFFFFFF
     Dim potentialEscape As String
     Dim codepoint As Long
     With escape
         If .Format <> efPython Then Err.Raise 5
         If .Position = 0 Then
             .PosLCase = InStr(1, str, SIG_LCASE, vbBinaryCompare)
-            If .PosLCase = 0 Then .PosLCase = &H7FFFFFFF
+            If .PosLCase = 0 Then .PosLCase = MAX_LONG
             .PosUCase = InStr(1, str, SIG_UCASE, vbBinaryCompare)
-            If .PosUCase = 0 Then .PosUCase = &H7FFFFFFF
+            If .PosUCase = 0 Then .PosUCase = MAX_LONG
             .Position = IIf(.PosUCase < .PosLCase, .PosUCase, .PosLCase)
-            If .Position = &H7FFFFFFF Then Exit Sub
+            If .Position = MAX_LONG Then Exit Sub
         End If
     End With
     
@@ -1251,13 +1252,13 @@ Private Sub NextPythonEscape(ByRef escape As EscapeSequence, _
         With escape
             If .PosUCase < .PosLCase Then
                 .PosUCase = InStr(.Position, str, SIG_UCASE, vbBinaryCompare)
-                If .PosUCase = 0 Then .PosUCase = &H7FFFFFFF
+                If .PosUCase = 0 Then .PosUCase = MAX_LONG
             Else
                 .PosLCase = InStr(.Position, str, SIG_LCASE, vbBinaryCompare)
-                If .PosLCase = 0 Then .PosLCase = &H7FFFFFFF
+                If .PosLCase = 0 Then .PosLCase = MAX_LONG
             End If
             .Position = IIf(.PosUCase < .PosLCase, .PosUCase, .PosLCase)
-            If .Position = &H7FFFFFFF Then Exit Sub
+            If .Position = MAX_LONG Then Exit Sub
         End With
         potentialEscape = Mid$(str, escape.Position, 10)
         If potentialEscape Like PYTHON_ESCAPE_PATTERN_NOT_BMP Then
@@ -1300,17 +1301,18 @@ Private Sub NextRustEscape(ByRef escape As EscapeSequence, _
                          "\[Uu]{10[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]}"
     Const SIG_UCASE As String = "\U{"
     Const SIG_LCASE As String = "\u{"
+    Const MAX_LONG As Long = &H7FFFFFFF
     Dim potentialEscape As String
     Dim codepoint As Long
     With escape
         If .Format <> efRust Then Err.Raise 5
         If .Position = 0 Then
             .PosLCase = InStr(1, str, SIG_LCASE, vbBinaryCompare)
-            If .PosLCase = 0 Then .PosLCase = &H7FFFFFFF
+            If .PosLCase = 0 Then .PosLCase = MAX_LONG
             .PosUCase = InStr(1, str, SIG_UCASE, vbBinaryCompare)
-            If .PosUCase = 0 Then .PosUCase = &H7FFFFFFF
+            If .PosUCase = 0 Then .PosUCase = MAX_LONG
             .Position = IIf(.PosUCase < .PosLCase, .PosUCase, .PosLCase)
-            If .Position = &H7FFFFFFF Then Exit Sub
+            If .Position = MAX_LONG Then Exit Sub
         End If
     End With
     
@@ -1318,20 +1320,19 @@ Private Sub NextRustEscape(ByRef escape As EscapeSequence, _
         With escape
             If .PosUCase < .PosLCase Then
                 .PosUCase = InStr(.Position, str, SIG_UCASE, vbBinaryCompare)
-                If .PosUCase = 0 Then .PosUCase = &H7FFFFFFF
+                If .PosUCase = 0 Then .PosUCase = MAX_LONG
             Else
                 .PosLCase = InStr(.Position, str, SIG_LCASE, vbBinaryCompare)
-                If .PosLCase = 0 Then .PosLCase = &H7FFFFFFF
+                If .PosLCase = 0 Then .PosLCase = MAX_LONG
             End If
             .Position = IIf(.PosUCase < .PosLCase, .PosUCase, .PosLCase)
-            If .Position = &H7FFFFFFF Then Exit Sub
+            If .Position = MAX_LONG Then Exit Sub
         End With
         
         potentialEscape = Mid$(str, escape.Position, 10)
         Dim nextClosingBrace As Long
         nextClosingBrace = InStr(5, potentialEscape, "}", vbBinaryCompare)
         Select Case nextClosingBrace
-            Case 0 'do nothing and enter next loop
             Case 10
                 If potentialEscape Like RUST_ESCAPE_PATTERN_6_DIGITS Then _
                     GoSub CheckCodepoint
@@ -1380,17 +1381,18 @@ Private Sub NextUPlusEscape(ByRef escape As EscapeSequence, _
         "[Uu]+10[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]"
     Const SIG_UCASE As String = "U+"
     Const SIG_LCASE As String = "u+"
+    Const MAX_LONG As Long = &H7FFFFFFF
     Dim potentialEscape As String
     Dim codepoint As Long
     With escape
         If .Format <> efUPlus Then Err.Raise 5
         If .Position = 0 Then
             .PosLCase = InStr(1, str, SIG_LCASE, vbBinaryCompare)
-            If .PosLCase = 0 Then .PosLCase = &H7FFFFFFF
+            If .PosLCase = 0 Then .PosLCase = MAX_LONG
             .PosUCase = InStr(1, str, SIG_UCASE, vbBinaryCompare)
-            If .PosUCase = 0 Then .PosUCase = &H7FFFFFFF
+            If .PosUCase = 0 Then .PosUCase = MAX_LONG
             .Position = IIf(.PosUCase < .PosLCase, .PosUCase, .PosLCase)
-            If .Position = &H7FFFFFFF Then Exit Sub
+            If .Position = MAX_LONG Then Exit Sub
         End If
     End With
     
@@ -1398,13 +1400,13 @@ Private Sub NextUPlusEscape(ByRef escape As EscapeSequence, _
         With escape
             If .PosUCase < .PosLCase Then
                 .PosUCase = InStr(.Position, str, SIG_UCASE, vbBinaryCompare)
-                If .PosUCase = 0 Then .PosUCase = &H7FFFFFFF
+                If .PosUCase = 0 Then .PosUCase = MAX_LONG
             Else
                 .PosLCase = InStr(.Position, str, SIG_LCASE, vbBinaryCompare)
-                If .PosLCase = 0 Then .PosLCase = &H7FFFFFFF
+                If .PosLCase = 0 Then .PosLCase = MAX_LONG
             End If
             .Position = IIf(.PosUCase < .PosLCase, .PosUCase, .PosLCase)
-            If .Position = &H7FFFFFFF Then Exit Sub
+            If .Position = MAX_LONG Then Exit Sub
         End With
 
         potentialEscape = Mid$(str, escape.Position, 8)
@@ -1439,6 +1441,7 @@ Private Sub NextMarkupEscape(ByRef escape As EscapeSequence, _
     Const MARKUP_ESCAPE_PATTERN_5_DIGITS As String = "&[#]#####;"
     Const MARKUP_ESCAPE_PATTERN_6_DIGITS As String = "&[#]######;"
     Const MARKUP_ESCAPE_PATTERN_7_DIGITS As String = "&[#]1######;"
+    Const MAX_LONG As Long = &H7FFFFFFF
     Dim potentialEscape As String
     Dim codepoint As Long
     If escape.Format <> efMarkup Then Err.Raise 5
@@ -1446,7 +1449,7 @@ Private Sub NextMarkupEscape(ByRef escape As EscapeSequence, _
     Do
         escape.Position = InStr(escape.Position, str, "&#", vbBinaryCompare)
         If escape.Position = 0 Then
-            escape.Position = &H7FFFFFFF
+            escape.Position = MAX_LONG
             escape.unescapedStr = vbNullString
             Exit Sub
         End If
@@ -1455,7 +1458,6 @@ Private Sub NextMarkupEscape(ByRef escape As EscapeSequence, _
         Dim nextSemicolon As Long
         nextSemicolon = InStr(4, potentialEscape, ";", vbBinaryCompare)
         Select Case nextSemicolon
-            Case 0 'do nothing and enter next loop
             Case 10
                 If potentialEscape Like MARKUP_ESCAPE_PATTERN_7_DIGITS Then _
                     GoSub CheckCodepoint
@@ -2134,7 +2136,8 @@ Public Function InsertB(ByRef str As String, _
                         ByRef strToInsert As String, _
                         ByRef afterPos As Long) As String
     Const methodName As String = "InsertB"
-    If afterPos < 0 Then afterPos = 0
+    If afterPos < 0 Then Err.Raise 5, methodName, _
+        "Argument 'afterPos' = " & afterPos & " < 0, invalid"
 
     InsertB = MidB$(str, 1, afterPos) & strToInsert & MidB$(str, afterPos + 1)
 End Function

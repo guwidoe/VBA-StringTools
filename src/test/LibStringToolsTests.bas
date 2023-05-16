@@ -776,7 +776,7 @@ Private Sub TestEscapeUnescapeUnicodePerformance()
         formatTypes = i '2 ^ i
         
         'Generate a large random string for testing
-        originalStr = RandomStringASCII(100000)
+        originalStr = RandomStringUnicode(100000)
         
         'Start the timer
         startTime = AccurateTimerMs()
