@@ -1918,21 +1918,21 @@ Public Function RandomStringAlphanumeric(ByVal Length As Long) As String
     If Length < 1 Then Exit Function
 
     Dim i As Long
-    Dim char As Long
+    Dim char As Byte
     Dim b() As Byte: ReDim b(0 To Length * 2 - 1)
 
     Randomize
     For i = 0 To Length - 1
         Select Case Rnd
             Case Is < 0.41935
-                Do: char = 25 * Rnd + 65: Loop Until char <> 0
+                char = Int(26 * Rnd) + 65
             Case Is < 0.83871
-                Do: char = 25 * Rnd + 97: Loop Until char <> 0
+                char = Int(26 * Rnd) + 97
             Case Else
-                Do: char = 9 * Rnd + 48: Loop Until char <> 0
+                char = Int(10 * Rnd) + 48
         End Select
 
-        b(2 * i) = (Int(char)) And &HFF
+        b(2 * i) = char And &HFF
     Next i
     RandomStringAlphanumeric = b
 End Function
@@ -1975,13 +1975,12 @@ Public Function RandomStringBMP(ByVal Length As Long) As String
     Randomize
     For i = 0 To Length - 1
         Do
-            char = MAX_UINT * Rnd
-        Loop Until (char <> 0) _
-               And (char < &HD800& Or char > &HDFFF&) _
+            char = Int(MAX_UINT * Rnd) + 1
+        Loop Until (char < &HD800& Or char > &HDFFF&) _
                And (char <> &HFEFF&)
 
-        b(2 * i) = (Int(char)) And &HFF
-        b(2 * i + 1) = (Int(char / (&H100))) And &HFF
+        b(2 * i) = char And &HFF
+        b(2 * i + 1) = char \ &H100& And &HFF
     Next i
     RandomStringBMP = b
 End Function
@@ -1992,7 +1991,7 @@ Public Function RandomBytes(ByVal numBytes As Long) As String
     Dim bytes() As Byte: ReDim bytes(0 To numBytes - 1)
     Dim i As Long
     For i = 0 To numBytes - 1
-        bytes(i) = Rnd * &HFF
+        bytes(i) = Int(Rnd * &HFF)
     Next i
     RandomBytes = bytes
 End Function
@@ -2014,9 +2013,8 @@ Public Function RandomStringUnicode(ByVal Length As Long) As String
     If Length > 1 Then
         For i = 0 To Length - 2
             Do
-                char = MAX_UNICODE * Rnd
-            Loop Until (char <> 0) _
-                   And (char < &HD800& Or char > &HDFFF&) _
+                char = Int(MAX_UNICODE * Rnd) + 1
+            Loop Until (char < &HD800& Or char > &HDFFF&) _
                    And (char <> &HFEFF&)
 
             If char < &H10000 Then
@@ -2040,9 +2038,8 @@ Public Function RandomStringUnicode(ByVal Length As Long) As String
     Const MAX_UINT As Long = &HFFFF&
     If CInt(b(UBound(b) - 1)) + b(UBound(b)) = 0 Then
         Do
-            char = MAX_UINT * Rnd
-        Loop Until (char <> 0) _
-               And (char < &HD800& Or char > &HDFFF&) _
+            char = Int(MAX_UINT * Rnd) + 1
+        Loop Until (char < &HD800& Or char > &HDFFF&) _
                And (char <> &HFEFF&)
         Mid$(RandomStringUnicode, Len(RandomStringUnicode), 1) = ChrW(char)
     End If
@@ -2053,13 +2050,13 @@ End Function
 Public Function RandomStringASCII(ByVal Length As Long) As String
     Const MAX_ASC As Long = &H7F&
     Dim i As Long
-    Dim char As Integer
+    Dim char As Byte
     Dim b() As Byte: ReDim b(0 To Length * 2 - 1)
 
     Randomize
     For i = 0 To Length - 1
-        Do: char = MAX_ASC * Rnd: Loop Until char <> 0
-        b(2 * i) = (char) And &HFF
+        char = Int(MAX_ASC * Rnd) + 1
+        b(2 * i) = char And &HFF
     Next i
     RandomStringASCII = b
 End Function
