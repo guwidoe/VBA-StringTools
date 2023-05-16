@@ -2383,21 +2383,12 @@ Public Function RepeatString(ByRef str As String, _
         Exit Function
     End If
 
-    RepeatString = Space$((LenB(str) * repeatTimes + 1) \ 2)
-
-    If (LenB(str) * repeatTimes) Mod 2 = 1 Then _
-        RepeatString = MidB$(RepeatString, 1, LenB(RepeatString) - 1)
-
-    Dim totalLen As Long: totalLen = LenB(RepeatString)
-    Dim chunkLen As Long: chunkLen = LenB(str)
-    Dim i As Long:        i = chunkLen + 1
-    '
-    MidB$(RepeatString, 1, chunkLen) = str
-    Do Until i > totalLen
-        MidB$(RepeatString, i, chunkLen) = RepeatString
-        i = i + chunkLen
-        chunkLen = chunkLen * 2
-    Loop
+    Dim newLength As Long: newLength = LenB(str) * repeatTimes
+    RepeatString = Space$((newLength + 1) \ 2)
+    If newLength Mod 2 = 1 Then RepeatString = MidB$(RepeatString, 2)
+    
+    MidB$(RepeatString, 1) = str
+    If repeatTimes > 1 Then MidB$(RepeatString, LenB(str) + 1) = RepeatString
 End Function
 
 'Adds fillerStr to the right side of a string repeatedly until the resulting
