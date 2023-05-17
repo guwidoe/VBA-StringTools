@@ -1923,6 +1923,7 @@ Public Function RandomStringAlphanumeric(ByVal length As Long) As String
     If Not isInitialized Then
         chars = StrConv(INKL_CHARS, vbFromUnicode)
         numPossChars = UBound(chars) - LBound(chars) + 1
+        isInitialized = True
     End If
     Dim b() As Byte: ReDim b(0 To length * 2 - 1)
     Randomize
