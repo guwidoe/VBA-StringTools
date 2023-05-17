@@ -44,7 +44,7 @@ Option Explicit
 #Else
     #If VBA7 Then
         'https://learn.microsoft.com/en-us/windows/win32/api/profileapi/nf-profileapi-queryperformancecounter
-        Private Declare PtrSafe Function QueryPerformanceFrequency Lib "kernel32" (ByRef Frequency As Currency) As LongPtr
+        Private Declare PtrSafe Function QueryPerformanceFrequency Lib "kernel32" (ByRef frequency As Currency) As LongPtr
         Private Declare PtrSafe Function QueryPerformanceCounter Lib "kernel32" (ByRef counter As Currency) As LongPtr
     #Else
         Private Declare Function QueryPerformanceFrequency Lib "kernel32" (ByRef Frequency As Currency) As Long
@@ -381,7 +381,7 @@ End Sub
 Public Function LimitConsecutiveSubstringRepetitionCheck(ByVal str As String, _
                                            Optional ByVal subStr As String = vbNewLine, _
                                            Optional ByVal limit As Long = 1, _
-                                           Optional ByVal compare As VbCompareMethod) _
+                                           Optional ByVal Compare As VbCompareMethod) _
                                                     As String
     Dim sReplace As String:     sReplace = RepeatString(subStr, limit)
     Dim sCompare As String:     sCompare = str
@@ -389,7 +389,7 @@ Public Function LimitConsecutiveSubstringRepetitionCheck(ByVal str As String, _
         Dim sFind As String:    sFind = sReplace & subStr
         Do
             LimitConsecutiveSubstringRepetitionCheck = sCompare
-            sCompare = Replace(sCompare, sFind, sReplace, , , compare)
+            sCompare = Replace(sCompare, sFind, sReplace, , , Compare)
             sFind = sFind & subStr 'This together with outer loop should
                                    'improve worst-case runtime a lot
         Loop Until sCompare = LimitConsecutiveSubstringRepetitionCheck
@@ -400,14 +400,14 @@ End Function
 Public Function LimitConsecutiveSubstringRepetitionCheck2(ByVal str As String, _
                                            Optional ByVal subStr As String = vbNewLine, _
                                            Optional ByVal limit As Long = 1, _
-                                           Optional ByVal compare As VbCompareMethod) _
+                                           Optional ByVal Compare As VbCompareMethod) _
                                                     As String
     Dim sReplace As String:     sReplace = RepeatString(subStr, limit)
     Dim sCompare As String:     sCompare = str
     Dim sFind As String:        sFind = sReplace & subStr
     Do
         LimitConsecutiveSubstringRepetitionCheck2 = sCompare
-        sCompare = Replace(sCompare, sFind, sReplace, , , compare)
+        sCompare = Replace(sCompare, sFind, sReplace, , , Compare)
     Loop Until sCompare = LimitConsecutiveSubstringRepetitionCheck2
 End Function
 
@@ -437,7 +437,7 @@ Sub RunLimitConsecutiveSubstringRepetitionTests()
     End If
     Exit Sub
 errh:
-    If Err.Number = vbObjectError + 43233 Then
+    If Err.number = vbObjectError + 43233 Then
         failedTests = failedTests + 1
         Debug.Print Err.description
         Resume Next
@@ -449,12 +449,12 @@ End Sub
 Private Sub TestLimitConsecutiveSubstringRepetition(ByVal str As String, _
                                   Optional ByVal subStr As String = vbNewLine, _
                                   Optional ByVal limit As Long = 1, _
-                                  Optional ByVal compare As VbCompareMethod)
-    If LimitConsecutiveSubstringRepetition(str, subStr, limit, compare) _
-    <> LimitConsecutiveSubstringRepetitionCheck(str, subStr, limit, compare) Then _
+                                  Optional ByVal Compare As VbCompareMethod)
+    If LimitConsecutiveSubstringRepetition(str, subStr, limit, Compare) _
+    <> LimitConsecutiveSubstringRepetitionCheck(str, subStr, limit, Compare) Then _
         Err.Raise vbObjectError + 43233, "TestLimitConsecutiveSubstringRepetition", _
         "TestLimitConsecutiveSubstringRepetition failed for: " & vbNewLine & _
-        "vbCompareMethod: " & compare & vbNewLine & _
+        "vbCompareMethod: " & Compare & vbNewLine & _
         "limit: " & limit & vbNewLine & _
         "subStr: " & subStr & _
         "str: " & str
@@ -659,8 +659,8 @@ Sub TestAPI()
     For Each cpID In AllCodePages
         Encode rndBytes, cpID, True
         i = i + 1
-        Debug.Print i, cpID, Err.Number, Err.description
-        convNotSupported(i) = Err.Number
+        Debug.Print i, cpID, Err.number, Err.description
+        convNotSupported(i) = Err.number
         On Error GoTo -1
     Next cpID
 '    i = 0
@@ -796,5 +796,6 @@ Private Sub TestEscapeUnescapeUnicodePerformance()
                     " Unescaping took: ", AccurateTimerMs() - startTime & " ms"
     Next i
 End Sub
+
 
 
