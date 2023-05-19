@@ -2172,12 +2172,7 @@ Public Function StringToCodepointNums(ByRef str As String) As Variant
     ReDim Preserve arr(0 To j - 1)
     StringToCodepointNums = arr
 End Function
-Sub asödlkjf()
-Dim n
-    n = StringToCodepointNums("")
-    Debug.Print IsEmpty(n)
-    Stop
-End Sub
+
 'Removes all characters from a string (str) that are not in the string inklChars
 'Default inklChars are all alphanumeric characters including dot and space
 Public Function CleanString(ByRef str As String, _
