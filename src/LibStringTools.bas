@@ -1915,6 +1915,7 @@ End Function
 'Returns a UTF-16 string containing all alphanumeric characters randomly equally
 'distributed. (0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz)
 Public Function RandomStringAlphanumeric(ByVal length As Long) As String
+    Const methodName As String = "RandomStringAlphanumeric"
     Const INKL_CHARS As String = _
         "01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
     Static chars() As Byte
@@ -1925,27 +1926,30 @@ Public Function RandomStringAlphanumeric(ByVal length As Long) As String
         numPossChars = UBound(chars) - LBound(chars) + 1
         isInitialized = True
     End If
+    
+    If length = 0 Then Exit Function
+    If length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
     Dim b() As Byte: ReDim b(0 To length * 2 - 1)
     Randomize
     Dim i As Long
-    For i = 0 To length - 1
-        b(2 * i) = chars(Int(Rnd * numPossChars))
+    For i = 0 To length * 2 - 1 Step 2
+        b(i) = chars(Int(Rnd * numPossChars))
     Next i
     RandomStringAlphanumeric = b
 End Function
 
-'Function returning a string containing all ASCII characters equally,
+'Returns a UTF-16 string containing all ASCII characters equally,
 'randomly distributed.
 Public Function RandomStringASCII(ByVal length As Long) As String
+    Const methodName As String = "RandomStringASCII"
     Const MAX_ASC As Long = &H7F&
+    If length = 0 Then Exit Function
+    If length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
     Dim i As Long
-    Dim char As Byte
     Dim b() As Byte: ReDim b(0 To length * 2 - 1)
-
     Randomize
-    For i = 0 To length - 1
-        char = Int(MAX_ASC * Rnd) + 1
-        b(2 * i) = char And &HFF
+    For i = 0 To length * 2 - 1 Step 2
+        b(i) = Int(MAX_ASC * Rnd) + 1
     Next i
     RandomStringASCII = b
 End Function
@@ -1954,9 +1958,10 @@ End Function
 '(Basic Multilingual Plane, so from all 2 byte UTF-16 chars) equally, randomly
 'distributed. Excludes surrogate range and BOM.
 Public Function RandomStringBMP(ByVal length As Long) As String
+    Const methodName As String = "RandomStringBMP"
     Const MAX_UINT As Long = &HFFFF&
-
-    If length < 1 Then Exit Function
+    If length = 0 Then Exit Function
+    If length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
 
     Dim i As Long
     Dim char As Long
@@ -1978,9 +1983,10 @@ End Function
 'randomly distributed. Excludes surrogate range and BOM.
 'Length in UTF-16 codepoints, (Len(result) = length)
 Public Function RandomStringUnicode(ByVal length As Long) As String
+    Const methodName As String = "RandomStringUnicode"
     Const MAX_UNICODE As Long = &H10FFFF
-
-    If length < 1 Then Exit Function
+    If length = 0 Then Exit Function
+    If length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
 
     Dim i As Long
     Dim char As Long
@@ -2022,6 +2028,9 @@ End Function
 
 'Returns a string containing random byte data
 Public Function RandomBytes(ByVal numBytes As Long) As String
+    Const methodName As String = "RandomBytes"
+    If length = 0 Then Exit Function
+    If length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
     Randomize
     Dim bytes() As Byte: ReDim bytes(0 To numBytes - 1)
     Dim i As Long
@@ -2041,9 +2050,8 @@ Public Function RandomString(ByVal length As Long, _
     Const methodName As String = "RandomString"
     Const MAX_UNICODE As Long = &H10FFFF
     Const MAX_UINT As Long = &HFFFF&
-    
-    If length < 1 Then Exit Function
-
+    If length = 0 Then Exit Function
+    If length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
     If maxCodepoint > MAX_UNICODE Or maxCodepoint < 0 Then Err.Raise 5, _
         methodName, "'maxCodepoint' outside of valid unicode range."
     If minCodepoint > MAX_UNICODE Or minCodepoint < 0 Then Err.Raise 5, _
@@ -2102,15 +2110,16 @@ Public Function RandomStringFromChars(ByVal length As Long, _
                              Optional ByRef inklChars As String = _
     "01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz") As String
     Const methodName As String = "RandomStringFromChars"
+    If length = 0 Then Exit Function
+    If Len(inklChars) = 0 Then Err.Raise 5, methodName, _
+        "No characters to build a string from specified in 'inklChars'"
+    If length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
     
     Dim chars() As String:    chars = StringToCodepointStrings(inklChars)
     Dim codepoints() As Long: codepoints = StringToCodepointNums(inklChars)
     Dim numChars As Long:  numChars = UBound(chars) - LBound(chars) + 1
-    Dim onlySurrogatePairs As Boolean
-    onlySurrogatePairs = numChars * 2 = Len(inklChars)
-    
-    If onlySurrogatePairs And length Mod 2 = 1 Then Err.Raise 5, methodName, _
-        "Can't build string of uneven length from only Surrogate Pairs."
+    If numChars * 2 = Len(inklChars) And length Mod 2 = 1 Then Err.Raise 5, _
+    methodName, "Can't build string of uneven length from only Surrogate Pairs."
         
     RandomStringFromChars = Space$(length)
     Randomize
@@ -2130,7 +2139,8 @@ End Function
 
 'Returns an array of strings containing the individual UTF-16 characters
 'Surrogate pairs remain together.
-Public Function StringToCodepointStrings(ByRef str As String) As String()
+Public Function StringToCodepointStrings(ByRef str As String) As Variant
+    If Len(str) = 0 Then Exit Function
     Dim arr() As String: ReDim arr(0 To Len(str) - 1)
     Dim i As Long, j As Long
     For i = 1 To Len(str)
@@ -2148,7 +2158,8 @@ End Function
 
 'Returns an array of numbers representing the individual UTF-16 codepoints from
 'the string 'str'
-Public Function StringToCodepointNums(ByRef str As String) As Long()
+Public Function StringToCodepointNums(ByRef str As String) As Variant
+    If Len(str) = 0 Then Exit Function
     Dim arr() As Long: ReDim arr(0 To Len(str) - 1)
     Dim i As Long, j As Long
     Dim codepoint As Long
@@ -2161,7 +2172,12 @@ Public Function StringToCodepointNums(ByRef str As String) As Long()
     ReDim Preserve arr(0 To j - 1)
     StringToCodepointNums = arr
 End Function
-
+Sub asödlkjf()
+Dim n
+    n = StringToCodepointNums("")
+    Debug.Print IsEmpty(n)
+    Stop
+End Sub
 'Removes all characters from a string (str) that are not in the string inklChars
 'Default inklChars are all alphanumeric characters including dot and space
 Public Function CleanString(ByRef str As String, _
