@@ -1201,8 +1201,8 @@ Public Function UnescapeUnicode(ByRef str As String, _
             Select Case buffFormat(nextPos)
                 Case efPython: TryPythonEscape escapes(i), str
                 Case efRust:   TryRustEscape escapes(i), str
-                Case efUPlus:  NextUPlusEscape escapes(i), str
-                Case efMarkup: NextMarkupEscape escapes(i), str
+                Case efUPlus:  TryUPlusEscape escapes(i), str
+                Case efMarkup: TryMarkupEscape escapes(i), str
             End Select
             With escapes(i)
                 If .unEscSize > 0 Then
@@ -1330,8 +1330,8 @@ Private Sub TryRustEscape(ByRef escape As EscapeSequence, ByRef str As String)
     End With
 End Sub
 
-Private Sub NextUPlusEscape(ByRef escape As EscapeSequence, _
-                            ByRef str As String)
+Private Sub TryUPlusEscape(ByRef escape As EscapeSequence, _
+                           ByRef str As String)
     Const h As String = "[0-9A-Fa-f]"
     Const UPLUS_ESCAPE_PATTERN_4_DIGITS = h & h & h & h & "*"
     Const UPLUS_ESCAPE_PATTERN_5_DIGITS = h & h & h & h & h & "*"
@@ -1374,8 +1374,8 @@ Private Sub NextUPlusEscape(ByRef escape As EscapeSequence, _
         End If
     End With
 End Sub
-Private Sub NextMarkupEscape(ByRef escape As EscapeSequence, _
-                             ByRef str As String)
+Private Sub TryMarkupEscape(ByRef escape As EscapeSequence, _
+                            ByRef str As String)
     Static mEscPattern(1 To 7) As String
     Static isPatternInit As Boolean
     Dim potentialEscape As String
