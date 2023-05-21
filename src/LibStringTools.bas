@@ -1209,7 +1209,6 @@ Public Function UnescapeUnicode(ByRef str As String, _
                     diff = .currPosition - inPos
                     If outPos > 1 Then
                         Mid$(UnescapeUnicode, outPos) = Mid$(str, inPos, diff)
-                        
                     End If
                     outPos = outPos + diff
                     If .unEscSize = 1 Then
