@@ -730,15 +730,15 @@ Private Sub TestEscapeAndUnescapeUnicode()
         
         'Generate a random string for testing
         Select Case i Mod 4
-        Case 0
-            originalStr = RandomStringASCII(10)
-        Case 1
-            originalStr = RandomStringAlphanumeric(10)
-        Case 2
-            originalStr = RandomStringBMP(10)
-        Case 3
-            originalStr = RandomStringUnicode(10)
-    End Select
+            Case 0
+                originalStr = RandomStringASCII(10)
+            Case 1
+                originalStr = RandomStringAlphanumeric(10)
+            Case 2
+                originalStr = RandomStringBMP(10)
+            Case 3
+                originalStr = RandomStringUnicode(10)
+        End Select
     
         'Test the EscapeUnicode function
         escapedStr = EscapeUnicode(originalStr, i Mod 127, formatTypes)

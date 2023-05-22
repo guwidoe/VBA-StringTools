@@ -781,7 +781,7 @@ Private Function GetReplacementCharForCodePage( _
     On Error GoTo 0
     On Error Resume Next
     GetReplacementCharForCodePage = replacementChars(CStr(cpID))
-    If Err.Number = 0 Then
+    If Err.number = 0 Then
         On Error GoTo 0
         Exit Function
     End If
@@ -1024,10 +1024,10 @@ End Function
 'Replaces all occurences of unicode characters outside the codePoint range
 'defined by maxNonEscapedCharCode with literals of the following formats
 'specified by `escapeFormat`:
-' efPython = 1 … \uXXXX \u00XXXXXX   (4 or 8 hex digits, 8 for chars outside BMP)
-' efRust   = 2 … \u{XXXX} \U{XXXXXX} (1 to 6 hex digits)
-' efUPlus  = 4 … u+XXXX u+XXXXXX     (4 or 6 hex digits)
-' efMarkup = 8 … &#ddddddd;          (1 to 7 decimal digits)
+' efPython = 1 ... \uXXXX \u00XXXXXX   (4 or 8 hex digits, 8 for chars outside BMP)
+' efRust   = 2 ... \u{XXXX} \U{XXXXXX} (1 to 6 hex digits)
+' efUPlus  = 4 ... u+XXXX u+XXXXXX     (4 or 6 hex digits)
+' efMarkup = 8 ... &#ddddddd;          (1 to 7 decimal digits)
 'Where:
 '   - prefixes \u is case insensitive
 '   - Xes are the digits of the codepoint in hexadecimal. (X = 0-9 or A-F/a-f)
@@ -1874,13 +1874,13 @@ Public Function RandomStringBMP(ByVal length As Long) As String
     Dim b() As Byte:  ReDim b(0 To length * 2 - 1)
 
     Randomize
-    For i = 0 To length - 1
+    For i = 0 To length - 1 Step 2
         Do
             char = Int(MAX_UINT * Rnd) + 1
         Loop Until (char < &HD800& Or char > &HDFFF&) _
                And (char <> &HFEFF&)
-        b(2 * i) = char And &HFF
-        b(2 * i + 1) = char \ &H100& And &HFF
+        b(i) = char And &HFF
+        b(i + 1) = char \ &H100& And &HFF
     Next i
     RandomStringBMP = b
 End Function
@@ -1900,23 +1900,23 @@ Public Function RandomStringUnicode(ByVal length As Long) As String
 
     Randomize
     If length > 1 Then
-        For i = 0 To length - 2
+        For i = 0 To length - 2 Step 2
             Do
                 char = Int(MAX_UNICODE * Rnd) + 1
             Loop Until (char < &HD800& Or char > &HDFFF&) _
                    And (char <> &HFEFF&)
             If char < &H10000 Then
-                b(2 * i) = char And &HFF
-                b(2 * i + 1) = (char / &H100&) And &HFF
+                b(i) = char And &HFF
+                b(i + 1) = char \ &H100& And &HFF
             Else
                 Dim m As Long: m = char - &H10000
                 Dim highSurrogate As Long: highSurrogate = &HD800& + (m \ &H400&)
                 Dim lowSurrogate As Long: lowSurrogate = &HDC00& + (m And &H3FF)
-                b(2 * i) = highSurrogate And &HFF&
-                b(2 * i + 1) = highSurrogate \ &H100&
-                i = i + 1
-                b(2 * i) = lowSurrogate And &HFF&
-                b(2 * i + 1) = lowSurrogate \ &H100&
+                b(i) = highSurrogate And &HFF&
+                b(i + 1) = highSurrogate \ &H100&
+                i = i + 2
+                b(i) = lowSurrogate And &HFF&
+                b(i + 1) = lowSurrogate \ &H100&
             End If
         Next i
     End If
@@ -1975,24 +1975,24 @@ Public Function RandomString(ByVal length As Long, _
 
     Randomize
     If length > 1 Then
-        For i = 0 To length - 2
+        For i = 0 To length - 2 Step 2
             Do
                 char = Int(cpRange * Rnd) + minCodepoint
             Loop Until (char < &HD800& Or char > &HDFFF&) _
                    And (char <> &HFEFF&)
 
             If char < &H10000 Then
-                b(2 * i) = char And &HFF
-                b(2 * i + 1) = (char / &H100&) And &HFF
+                b(i) = char And &HFF
+                b(1) = char \ &H100& And &HFF
             Else
                 Dim m As Long: m = char - &H10000
                 Dim highSurrogate As Long: highSurrogate = &HD800& + (m \ &H400&)
                 Dim lowSurrogate As Long: lowSurrogate = &HDC00& + (m And &H3FF)
-                b(2 * i) = highSurrogate And &HFF&
-                b(2 * i + 1) = highSurrogate \ &H100&
-                i = i + 1
-                b(2 * i) = lowSurrogate And &HFF&
-                b(2 * i + 1) = lowSurrogate \ &H100&
+                b(i) = highSurrogate And &HFF&
+                b(i + 1) = highSurrogate \ &H100&
+                i = i + 2
+                b(i) = lowSurrogate And &HFF&
+                b(i + 1) = lowSurrogate \ &H100&
             End If
         Next i
     End If
