@@ -103,12 +103,15 @@ Private Const BYTE_SIZE As Long = 1
 Private Const INT_SIZE As Long = 2
 
 Private Type EscapeSequence
-    Position As Long
-    PosUCase As Long 'Next escape like "\U1234"
-    PosLCase As Long 'Next escape like "\u1234"
-    length As Long
-    Format As UnicodeEscapeFormat
-    unescapedStr As String
+    ueFormat As UnicodeEscapeFormat
+    ueSignature As String
+    letSngSurrogate As Boolean
+    buffPosition As Long
+    currPosition As Long
+    sigSize As Long
+    escSize As Long
+    codepoint As Long
+    unEscSize As Long
 End Type
 
 #If Win64 Then
@@ -136,11 +139,14 @@ Private Const MAC_API_ERR_E2BIG  As Long = 7  'Argument list too long
 Private Const vbErrInternalError As Long = 51
 
 Public Enum UnicodeEscapeFormat
+    [_efNone] = 0
     efPython = 1 '\uXXXX \u00XXXXXX (4 or 8 hex digits, 8 for chars outside BMP)
     efRust = 2   '\u{X} \U{XXXXXX}  (1 to 6 hex digits)
     efUPlus = 4  'u+XXXX u+XXXXXX   (4 or 6 hex digits)
     efMarkup = 8 '&#ddddddd;        (1 to 7 decimal digits)
     efAll = 15
+    [_efMin] = efPython
+    [_efMax] = efAll
 End Enum
 
 'https://learn.microsoft.com/en-us/windows/win32/intl/code-page-identifiers
@@ -1041,8 +1047,8 @@ Public Function EscapeUnicode(ByRef str As String, _
     Const methodName As String = "EscapeUnicode"
     If maxNonEscapedCharCode < 0 Then Err.Raise 5, methodName, _
         "`maxNonEscapedCharCode` must be greater than 0."
-    If escapeFormat < 1 Or escapeFormat > efAll Then Err.Raise 5, methodName, _
-        "Invalid escape type."
+    If escapeFormat < [_efMin] Or escapeFormat > [_efMax] Then _
+        Err.Raise 5, methodName, "Invalid escape type."
     Dim i As Long
     Dim j As Long:                j = 1
     Dim result() As String:       ReDim result(1 To Len(str))
@@ -1110,10 +1116,10 @@ End Function
 
 'Replaces all occurences of unicode literals
 'Accepts the following formattings `escapeFormat`:
-' efPython = 1 … \uXXXX \u00XXXXXX   (4 or 8 hex digits, 8 for chars outside BMP)
-' efRust   = 2 … \u{XXXX} \U{XXXXXX} (1 to 6 hex digits)
-' efUPlus  = 4 … u+XXXX u+XXXXXX     (4 or 6 hex digits)
-' efMarkup = 8 … &#ddddddd;          (1 to 7 decimal digits)
+'   efPython = 1 ... \uXXXX \u000XXXXX    (4 or 8 hex digits, 8 for chars outside BMP)
+'   efRust   = 2 ... \u{XXXX} \U{XXXXXXX} (1 to 6 hex digits)
+'   efUPlus  = 4 ... u+XXXX u+XXXXXX      (4 or 6 hex digits)
+'   efMarkup = 8 ... &#ddddddd;           (1 to 7 decimal digits)
 'Where:
 '   - prefixes \u is case insensitive
 '   - Xes are the digits of the codepoint in hexadecimal. (X = 0-9 or A-F/a-f)
@@ -1136,368 +1142,267 @@ End Function
 '     the optional parameter `allowSingleSurrogates = False` like this
 '     `UnescapeUnicode("\uD801", , True)`. This will return invalid UTF-16.
 Public Function UnescapeUnicode(ByRef str As String, _
-                       Optional ByVal escapeFormat As UnicodeEscapeFormat _
-                                                    = efAll, _
-                       Optional ByVal allowSingleSurrogates As Boolean = False) _
-                                As String
-    Const methodName As String = "EscapeUnicode"
-    If escapeFormat < 1 Or escapeFormat > efAll Then Err.Raise 5, methodName, _
-        "Invalid escape format."
-        
-    Dim nextEscape() As EscapeSequence: ReDim nextEscape(0 To 3)
+                       Optional ByVal escapeFormat As UnicodeEscapeFormat = efAll, _
+                       Optional ByVal allowSingleSurrogates As Boolean = False) As String
+    If escapeFormat < [_efMin] Or escapeFormat > [_efMax] Then
+        Err.Raise 5, "EscapeUnicode", "Invalid escape format"
+    End If
+
+    Dim escapes() As EscapeSequence: escapes = NewEscapes()
+    Dim lb As Long: lb = LBound(escapes)
+    Dim ub As Long: ub = UBound(escapes)
     Dim i As Long
-    For i = 0 To (Log(efAll + 1) / Log(2)) - 1
-        nextEscape(i).Format = 2 ^ i
+
+    For i = lb To ub 'Find first signature for each wanted format
+        With escapes(i)
+            If escapeFormat And .ueFormat Then
+                .buffPosition = InStr(1, str, .ueSignature, vbBinaryCompare)
+                .letSngSurrogate = allowSingleSurrogates
+            End If
+        End With
     Next i
-    Dim ass As Boolean: ass = allowSingleSurrogates 'Just for shorter var name
-    If escapeFormat And efPython Then NextPythonEscape nextEscape(0), str, ass
-    If escapeFormat And efRust Then NextRustEscape nextEscape(1), str, ass
-    If escapeFormat And efUPlus Then NextUPlusEscape nextEscape(2), str, ass
-    If escapeFormat And efMarkup Then NextMarkupEscape nextEscape(3), str, ass
-    For i = 0 To (Log(efAll + 1) / Log(2)) - 1
-        If nextEscape(i).Position = 0 Then nextEscape(i).Position = &H7FFFFFFF
-    Next i
-    
     UnescapeUnicode = str 'Allocate buffer
     
-    'Bubble sort because it only runs once and the array has only 4 elements
-    Dim j As Long
-    For i = LBound(nextEscape) To UBound(nextEscape) - 1
-        For j = i + 1 To UBound(nextEscape)
-            If nextEscape(i).Position > nextEscape(j).Position Then
-                Dim temp As EscapeSequence: temp = nextEscape(i)
-                nextEscape(i) = nextEscape(j)
-                nextEscape(j) = temp
-            End If
-        Next j
-    Next i
-    Do Until nextEscape(UBound(nextEscape)).Position <> &H7FFFFFFF
-        If UBound(nextEscape) = LBound(nextEscape) Then Exit Function
-        ReDim Preserve nextEscape(LBound(nextEscape) To UBound(nextEscape) - 1)
-    Loop
-    
-    Dim lastPosOld As Long: lastPosOld = 1
-    Dim lastPosNew As Long: lastPosNew = 1
-    Do
-        Dim diff As Long: diff = nextEscape(0).Position - lastPosOld
-        If diff <> 0 Then Mid$(UnescapeUnicode, lastPosNew, diff) = _
-                                                    Mid$(str, lastPosOld, diff)
-        lastPosNew = lastPosNew + diff
-        lastPosOld = lastPosOld + diff
-        
-        Dim lenReplace As Long: lenReplace = Len(nextEscape(0).unescapedStr)
-        Mid$(UnescapeUnicode, lastPosNew, lenReplace) = _
-            nextEscape(0).unescapedStr
-        lastPosNew = lastPosNew + lenReplace
-        lastPosOld = lastPosOld + nextEscape(0).length
-        nextEscape(0).Position = lastPosOld
-        
-        Select Case nextEscape(0).Format
-            Case efPython: NextPythonEscape nextEscape(0), str, ass
-            Case efRust: NextRustEscape nextEscape(0), str, ass
-            Case efUPlus: NextUPlusEscape nextEscape(0), str, ass
-            Case efMarkup: NextMarkupEscape nextEscape(0), str, ass
-        End Select
-        
-        If nextEscape(0).Position = &H7FFFFFFF Then _
-            If UBound(nextEscape) = 0 Then Exit Do
+    Const posByte As Byte = &H80
+    Const buffSize As Long = 1024
+    Dim buffSignaturePos(1 To buffSize) As Byte
+    Dim buffFormat(1 To buffSize) As UnicodeEscapeFormat
+    Dim buffEscIndex(1 To buffSize) As Long
+    Dim posOffset As Long
+    Dim diff As Long
+    Dim highSur As Long
+    Dim lowSur As Long
+    Dim remainingLen As Long: remainingLen = Len(str)
+    Dim posChar As String:    posChar = ChrB$(posByte)
+    Dim outPos As Long:       outPos = 1
+    Dim inPos As Long:        inPos = 1
 
-        If UBound(nextEscape) > 0 Then
-            'This version of insertion sort assumes that only 1 element is
-            'out of order: Complexity O(n/2), worst case O(n)
-            For i = LBound(nextEscape) To UBound(nextEscape) - 1
-                If nextEscape(i).Position > nextEscape(i + 1).Position Then
-                    temp = nextEscape(i)
-                    nextEscape(i) = nextEscape(i + 1)
-                    nextEscape(i + 1) = temp
-                Else
-                    Exit For '(List was already sorted except for one element)
+    Do
+        Dim upperLimit As Long: upperLimit = posOffset + buffSize
+        For i = lb To ub 'Find all signatures within buffer size
+            With escapes(i)
+                Do Until .buffPosition = 0 Or .buffPosition > upperLimit
+                    .buffPosition = .buffPosition - posOffset
+                    buffSignaturePos(.buffPosition) = posByte
+                    buffFormat(.buffPosition) = .ueFormat
+                    buffEscIndex(.buffPosition) = i
+                    .buffPosition = .buffPosition + .sigSize + posOffset
+                    .buffPosition = InStr(.buffPosition, str, .ueSignature)
+                Loop
+            End With
+        Next i
+
+        Dim temp As String:  temp = buffSignaturePos
+        Dim nextPos As Long: nextPos = InStrB(1, temp, posChar)
+
+        Do Until nextPos = 0 'Unescape all found signatures from buffer
+            i = buffEscIndex(nextPos)
+            escapes(i).currPosition = nextPos + posOffset
+            Select Case buffFormat(nextPos)
+                Case efPython: TryPythonEscape escapes(i), str
+                Case efRust:   TryRustEscape escapes(i), str
+                Case efUPlus:  TryUPlusEscape escapes(i), str
+                Case efMarkup: TryMarkupEscape escapes(i), str
+            End Select
+            With escapes(i)
+                If .unEscSize > 0 Then
+                    diff = .currPosition - inPos
+                    If outPos > 1 Then
+                        Mid$(UnescapeUnicode, outPos) = Mid$(str, inPos, diff)
+                    End If
+                    outPos = outPos + diff
+                    If .unEscSize = 1 Then
+                        Mid$(UnescapeUnicode, outPos) = ChrW$(.codepoint)
+                    Else
+                        .codepoint = .codepoint - &H10000
+                        highSur = &HD800& Or (.codepoint \ &H400&)
+                        lowSur = &HDC00& Or (.codepoint And &H3FF&)
+                        Mid$(UnescapeUnicode, outPos) = ChrW$(highSur)
+                        Mid$(UnescapeUnicode, outPos + 1) = ChrW$(lowSur)
+                    End If
+                    outPos = outPos + .unEscSize
+                    inPos = .currPosition + .escSize
+                    nextPos = nextPos + .escSize - .sigSize
                 End If
-            Next i
-            If nextEscape(UBound(nextEscape)).Position = &H7FFFFFFF Then _
-                ReDim Preserve nextEscape(LBound(nextEscape) To _
-                                          UBound(nextEscape) - 1)
+                nextPos = InStrB(nextPos + .sigSize, temp, posChar)
+            End With
+        Loop
+        remainingLen = remainingLen - buffSize
+        posOffset = posOffset + buffSize
+        Erase buffSignaturePos
+    Loop Until remainingLen < 1
+    
+    If outPos > 1 Then
+        diff = Len(str) - inPos + 1
+        If diff > 0 Then
+            Mid$(UnescapeUnicode, outPos, diff) = Mid$(str, inPos, diff)
         End If
-    Loop
-    diff = Len(str) - lastPosOld + 1
-    If diff > 0 Then Mid$(UnescapeUnicode, lastPosNew, diff) = _
-                                            Mid$(str, lastPosOld, diff)
-    UnescapeUnicode = Left$(UnescapeUnicode, lastPosNew + diff - 1)
+        UnescapeUnicode = Left$(UnescapeUnicode, outPos + diff - 1)
+    End If
 End Function
-Private Sub NextPythonEscape(ByRef escape As EscapeSequence, _
-                             ByRef str As String, _
-                             ByVal ass As Boolean)
-    Const PYTHON_ESCAPE_PATTERN_NOT_BMP As String = _
-        "\[Uu]00[01][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]"
-    Const PYTHON_ESCAPE_PATTERN_BMP As String = _
-        "\[Uu][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]"
-    Const SIG_UCASE As String = "\U"
-    Const SIG_LCASE As String = "\u"
-    Const MAX_LONG As Long = &H7FFFFFFF
-    Dim potentialEscape As String
-    Dim codepoint As Long
-    With escape
-        If .Format <> efPython Then Err.Raise 5
-        If .Position = 0 Then
-            .PosLCase = InStr(1, str, SIG_LCASE, vbBinaryCompare)
-            If .PosLCase = 0 Then .PosLCase = MAX_LONG
-            .PosUCase = InStr(1, str, SIG_UCASE, vbBinaryCompare)
-            If .PosUCase = 0 Then .PosUCase = MAX_LONG
-            .Position = IIf(.PosUCase < .PosLCase, .PosUCase, .PosLCase)
-            If .Position = MAX_LONG Then Exit Sub
-        End If
-    End With
-    
-    Do
-        With escape
-            If .PosUCase < .PosLCase Then
-                .PosUCase = InStr(.Position, str, SIG_UCASE, vbBinaryCompare)
-                If .PosUCase = 0 Then .PosUCase = MAX_LONG
-            Else
-                .PosLCase = InStr(.Position, str, SIG_LCASE, vbBinaryCompare)
-                If .PosLCase = 0 Then .PosLCase = MAX_LONG
-            End If
-            .Position = IIf(.PosUCase < .PosLCase, .PosUCase, .PosLCase)
-            If .Position = MAX_LONG Then Exit Sub
-        End With
-        potentialEscape = Mid$(str, escape.Position, 10)
-        If potentialEscape Like PYTHON_ESCAPE_PATTERN_NOT_BMP Then
-            codepoint = CLng("&H" & Mid$(potentialEscape, 5))
-            GoSub CheckCodepoint
-        End If
-        potentialEscape = Left$(potentialEscape, 6)
-        If potentialEscape Like PYTHON_ESCAPE_PATTERN_BMP Then
-            codepoint = CLng("&H" & Mid$(potentialEscape, 3))
-            GoSub CheckNoSingleSurrogate
-        End If
-        escape.Position = escape.Position + 2
-    Loop
-    Exit Sub
-CheckCodepoint:
-    If codepoint < &H110000 Then
-CheckNoSingleSurrogate:
-        If codepoint < &HD800& Or codepoint >= &HE000& Or ass Then
-            escape.length = Len(potentialEscape)
-            escape.unescapedStr = ChrU(codepoint, ass)
-            Exit Sub
-        End If
+Private Function NewEscapes() As EscapeSequence()
+    Static escapes(0 To 6) As EscapeSequence
+    If escapes(0).ueFormat = [_efNone] Then
+        InitEscape escapes(0), efPython, "\U"
+        InitEscape escapes(1), efPython, "\u"
+        InitEscape escapes(2), efRust, "\U{"
+        InitEscape escapes(3), efRust, "\u{"
+        InitEscape escapes(4), efUPlus, "U+"
+        InitEscape escapes(5), efUPlus, "u+"
+        InitEscape escapes(6), efMarkup, "&#"
     End If
-    Return
-End Sub
-Private Sub NextRustEscape(ByRef escape As EscapeSequence, _
-                           ByRef str As String, _
-                           ByVal ass As Boolean)
-    Const RUST_ESCAPE_PATTERN_BASE As String = ""
-    Const RUST_ESCAPE_PATTERN_1_DIGIT As String = "\[Uu]{[0-9A-Fa-f]}"
-    Const RUST_ESCAPE_PATTERN_2_DIGITS As String = _
-                                                 "\[Uu]{[0-9A-Fa-f][0-9A-Fa-f]}"
-    Const RUST_ESCAPE_PATTERN_3_DIGITS As String = _
-                                      "\[Uu]{[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]}"
-    Const RUST_ESCAPE_PATTERN_4_DIGITS As String = _
-                           "\[Uu]{[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]}"
-    Const RUST_ESCAPE_PATTERN_5_DIGITS As String = _
-                "\[Uu]{[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]}"
-    Const RUST_ESCAPE_PATTERN_6_DIGITS As String = _
-                         "\[Uu]{10[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]}"
-    Const SIG_UCASE As String = "\U{"
-    Const SIG_LCASE As String = "\u{"
-    Const MAX_LONG As Long = &H7FFFFFFF
-    Dim potentialEscape As String
-    Dim codepoint As Long
+    NewEscapes = escapes
+End Function
+Private Sub InitEscape(ByRef escape As EscapeSequence, _
+                       ByVal ueFormat As UnicodeEscapeFormat, _
+                       ByRef ueSignature As String)
     With escape
-        If .Format <> efRust Then Err.Raise 5
-        If .Position = 0 Then
-            .PosLCase = InStr(1, str, SIG_LCASE, vbBinaryCompare)
-            If .PosLCase = 0 Then .PosLCase = MAX_LONG
-            .PosUCase = InStr(1, str, SIG_UCASE, vbBinaryCompare)
-            If .PosUCase = 0 Then .PosUCase = MAX_LONG
-            .Position = IIf(.PosUCase < .PosLCase, .PosUCase, .PosLCase)
-            If .Position = MAX_LONG Then Exit Sub
-        End If
+        .ueFormat = ueFormat
+        .ueSignature = ueSignature
+        .sigSize = Len(ueSignature)
     End With
-    
-    Do
-        With escape
-            If .PosUCase < .PosLCase Then
-                .PosUCase = InStr(.Position, str, SIG_UCASE, vbBinaryCompare)
-                If .PosUCase = 0 Then .PosUCase = MAX_LONG
-            Else
-                .PosLCase = InStr(.Position, str, SIG_LCASE, vbBinaryCompare)
-                If .PosLCase = 0 Then .PosLCase = MAX_LONG
-            End If
-            .Position = IIf(.PosUCase < .PosLCase, .PosUCase, .PosLCase)
-            If .Position = MAX_LONG Then Exit Sub
-        End With
-        
-        potentialEscape = Mid$(str, escape.Position, 10)
-        Dim nextClosingBrace As Long
-        nextClosingBrace = InStr(5, potentialEscape, "}", vbBinaryCompare)
-        Select Case nextClosingBrace
-            Case 10
-                If potentialEscape Like RUST_ESCAPE_PATTERN_6_DIGITS Then _
-                    GoSub CheckCodepoint
-            Case 9
-                potentialEscape = Left$(potentialEscape, 9)
-                If potentialEscape Like RUST_ESCAPE_PATTERN_5_DIGITS Then _
-                    GoSub CheckCodepoint
-            Case 8
-                potentialEscape = Left$(potentialEscape, 8)
-                If potentialEscape Like RUST_ESCAPE_PATTERN_4_DIGITS Then _
-                    GoSub CheckCodepoint
-            Case 7
-                potentialEscape = Left$(potentialEscape, 7)
-                If potentialEscape Like RUST_ESCAPE_PATTERN_3_DIGITS Then _
-                    GoSub CheckCodepoint
-            Case 6
-                potentialEscape = Left$(potentialEscape, 6)
-                If potentialEscape Like RUST_ESCAPE_PATTERN_2_DIGITS Then _
-                    GoSub CheckCodepoint
-            Case 5
-                potentialEscape = Left$(potentialEscape, 5)
-                If potentialEscape Like RUST_ESCAPE_PATTERN_1_DIGIT Then _
-                    GoSub CheckCodepoint
-        End Select
-        escape.Position = escape.Position + 3
-    Loop
-CheckCodepoint:
-    escape.length = Len(potentialEscape)
-    codepoint = CLng("&H" & Mid$(potentialEscape, 4, escape.length - 4))
-    If codepoint < &H110000 Then
-        If codepoint < &HD800& Or codepoint >= &HE000& Or ass Then
-            escape.unescapedStr = ChrU(codepoint, ass)
-            Exit Sub
-        End If
-    End If
-    Return
 End Sub
-Private Sub NextUPlusEscape(ByRef escape As EscapeSequence, _
-                            ByRef str As String, _
-                            ByVal ass As Boolean)
-    Const UPLUS_ESCAPE_PATTERN_4_DIGITS As String = _
-        "[Uu]+[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]"
-    Const UPLUS_ESCAPE_PATTERN_5_DIGITS As String = _
-        "[Uu]+[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]"
-    Const UPLUS_ESCAPE_PATTERN_6_DIGITS As String = _
-        "[Uu]+10[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]"
-    Const SIG_UCASE As String = "U+"
-    Const SIG_LCASE As String = "u+"
-    Const MAX_LONG As Long = &H7FFFFFFF
-    Dim potentialEscape As String
-    Dim codepoint As Long
-    With escape
-        If .Format <> efUPlus Then Err.Raise 5
-        If .Position = 0 Then
-            .PosLCase = InStr(1, str, SIG_LCASE, vbBinaryCompare)
-            If .PosLCase = 0 Then .PosLCase = MAX_LONG
-            .PosUCase = InStr(1, str, SIG_UCASE, vbBinaryCompare)
-            If .PosUCase = 0 Then .PosUCase = MAX_LONG
-            .Position = IIf(.PosUCase < .PosLCase, .PosUCase, .PosLCase)
-            If .Position = MAX_LONG Then Exit Sub
-        End If
-    End With
-    
-    Do
-        With escape
-            If .PosUCase < .PosLCase Then
-                .PosUCase = InStr(.Position, str, SIG_UCASE, vbBinaryCompare)
-                If .PosUCase = 0 Then .PosUCase = MAX_LONG
-            Else
-                .PosLCase = InStr(.Position, str, SIG_LCASE, vbBinaryCompare)
-                If .PosLCase = 0 Then .PosLCase = MAX_LONG
-            End If
-            .Position = IIf(.PosUCase < .PosLCase, .PosUCase, .PosLCase)
-            If .Position = MAX_LONG Then Exit Sub
-        End With
 
-        potentialEscape = Mid$(str, escape.Position, 8)
-        If potentialEscape Like UPLUS_ESCAPE_PATTERN_6_DIGITS Then _
-            GoSub CheckCodepoint
-        potentialEscape = Left$(potentialEscape, 7)
-        If potentialEscape Like UPLUS_ESCAPE_PATTERN_5_DIGITS Then _
-            GoSub CheckCodepoint
-        potentialEscape = Left$(potentialEscape, 6)
-        If potentialEscape Like UPLUS_ESCAPE_PATTERN_4_DIGITS Then _
-            GoSub CheckCodepoint
-        escape.Position = escape.Position + 2
-    Loop
-CheckCodepoint:
-    escape.length = Len(potentialEscape)
-    codepoint = CLng("&H" & Mid$(potentialEscape, 3))
-    If codepoint < &H110000 Then
-        If codepoint < &HD800& Or codepoint >= &HE000& Or ass Then
-            escape.unescapedStr = ChrU(codepoint, ass)
-            Exit Sub
-        End If
-    End If
-    Return
-End Sub
-Private Sub NextMarkupEscape(ByRef escape As EscapeSequence, _
-                             ByRef str As String, _
-                             ByVal ass As Boolean)
-    Const MARKUP_ESCAPE_PATTERN_1_DIGIT As String = "&[#]#;"
-    Const MARKUP_ESCAPE_PATTERN_2_DIGITS As String = "&[#]##;"
-    Const MARKUP_ESCAPE_PATTERN_3_DIGITS As String = "&[#]###;"
-    Const MARKUP_ESCAPE_PATTERN_4_DIGITS As String = "&[#]####;"
-    Const MARKUP_ESCAPE_PATTERN_5_DIGITS As String = "&[#]#####;"
-    Const MARKUP_ESCAPE_PATTERN_6_DIGITS As String = "&[#]######;"
-    Const MARKUP_ESCAPE_PATTERN_7_DIGITS As String = "&[#]1######;"
-    Const MAX_LONG As Long = &H7FFFFFFF
+Private Sub TryPythonEscape(ByRef escape As EscapeSequence, ByRef str As String)
+    Const h As String = "[0-9A-Fa-f]"
+    Const PYTHON_ESCAPE_PATTERN_NOT_BMP = "00[01]" & h & h & h & h & h
+    Const PYTHON_ESCAPE_PATTERN_BMP As String = h & h & h & h & "*"
     Dim potentialEscape As String
-    Dim codepoint As Long
-    If escape.Format <> efMarkup Then Err.Raise 5
-    If escape.Position = 0 Then escape.Position = 1
-    Do
-        escape.Position = InStr(escape.Position, str, "&#", vbBinaryCompare)
-        If escape.Position = 0 Then
-            escape.Position = MAX_LONG
-            escape.unescapedStr = vbNullString
-            Exit Sub
+
+    With escape
+        .unEscSize = 0
+        potentialEscape = Mid$(str, .currPosition + 2, 8) 'Exclude leading \[Uu]
+        If potentialEscape Like PYTHON_ESCAPE_PATTERN_NOT_BMP Then
+            .escSize = 10 '\[Uu]00[01]HHHHH
+            .codepoint = CLng("&H" & potentialEscape) 'No extra Mid$ needed
+            If .codepoint < &H10000 Then
+                If IsValidBMP(.codepoint, .letSngSurrogate) Then
+                    .unEscSize = 1
+                    Exit Sub
+                End If
+            ElseIf .codepoint < &H110000 Then
+                .unEscSize = 2
+                Exit Sub
+            End If
         End If
-        
-        potentialEscape = Mid$(str, escape.Position, 10)
-        Dim nextSemicolon As Long
-        nextSemicolon = InStr(4, potentialEscape, ";", vbBinaryCompare)
-        Select Case nextSemicolon
-            Case 10
-                If potentialEscape Like MARKUP_ESCAPE_PATTERN_7_DIGITS Then _
-                    GoSub CheckCodepoint
-            Case 9
-                potentialEscape = Left$(potentialEscape, 9)
-                If potentialEscape Like MARKUP_ESCAPE_PATTERN_6_DIGITS Then _
-                    GoSub CheckCodepoint
-            Case 8
-                potentialEscape = Left$(potentialEscape, 8)
-                If potentialEscape Like MARKUP_ESCAPE_PATTERN_5_DIGITS Then _
-                    GoSub CheckCodepoint
-            Case 7
-                potentialEscape = Left$(potentialEscape, 7)
-                If potentialEscape Like MARKUP_ESCAPE_PATTERN_4_DIGITS Then _
-                    GoSub CheckCodepoint
-            Case 6
-                potentialEscape = Left$(potentialEscape, 6)
-                If potentialEscape Like MARKUP_ESCAPE_PATTERN_3_DIGITS Then _
-                    GoSub CheckCodepoint
-            Case 5
-                potentialEscape = Left$(potentialEscape, 5)
-                If potentialEscape Like MARKUP_ESCAPE_PATTERN_2_DIGITS Then _
-                    GoSub CheckCodepoint
-            Case 4
-                potentialEscape = Left$(potentialEscape, 4)
-                If potentialEscape Like MARKUP_ESCAPE_PATTERN_1_DIGIT Then _
-                    GoSub CheckCodepoint
-        End Select
-        escape.Position = escape.Position + 2
-    Loop
-CheckCodepoint:
-    escape.length = Len(potentialEscape)
-    codepoint = CLng(Mid$(potentialEscape, 3, escape.length - 3))
-    If codepoint < &H110000 Then
-        If codepoint < &HD800& Or codepoint >= &HE000& Or ass Then
-            escape.unescapedStr = ChrU(codepoint, ass)
-            Exit Sub
+        If potentialEscape Like PYTHON_ESCAPE_PATTERN_BMP Then
+            .escSize = 6 '\[Uu]HHHH
+            .codepoint = CLng("&H" & Left$(potentialEscape, 4))
+            If IsValidBMP(.codepoint, .letSngSurrogate) Then .unEscSize = 1
         End If
+    End With
+End Sub
+Private Function IsValidBMP(ByVal codepoint As Long, _
+                            ByVal letSingleSurrogate As Boolean) As Boolean
+    IsValidBMP = (codepoint < &HD800& Or codepoint >= &HE000& Or letSingleSurrogate)
+End Function
+
+Private Sub TryRustEscape(ByRef escape As EscapeSequence, ByRef str As String)
+    Static rustEscPattern(1 To 6) As String
+    Static isPatternInit As Boolean
+    Dim potentialEscape As String
+    Dim nextBrace As Long
+    
+    If Not isPatternInit Then
+        Dim i As Long
+        rustEscPattern(1) = "[0-9A-Fa-f]}*"
+        For i = 2 To 6
+            rustEscPattern(i) = "[0-9A-Fa-f]" & rustEscPattern(i - 1)
+        Next i
+        isPatternInit = True
     End If
-    Return
+    With escape
+        .unEscSize = 0
+        potentialEscape = Mid$(str, .currPosition + 3, 7) 'Exclude leading \[Uu]{
+        nextBrace = InStr(2, potentialEscape, "}", vbBinaryCompare)
+        
+        If nextBrace = 0 Then Exit Sub
+        If Not potentialEscape Like rustEscPattern(nextBrace - 1) Then Exit Sub
+        
+        .codepoint = CLng("&H" & Left$(potentialEscape, nextBrace - 1))
+        .escSize = nextBrace + 3
+        If .codepoint < &H10000 Then
+            If IsValidBMP(.codepoint, .letSngSurrogate) Then .unEscSize = 1
+        ElseIf .codepoint < &H110000 Then
+            .unEscSize = 2
+        End If
+    End With
+End Sub
+
+Private Sub TryUPlusEscape(ByRef escape As EscapeSequence, _
+                           ByRef str As String)
+    Const h As String = "[0-9A-Fa-f]"
+    Const UPLUS_ESCAPE_PATTERN_4_DIGITS = h & h & h & h & "*"
+    Const UPLUS_ESCAPE_PATTERN_5_DIGITS = h & h & h & h & h & "*"
+    Const UPLUS_ESCAPE_PATTERN_6_DIGITS = h & h & h & h & h & h
+    Dim potentialEscape As String
+    
+    With escape
+        .unEscSize = 0
+        potentialEscape = Mid$(str, .currPosition + 2, 6) 'Exclude leading [Uu]+
+        If potentialEscape Like UPLUS_ESCAPE_PATTERN_6_DIGITS Then
+            .escSize = 8
+            .codepoint = CLng("&H" & potentialEscape)
+            If .codepoint < &H10000 Then
+                If IsValidBMP(.codepoint, .letSngSurrogate) Then
+                    .unEscSize = 1
+                    Exit Sub
+                End If
+            ElseIf .codepoint < &H110000 Then
+                .unEscSize = 2
+                Exit Sub
+            End If
+        End If
+        If potentialEscape Like UPLUS_ESCAPE_PATTERN_5_DIGITS Then
+            .escSize = 7
+            .codepoint = CLng("&H" & Left$(potentialEscape, 5))
+            If .codepoint < &H10000 Then
+                If IsValidBMP(.codepoint, .letSngSurrogate) Then
+                    .unEscSize = 1
+                    Exit Sub
+                End If
+            Else
+                .unEscSize = 2
+                Exit Sub
+            End If
+        End If
+        If potentialEscape Like UPLUS_ESCAPE_PATTERN_4_DIGITS Then
+            .escSize = 6
+            .codepoint = CLng("&H" & Left$(potentialEscape, 4))
+            If IsValidBMP(.codepoint, .letSngSurrogate) Then .unEscSize = 1
+        End If
+    End With
+End Sub
+Private Sub TryMarkupEscape(ByRef escape As EscapeSequence, _
+                            ByRef str As String)
+    Static mEscPattern(1 To 7) As String
+    Static isPatternInit As Boolean
+    Dim potentialEscape As String
+    Dim nextSemicolon As Long
+    
+    If Not isPatternInit Then
+        Dim i As Long
+        For i = 1 To 6
+            mEscPattern(i) = String$(i, "#") & ";*"
+        Next i
+        mEscPattern(7) = "1######;"
+        isPatternInit = True
+    End If
+    With escape
+        potentialEscape = Mid$(str, .currPosition + 2, 8) 'Exclude leading &[#]
+        nextSemicolon = InStr(2, potentialEscape, ";", vbBinaryCompare)
+        
+        If nextSemicolon = 0 Then Exit Sub
+        If Not potentialEscape Like mEscPattern(nextSemicolon - 1) Then Exit Sub
+        
+        .codepoint = CLng(Left$(potentialEscape, nextSemicolon - 1))
+        .escSize = nextSemicolon + 2
+        If .codepoint < &H10000 Then
+            If IsValidBMP(.codepoint, .letSngSurrogate) Then .unEscSize = 1
+        ElseIf .codepoint < &H110000 Then
+            .unEscSize = 2
+        End If
+    End With
 End Sub
 
 'Returns the given unicode codepoint as standard VBA UTF-16LE string
@@ -2029,8 +1934,8 @@ End Function
 'Returns a string containing random byte data
 Public Function RandomBytes(ByVal numBytes As Long) As String
     Const methodName As String = "RandomBytes"
-    If length = 0 Then Exit Function
-    If length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
+    If numBytes = 0 Then Exit Function
+    If numBytes < 0 Then Err.Raise 5, methodName, "numBytes must be >= 0"
     Randomize
     Dim bytes() As Byte: ReDim bytes(0 To numBytes - 1)
     Dim i As Long
