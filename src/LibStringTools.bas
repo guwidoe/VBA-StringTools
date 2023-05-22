@@ -781,7 +781,7 @@ Private Function GetReplacementCharForCodePage( _
     On Error GoTo 0
     On Error Resume Next
     GetReplacementCharForCodePage = replacementChars(CStr(cpID))
-    If Err.number = 0 Then
+    If Err.Number = 0 Then
         On Error GoTo 0
         Exit Function
     End If
@@ -1389,6 +1389,7 @@ Private Sub TryMarkupEscape(ByRef escape As EscapeSequence, _
         isPatternInit = True
     End If
     With escape
+        .unEscSize = 0
         potentialEscape = Mid$(str, .currPosition + 2, 8) 'Exclude leading &[#]
         nextSemicolon = InStr(2, potentialEscape, ";", vbBinaryCompare)
         
