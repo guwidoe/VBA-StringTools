@@ -114,6 +114,13 @@ Private Type EscapeSequence
     unEscSize As Long
 End Type
 
+Private Type TwoCharTemplate
+    s As String * 2
+End Type
+Private Type LongTemplate
+    l As Long
+End Type
+
 #If Win64 Then
     #If Mac Then
         Private Const vbLongLong As Long = 20 'Apparently missing for x64 on Mac
@@ -1410,6 +1417,8 @@ End Sub
 Public Function ChrU(ByVal codepoint As Long, _
              Optional ByVal allowSingleSurrogates As Boolean = False) As String
     Const methodName As String = "ChrU"
+    Static st As TwoCharTemplate
+    Static lt As LongTemplate
 
     If codepoint < &H8000 Then Err.Raise 5, methodName, "Codepoint < -32768"
     If codepoint < 0 Then codepoint = codepoint And &HFFFF& 'Incase of uInt input
@@ -1421,9 +1430,10 @@ Public Function ChrU(ByVal codepoint As Long, _
     ElseIf codepoint < &H10000 Then
         ChrU = ChrW$(codepoint)
     ElseIf codepoint < &H110000 Then
-        codepoint = codepoint - &H10000
-        ChrU = ChrW$(&HD800& Or (codepoint \ &H400&)) & _
-               ChrW$(&HDC00& Or (codepoint And &H3FF&))
+        lt.l = (&HD800& Or (codepoint \ &H400& - &H40&)) _
+            Or (&HDC00 Or (codepoint And &H3FF&)) * &H10000 '&HDC00 with no &
+        LSet st = lt
+        ChrU = st.s
     Else
         Err.Raise 5, methodName, "Codepoint outside of valid Unicode range."
     End If
