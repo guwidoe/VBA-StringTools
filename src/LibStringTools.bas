@@ -2602,11 +2602,11 @@ End Function
 'a row) the string will not be split at that position and instead the double
 'delimiter will be replaced by a single one
 Public Function SplitUnlessEscaped(ByRef str As String, _
-                            Optional ByRef sDelimiter As String = " ", _
-                            Optional ByVal lLimit As Long = -1, _
-                            Optional ByVal lCompare As VbCompareMethod = _
-                                                       vbBinaryCompare) _
-                                     As Variant
+                          Optional ByRef sDelimiter As String = " ", _
+                          Optional ByVal lLimit As Long = -1, _
+                          Optional ByVal lCompare As VbCompareMethod = _
+                                                     vbBinaryCompare) _
+                                   As Variant
     Const methodName As String = "SplitUnlessEscaped"
     If lLimit < -1 Then Err.Raise 5, methodName, _
         "Argument 'lLimit' = " & lLimit & " < -1, invalid"
@@ -2628,7 +2628,7 @@ Public Function SplitUnlessEscaped(ByRef str As String, _
     Dim partStart As Long:      partStart = 1
     Dim count As Long:          count = 0
     Dim lastOccurrence As Long: lastOccurrence = 1
-    Dim i As Long:              i = InStr(lastOccurrence, str, sDelimiter, lCompare)
+    Dim i As Long:          i = InStr(lastOccurrence, str, sDelimiter, lCompare)
     
     Do Until i = 0 Or count + 1 >= lLimit
         If Mid(str, i + lenDelim, lenDelim) = sDelimiter Then
@@ -2646,6 +2646,56 @@ Public Function SplitUnlessEscaped(ByRef str As String, _
     If count < lLimit Then arr(count) = Replace(Mid(str, partStart), _
                                             sDelimiter & sDelimiter, sDelimiter)
     SplitUnlessEscaped = arr
+End Function
+
+'Works like 'SplitB', but if delimiter is escaped (appears twice in
+'a row) the string will not be split at that position and instead the double
+'delimiter will be replaced by a single one
+Public Function SplitUnlessEscapedB(ByRef bytes As String, _
+                           Optional ByRef sDelimiter As String = " ", _
+                           Optional ByVal lLimit As Long = -1, _
+                           Optional ByVal lCompare As VbCompareMethod = _
+                                                      vbBinaryCompare) _
+                                    As Variant
+    Const methodName As String = "SplitUnlessEscapedB"
+    If lLimit < -1 Then Err.Raise 5, methodName, _
+        "Argument 'lLimit' = " & lLimit & " < -1, invalid"
+    lLimit = lLimit And &H7FFFFFFF
+
+    If LenB(bytes) = 0 Or LenB(sDelimiter) = 0 Or lLimit < 2 Then
+        Dim arr() As String:  ReDim arr(0 To 0)
+        arr(0) = bytes
+        SplitUnlessEscapedB = arr
+        Exit Function
+    End If
+    
+    Dim lenBDelim As Long:   lenBDelim = LenB(sDelimiter)
+    Dim numParts As Long:    numParts = CountSubstringUnlessEscapedB(bytes, _
+                                                    sDelimiter, 1, lCompare) + 1
+    If lLimit < numParts Then numParts = lLimit
+
+    ReDim arr(0 To numParts - 1)
+    Dim partStart As Long:      partStart = 1
+    Dim count As Long:          count = 0
+    Dim lastOccurrence As Long: lastOccurrence = 1
+    Dim i As Long:       i = InStrB(lastOccurrence, bytes, sDelimiter, lCompare)
+    
+    Do Until i = 0 Or count + 1 >= lLimit
+        If MidB(bytes, i + lenBDelim, lenBDelim) = sDelimiter Then
+            lastOccurrence = i + 2 * lenBDelim
+        Else
+            arr(count) = Replace(MidB(bytes, partStart, i - partStart), _
+                                 sDelimiter & sDelimiter, sDelimiter)
+            count = count + 1
+            partStart = i + lenBDelim
+            lastOccurrence = partStart
+        End If
+        i = InStrB(lastOccurrence, bytes, sDelimiter, lCompare)
+    Loop
+    
+    If count < lLimit Then arr(count) = Replace(MidB(bytes, partStart), _
+                                            sDelimiter & sDelimiter, sDelimiter)
+    SplitUnlessEscapedB = arr
 End Function
 
 'Splits a string at every occurrence of the specified delimiter "delim", unless
