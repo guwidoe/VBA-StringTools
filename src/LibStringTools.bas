@@ -2569,9 +2569,11 @@ Public Function SplitB(ByRef bytes As String, _
     If lLimit < -1 Then Err.Raise 5, methodName, _
         "Argument 'lLimit' = " & lLimit & " < -1, invalid"
     lLimit = lLimit And &H7FFFFFFF
-
+    
     If LenB(bytes) = 0 Or LenB(sDelimiter) = 0 Or lLimit < 2 Then
-        SplitB = VBA.Array(bytes) 'Ignores Option Base 1, like inbuilt 'Split'
+        Dim arr() As String:  ReDim arr(0 To 0)
+        arr(0) = bytes
+        SplitB = arr
         Exit Function
     End If
 
@@ -2580,7 +2582,7 @@ Public Function SplitB(ByRef bytes As String, _
                                                        1, lCompare) + 1
     If lLimit < numParts Then numParts = lLimit
 
-    Dim arr As Variant:         ReDim arr(0 To numParts - 1)
+    ReDim arr(0 To numParts - 1)
     Dim i As Long:              i = InStrB(1, bytes, sDelimiter, lCompare)
     Dim lastOccurrence As Long: lastOccurrence = 1
     Dim count As Long:          count = 0
