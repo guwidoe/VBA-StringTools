@@ -2216,6 +2216,67 @@ Public Function CountSubstringB(ByRef bytes As String, _
     Loop
 End Function
 
+'Counts the number of times a substring exists in a string unless they are
+'escaped' (appear twice in a row). Does not count overlapping occurrences of
+'substring.
+'E.g.: CountSubstringUnlessEscaped("abababababab", "abab") -> 1
+Public Function CountSubstringUnlessEscaped(ByRef str As String, _
+                                            ByRef subStr As String, _
+                                   Optional ByVal lStart As Long = 1, _
+                                   Optional ByVal lCompare As VbCompareMethod _
+                                                            = vbBinaryCompare) _
+                                            As Long
+    Const methodName As String = "CountSubstringUnlessEscaped"
+    If lStart < 1 Then Err.Raise 5, methodName, _
+        "Argument 'Start' = " & lStart & " < 1, invalid"
+
+    Dim lenSubStr As Long: lenSubStr = Len(subStr)
+    Dim i As Long:         i = InStr(lStart, str, subStr, lCompare)
+
+    CountSubstringUnlessEscaped = 0
+    Do Until i = 0
+        If StrComp(subStr, Mid(str, i + lenSubStr, lenSubStr), lCompare) = 0 Then
+            i = i + lenSubStr
+        Else
+            CountSubstringUnlessEscaped = CountSubstringUnlessEscaped + 1
+        End If
+        i = InStr(i + lenSubStr, str, subStr, lCompare)
+    Loop
+End Function
+
+'Like CountSubstringUnlessEscaped but scans a string bytewise.
+'Example illustrating the difference to CountSubstring:
+'                       |c1||c2||c3||c4|
+'bytes = HexToString("0x0061006100610061")
+'                         |escape||ct|
+'sFind =   HexToString("0x6100")
+'CountSubstringUnlessEscaped(bytes, sFind) -> 0
+'CountSubstringUnlessEscapedB(bytes, sFind) -> 1
+Public Function CountSubstringUnlessEscapedB(ByRef bytes As String, _
+                                             ByRef subStr As String, _
+                                    Optional ByVal lStart As Long = 1, _
+                                    Optional ByVal lCompare As VbCompareMethod _
+                                                            = vbBinaryCompare) _
+                                             As Long
+    Const methodName As String = "CountSubstringUnlessEscaped"
+    If lStart < 1 Then Err.Raise 5, methodName, _
+        "Argument 'Start' = " & lStart & " < 1, invalid"
+
+    Dim lenBSubStr As Long: lenBSubStr = LenB(subStr)
+    Dim i As Long:          i = InStrB(lStart, bytes, subStr, lCompare)
+
+    CountSubstringUnlessEscapedB = 0
+    Do Until i = 0
+        If StrComp(subStr, MidB(bytes, i + lenBSubStr, lenBSubStr), _
+                   lCompare) = 0 Then
+            i = i + lenBSubStr
+        Else
+            CountSubstringUnlessEscapedB = CountSubstringUnlessEscapedB + 1
+        End If
+        i = InStrB(i + lenBSubStr, bytes, subStr, lCompare)
+    Loop
+End Function
+
 'Works like the inbuilt 'Replace', but parses the string bytewise, not charwise.
 'Example illustrating the difference:
 'bytes = HexToString("0x00610061")
