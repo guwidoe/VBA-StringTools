@@ -2684,8 +2684,8 @@ Public Function SplitUnlessEscapedB(ByRef bytes As String, _
         If MidB(bytes, i + lenBDelim, lenBDelim) = sDelimiter Then
             lastOccurrence = i + 2 * lenBDelim
         Else
-            arr(count) = Replace(MidB(bytes, partStart, i - partStart), _
-                                 sDelimiter & sDelimiter, sDelimiter)
+            arr(count) = ReplaceB(MidB(bytes, partStart, i - partStart), _
+                                  sDelimiter & sDelimiter, sDelimiter)
             count = count + 1
             partStart = i + lenBDelim
             lastOccurrence = partStart
@@ -2693,7 +2693,7 @@ Public Function SplitUnlessEscapedB(ByRef bytes As String, _
         i = InStrB(lastOccurrence, bytes, sDelimiter, lCompare)
     Loop
     
-    If count < lLimit Then arr(count) = Replace(MidB(bytes, partStart), _
+    If count < lLimit Then arr(count) = ReplaceB(MidB(bytes, partStart), _
                                             sDelimiter & sDelimiter, sDelimiter)
     SplitUnlessEscapedB = arr
 End Function
@@ -2871,5 +2871,53 @@ Private Function GetArrayDimsCount(ByRef arr As Variant) As Long
     Next dimension
 FinalDimension:
     GetArrayDimsCount = dimension - 1
+End Function
+
+'This function can replace multiple values with multiple different replace
+'values in each element of an array or just in a regular string.
+'E.g.: ArrayReplaceMultiple("ab", Array("a", "b"), Array("c", "d")) returns "cd"
+'Or: ArrayReplaceMultiple(Array("ab", "ab"), Array("a", "b"), Array("c", "d"))
+'returns an array with two elements: ("cd", "cd")
+Public Function ArrayReplaceMultiple(ByVal strOrStrArr As Variant, _
+                                     ByVal findOrFinds As Variant, _
+                                     ByVal replaceOrReplaces As Variant, _
+                            Optional ByVal compareMethod As VbCompareMethod _
+                                                          = vbBinaryCompare) _
+                                     As Variant
+    Const methodName As String = "ReplaceMultiple"
+    If IsArray(findOrFinds) Then If Not IsArray(replaceOrReplaces) Then _
+        Err.Raise 5, methodName, "Finds and Replaces must both be array or not."
+    If IsArray(findOrFinds) Then
+        If Not UBound(findOrFinds) - LBound(findOrFinds) = _
+               UBound(replaceOrReplaces) - LBound(replaceOrReplaces) Then
+            Err.Raise 5, methodName, _
+                "There must be the same number of find and replace values"
+        End If
+    Else
+        Dim tmpArr As Variant: ReDim tmpArr(0 To 0)
+        tmpArr(0) = findOrFinds
+        findOrFinds = tmpArr
+        tmpArr(0) = replaceOrReplaces
+        replaceOrReplaces = tmpArr
+    End If
+    Dim i As Long, j As Long, k As Long
+    If IsArray(strOrStrArr) Then
+        For i = LBound(strOrStrArr) To UBound(strOrStrArr)
+            k = LBound(replaceOrReplaces)
+            For j = LBound(findOrFinds) To UBound(findOrFinds)
+                strOrStrArr(i) = Replace(strOrStrArr(i), findOrFinds(j), _
+                                        replaceOrReplaces(k), , , compareMethod)
+                k = k + 1
+            Next j
+        Next i
+    Else
+        k = LBound(replaceOrReplaces)
+        For j = LBound(findOrFinds) To UBound(findOrFinds)
+            strOrStrArr = Replace(strOrStrArr, findOrFinds(j), _
+                                  replaceOrReplaces(k), , , compareMethod)
+            k = k + 1
+        Next j
+    End If
+    ArrayReplaceMultiple = strOrStrArr
 End Function
 
