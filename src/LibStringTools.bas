@@ -2178,6 +2178,7 @@ Public Function CountSubstring(ByRef str As String, _
     Const methodName As String = "CountSubstring"
     If lStart < 1 Then Err.Raise 5, methodName, _
         "Argument 'Start' = " & lStart & " < 1, invalid"
+    If subStr = vbNullString Then Exit Function
 
     Dim lenSubStr As Long: lenSubStr = Len(subStr)
     Dim i As Long:         i = InStr(lStart, str, subStr, lCompare)
@@ -2205,7 +2206,8 @@ Public Function CountSubstringB(ByRef bytes As String, _
     Const methodName As String = "CountSubstringB"
     If lStart < 1 Then Err.Raise 5, methodName, _
         "Argument 'Start' = " & lStart & " < 1, invalid"
-
+    If subStr = vbNullString Then Exit Function
+    
     Dim lenBSubStr As Long: lenBSubStr = LenB(subStr)
     Dim i As Long:          i = InStrB(lStart, bytes, subStr, lCompare)
 
@@ -2298,7 +2300,7 @@ Public Function ReplaceB(ByRef bytes As String, _
     lCount = lCount And &H7FFFFFFF
 
     If LenB(bytes) = 0 Or LenB(sFind) = 0 Then
-        ReplaceB = bytes
+        ReplaceB = MidB$(bytes, lStart)
         Exit Function
     End If
 
