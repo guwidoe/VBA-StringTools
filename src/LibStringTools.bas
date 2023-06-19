@@ -2996,7 +2996,7 @@ Public Function ReplaceMultiple(ByRef str As String, _
         Else
             nextOcc = InStr(lStart, str, finds(i), lCompare) * 2 - 1
         End If
-        If nextOcc <> 0 Then
+        If nextOcc > 0 Then
             insertElement(0) = nextOcc
             insertElement(1) = i
             insertElement(2) = i Mod m
@@ -3203,7 +3203,7 @@ Public Function ReplaceMultipleB(ByRef bytes As String, _
         Else
             nextOcc = InStr(lStart, str, finds(i), lCompare) * 2 - 1
         End If
-        If nextOcc <> 0 Then
+        If nextOcc > 0 Then
             insertElement(0) = nextOcc
             insertElement(1) = i
             insertElement(2) = i Mod m
