@@ -797,5 +797,17 @@ Private Sub TestEscapeUnescapeUnicodePerformance()
     Next i
 End Sub
 
+Sub TestReplaceMultiple()
 
+    Dim s As String
+    s = "12322"
+    Debug.Print ReplaceMultiple(s, Array("1", "2", "3"), Array("44", "55")) = Replace(Replace(Replace(s, "1", "44"), "2", "55"), "3", "44")
+    st
+    ReplaceMultiple s, Array("1", "2", "3"), Array("44", "55")
+    RT , , True
+    Replace Replace(Replace(s, "1", "44"), "2", "55"), "3", "44"
+    RT
+    
+    Debug.Print ReplaceMultipleB(s, Array("1", "2", "3"), Array("44", "55"))
+End Sub
 

@@ -2969,7 +2969,8 @@ Public Function ReplaceMultiple(ByRef str As String, _
     Dim insertElement(0 To 2) As Long
     Dim heapSize As Long
     For i = 0 To UBound(finds)
-        Dim nextOcc As Long: nextOcc = InStr(lStart, str, finds(i), lCompare) * 2 - 1
+        Dim nextOcc As Long
+        nextOcc = InStr(lStart, str, finds(i), lCompare) * 2 - 1
         If nextOcc <> 0 Then
             insertElement(0) = nextOcc
             insertElement(1) = i
@@ -3083,6 +3084,192 @@ HeapRemoveMin:
     Loop
     Return
 End Function
+
+'Same as ReplaceMultiple but parses the string bytewise
+Public Function ReplaceMultipleB(ByRef bytes As String, _
+                                 ByRef sFindOrFinds As Variant, _
+                                 ByRef sReplaceOrReplaces As Variant, _
+                        Optional ByVal lStart As Long = 1, _
+                        Optional ByVal lCount As Long = -1, _
+                        Optional ByVal lCompare As VbCompareMethod _
+                                                 = vbBinaryCompare) As String
+    Const methodName As String = "ReplaceMultipleB"
+    If lStart < 1 Then Err.Raise 5, methodName, _
+                               "Argument 'lStart' = " & lStart & " < 1, invalid"
+    If lCount < -1 Then Err.Raise 5, methodName, _
+                              "Argument 'lCount' = " & lCount & " < -1, invalid"
+                              
+    If lStart > LenB(bytes) Then Exit Function
+    
+    Dim finds As Variant
+    If IsArray(sFindOrFinds) Then finds = sFindOrFinds _
+                             Else finds = VBA.Array(sFindOrFinds)
+    If Not LBound(finds) = 0 Then _
+        ReDim Preserve finds(0 To UBound(finds) - LBound(finds))
+    Dim replaces As Variant
+    If IsArray(sReplaceOrReplaces) Then replaces = sReplaceOrReplaces _
+                                   Else replaces = VBA.Array(sReplaceOrReplaces)
+    If Not LBound(replaces) = 0 Then _
+        ReDim Preserve replaces(0 To UBound(replaces) - LBound(replaces))
+    lCount = lCount And &H7FFFFFFF
+    
+    If UBound(finds) = 0 And Len(finds(0)) = 0 _
+    And UBound(replaces) = 0 And Len(replaces(0)) = 0 Then
+        ReplaceMultipleB = MidB$(bytes, lStart)
+        Exit Function
+    End If
+    
+    'Allocate buffer
+    Dim n As Long:          n = UBound(finds) + 1
+    Dim m As Long:          m = UBound(replaces) + 1
+    Dim lenBBuffer As Long: lenBBuffer = LenB(bytes) - (lStart - 1)
+    Dim i As Long, j As Long
+    If m > n Then
+        For i = 0 To UBound(finds)
+            Dim numReplPerFind As Long
+            numReplPerFind = IIf(i < m Mod n, (m \ n) + 1, (m \ n))
+            Dim numOcc As Long
+            numOcc = CountSubstringB(bytes, CStr(finds(i)), lStart, lCompare)
+            For j = i To m - 1 Step n
+                lenBBuffer = lenBBuffer + (LenB(replaces(j)) - LenB(finds(i))) _
+                             * IIf((j - i) \ n < numOcc Mod numReplPerFind _
+                         , numOcc \ numReplPerFind + 1, numOcc \ numReplPerFind)
+            Next j
+        Next i
+    Else
+        For i = 0 To UBound(finds)
+            numOcc = CountSubstringB(bytes, CStr(finds(i)), lStart, lCompare)
+            lenBBuffer = lenBBuffer + _
+                         (LenB(replaces(i Mod m)) - LenB(finds(i))) * numOcc
+        Next i
+    End If
+    
+    Dim buffer() As Byte: ReDim buffer(1 To lenBBuffer)
+    ReplaceMultipleB = buffer
+    
+    'Keep track of the next position for replacing by using a min-heap
+    Dim nextOccsHeap() As Long: ReDim nextOccsHeap(0 To UBound(finds), 0 To 2)
+    Dim index1 As Long
+    Dim index2 As Long
+    Dim insertElement(0 To 2) As Long
+    Dim heapSize As Long
+    For i = 0 To UBound(finds)
+        Dim nextOcc As Long
+        nextOcc = InStrB(lStart, bytes, finds(i), lCompare)
+        If nextOcc <> 0 Then
+            insertElement(0) = nextOcc
+            insertElement(1) = i
+            insertElement(2) = i Mod m
+            GoSub HeapInsert
+        End If
+    Next i
+    
+    Dim lenBReplaces() As Long: ReDim lenBReplaces(0 To UBound(replaces))
+    For i = 0 To UBound(replaces)
+        lenBReplaces(i) = LenB(replaces(i))
+    Next i
+    Dim lenBFinds() As Long: ReDim lenBFinds(0 To UBound(finds))
+    For i = 0 To UBound(finds)
+        lenBFinds(i) = LenB(finds(i))
+    Next i
+    Dim lastOccurrence As Long: lastOccurrence = lStart
+    Dim currOccurrence As Long: currOccurrence = nextOccsHeap(0, 0)
+    Dim currReplaceIdx As Long: currReplaceIdx = nextOccsHeap(0, 2)
+    Dim builtStrPos As Long:    builtStrPos = 1
+    Dim count As Long:          count = 1
+    
+    'Do the replacing using InStrB() and MidB$ in a loop
+    Do Until heapSize = 0 Or count > lCount
+        Dim diff As Long: diff = currOccurrence - lastOccurrence
+        If diff > 0 Then _
+            MidB$(ReplaceMultipleB, builtStrPos, diff) = _
+                MidB$(bytes, lastOccurrence, diff)
+        builtStrPos = builtStrPos + diff
+        If lenBReplaces(currReplaceIdx) <> 0 Then
+            MidB$(ReplaceMultipleB, builtStrPos, lenBReplaces(currReplaceIdx)) = _
+                replaces(currReplaceIdx)
+            builtStrPos = builtStrPos + lenBReplaces(currReplaceIdx)
+        End If
+        count = count + 1
+        lastOccurrence = currOccurrence + lenBFinds(nextOccsHeap(0, 1))
+        insertElement(0) = InStrB(lastOccurrence, bytes, _
+                                 finds(nextOccsHeap(0, 1)), lCompare)
+        insertElement(1) = nextOccsHeap(0, 1)
+        If m > n Then
+            currReplaceIdx = currReplaceIdx + n
+            If currReplaceIdx >= m Then currReplaceIdx = nextOccsHeap(0, 1) Mod m
+        End If
+        insertElement(2) = currReplaceIdx
+        GoSub HeapRemoveMin
+        If insertElement(0) > 0 Then GoSub HeapInsert
+        currOccurrence = nextOccsHeap(0, 0)
+        currReplaceIdx = nextOccsHeap(0, 2)
+    Loop
+    
+    If builtStrPos <= LenB(ReplaceMultipleB) Then _
+        MidB$(ReplaceMultipleB, builtStrPos) = MidB$(bytes, lastOccurrence)
+    
+    Exit Function
+HeapSwapElements:
+    Dim temp(0 To 2) As Long
+    temp(0) = nextOccsHeap(index1, 0)
+    temp(1) = nextOccsHeap(index1, 1)
+    temp(2) = nextOccsHeap(index1, 2)
+    nextOccsHeap(index1, 0) = nextOccsHeap(index2, 0)
+    nextOccsHeap(index1, 1) = nextOccsHeap(index2, 1)
+    nextOccsHeap(index1, 2) = nextOccsHeap(index2, 2)
+    nextOccsHeap(index2, 0) = temp(0)
+    nextOccsHeap(index2, 1) = temp(1)
+    nextOccsHeap(index2, 2) = temp(2)
+    Return
+HeapInsert:
+    nextOccsHeap(heapSize, 0) = insertElement(0)
+    nextOccsHeap(heapSize, 1) = insertElement(1)
+    nextOccsHeap(heapSize, 2) = insertElement(2)
+    Dim currentIndex As Long: currentIndex = heapSize
+    Do While currentIndex > 0 _
+         And nextOccsHeap(currentIndex, 0) < _
+             nextOccsHeap((currentIndex - 1) \ 2, 0) 'ParentNode
+        index1 = currentIndex
+        index2 = (currentIndex - 1) \ 2 'ParentIndex
+        GoSub HeapSwapElements
+        currentIndex = (currentIndex - 1) \ 2 'ParentIndex
+    Loop
+    heapSize = heapSize + 1
+    Return
+HeapRemoveMin:
+    nextOccsHeap(0, 0) = nextOccsHeap(heapSize - 1, 0)
+    nextOccsHeap(0, 1) = nextOccsHeap(heapSize - 1, 1)
+    nextOccsHeap(0, 2) = nextOccsHeap(heapSize - 1, 2)
+    heapSize = heapSize - 1
+    
+    currentIndex = 0
+    Do
+        Dim iLeft As Long: iLeft = 2 * currentIndex + 1 'LeftChildIndex
+        Dim iRight As Long: iRight = 2 * currentIndex + 2 'RightChildIndex
+        Dim smallest As Long: smallest = currentIndex
+        
+        If iLeft < heapSize Then
+            If nextOccsHeap(iLeft, 0) < nextOccsHeap(smallest, 0) Then _
+                smallest = iLeft
+        End If
+        If iRight < heapSize Then
+            If nextOccsHeap(iRight, 0) < nextOccsHeap(smallest, 0) Then _
+                smallest = iRight
+        End If
+        
+        If smallest <> currentIndex Then
+            index1 = currentIndex
+            index2 = smallest
+            GoSub HeapSwapElements
+            currentIndex = smallest
+        Else
+            Exit Do
+        End If
+    Loop
+    Return
+End Function
+
 
 'This function can replace multiple values with multiple different replace
 'values in each element of an array or just in a regular string.
