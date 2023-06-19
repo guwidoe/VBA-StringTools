@@ -3270,6 +3270,58 @@ HeapRemoveMin:
     Return
 End Function
 
+'Similar to ReplaceMultiple, but here, replacements will be performed one after
+'another in the order of the input arrays and not all in a single pass like in
+'the regular ReplaceMultiple.
+'In this version lCount specifies the maximum number of replacements per find
+'value, and not in total like in the regular ReplaceMultiple.
+'Also, this version does not support multiple different replace values for a
+'given find value, this means numFinds must be >= numReplaces.
+Public Function ReplaceMultipleMultiPass(ByRef str As String, _
+                                         ByRef sFindOrFinds As Variant, _
+                                         ByRef sReplaceOrReplaces As Variant, _
+                                Optional ByVal lStart As Long = 1, _
+                                Optional ByVal lCount As Long = -1, _
+                                Optional ByVal lCompare As VbCompareMethod _
+                                                         = vbBinaryCompare) _
+                                         As String
+    Const methodName As String = "ReplaceMultipleMultiPass"
+    If lStart < 1 Then Err.Raise 5, methodName, _
+                               "Argument 'lStart' = " & lStart & " < 1, invalid"
+    If lCount < -1 Then Err.Raise 5, methodName, _
+                              "Argument 'lCount' = " & lCount & " < -1, invalid"
+    
+    Dim finds As Variant
+    If IsArray(sFindOrFinds) Then finds = sFindOrFinds _
+                             Else finds = VBA.Array(sFindOrFinds)
+    If Not LBound(finds) = 0 Then _
+        ReDim Preserve finds(0 To UBound(finds) - LBound(finds))
+    Dim replaces As Variant
+    If IsArray(sReplaceOrReplaces) Then replaces = sReplaceOrReplaces _
+                                   Else replaces = VBA.Array(sReplaceOrReplaces)
+    If Not LBound(replaces) = 0 Then _
+        ReDim Preserve replaces(0 To UBound(replaces) - LBound(replaces))
+        
+    If UBound(replaces) > UBound(finds) Then Err.Raise 5, methodName, "'sFind" _
+        & "OrFinds' must have at least as many elements as 'sReplaceOrReplaces'"
+    
+    lCount = lCount And &H7FFFFFFF
+    
+    If lStart > Len(str) Then Exit Function
+    
+    ReplaceMultipleMultiPass = Mid$(str, lStart)
+    If UBound(finds) = 0 And Len(finds(0)) = 0 _
+    And UBound(replaces) = 0 And Len(replaces(0)) = 0 Then Exit Function
+    
+    Dim numReplaces As Long: numReplaces = UBound(replaces) + 1
+    
+    Dim i As Long
+    For i = 0 To UBound(finds)
+        ReplaceMultipleMultiPass = Replace(ReplaceMultipleMultiPass, finds(i), _
+                                replaces(i Mod numReplaces), , lCount, lCompare)
+    Next i
+End Function
+
 
 'This function can replace multiple values with multiple different replace
 'values in each element of an array or just in a regular string.

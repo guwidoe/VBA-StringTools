@@ -800,14 +800,20 @@ End Sub
 Sub TestReplaceMultiple()
 
     Dim s As String
-    s = "12322"
-    Debug.Print ReplaceMultiple(s, Array("1", "2", "3"), Array("44", "55")) = Replace(Replace(Replace(s, "1", "44"), "2", "55"), "3", "44")
+    s = RandomStringFromChars(1000, "0123456789")
+    Dim finds As Variant
+    finds = Array("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
+    Dim replaces As Variant
+    replaces = Array("a", "b", "c", "d", "e", "f", "g", "h", "i", "j")
+    Debug.Print ReplaceMultiple(s, finds, replaces) = ReplaceMultipleMultiPass(s, finds, replaces)
+'    Debug.Print ReplaceMultiple(s, finds, replaces)
+'    Debug.Print ReplaceMultipleMultiPass(s, finds, replaces)
     st
-    ReplaceMultiple s, Array("1", "2", "3"), Array("44", "55")
+    ReplaceMultiple s, finds, replaces
     RT , , True
-    Replace Replace(Replace(s, "1", "44"), "2", "55"), "3", "44"
+    ReplaceMultipleMultiPass s, finds, replaces
     RT
     
-    Debug.Print ReplaceMultipleB(s, Array("1", "2", "3"), Array("44", "55"))
+    'Debug.Print ReplaceMultipleB(s, Array("1", "2", "3"), Array("44", "55"))
 End Sub
 
