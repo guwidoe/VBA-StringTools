@@ -2934,11 +2934,22 @@ Public Function ReplaceMultiple(ByRef str As String, _
         Exit Function
     End If
     
-    'Allocate buffer
+    'Clean input arrays to deal with cases where one "find" contains another one
     Dim n As Long:          n = UBound(finds) + 1
     Dim m As Long:          m = UBound(replaces) + 1
-    Dim lenBBuffer As Long: lenBBuffer = LenB(str) - (lStart - 1) * 2
     Dim i As Long, j As Long
+    For i = 0 To UBound(finds)
+        If Len(finds(i)) <> 0 Then
+            For j = i + 1 To UBound(finds)
+                If InStr(1, finds(j), finds(i), lCompare) <> 0 Then
+                    finds(j) = vbNullString
+                End If
+            Next j
+        End If
+    Next i
+    
+    'Allocate buffer
+    Dim lenBBuffer As Long: lenBBuffer = LenB(str) - (lStart - 1) * 2
     If m > n Then
         For i = 0 To UBound(finds)
             Dim numReplPerFind As Long
@@ -2968,16 +2979,6 @@ Public Function ReplaceMultiple(ByRef str As String, _
     Dim index2 As Long
     Dim insertElement(0 To 2) As Long
     Dim heapSize As Long
-    For i = 0 To UBound(finds)
-        Dim nextOcc As Long
-        nextOcc = InStr(lStart, str, finds(i), lCompare) * 2 - 1
-        If nextOcc <> 0 Then
-            insertElement(0) = nextOcc
-            insertElement(1) = i
-            insertElement(2) = i Mod m
-            GoSub HeapInsert
-        End If
-    Next i
     
     Dim lenBReplaces() As Long: ReDim lenBReplaces(0 To UBound(replaces))
     For i = 0 To UBound(replaces)
@@ -2987,6 +2988,22 @@ Public Function ReplaceMultiple(ByRef str As String, _
     For i = 0 To UBound(finds)
         lenBFinds(i) = LenB(finds(i))
     Next i
+    
+    For i = 0 To UBound(finds)
+        Dim nextOcc As Long
+        If lenBFinds(i) < 2 Then
+            nextOcc = 0
+        Else
+            nextOcc = InStr(lStart, str, finds(i), lCompare) * 2 - 1
+        End If
+        If nextOcc <> 0 Then
+            insertElement(0) = nextOcc
+            insertElement(1) = i
+            insertElement(2) = i Mod m
+            GoSub HeapInsert
+        End If
+    Next i
+    
     Dim lastOccurrence As Long: lastOccurrence = lStart * 2 - 1
     Dim currOccurrence As Long: currOccurrence = nextOccsHeap(0, 0)
     Dim currReplaceIdx As Long: currReplaceIdx = nextOccsHeap(0, 2)
@@ -3007,8 +3024,12 @@ Public Function ReplaceMultiple(ByRef str As String, _
         End If
         count = count + 1
         lastOccurrence = currOccurrence + lenBFinds(nextOccsHeap(0, 1))
-        insertElement(0) = InStr((lastOccurrence + 1) \ 2, str, _
-                                 finds(nextOccsHeap(0, 1)), lCompare) * 2 - 1
+        If lenBFinds(nextOccsHeap(0, 1)) < 2 Then
+            insertElement(0) = 0
+        Else
+            insertElement(0) = InStr((lastOccurrence + 1) \ 2, str, _
+                                    finds(nextOccsHeap(0, 1)), lCompare) * 2 - 1
+        End If
         insertElement(1) = nextOccsHeap(0, 1)
         If m > n Then
             currReplaceIdx = currReplaceIdx + n
@@ -3119,9 +3140,21 @@ Public Function ReplaceMultipleB(ByRef bytes As String, _
         Exit Function
     End If
     
-    'Allocate buffer
+    'Clean input arrays to deal with cases where one "find" contains another one
     Dim n As Long:          n = UBound(finds) + 1
     Dim m As Long:          m = UBound(replaces) + 1
+    Dim i As Long, j As Long
+    For i = 0 To UBound(finds)
+        If LenB(finds(i)) <> 0 Then
+            For j = i + 1 To UBound(finds)
+                If InStrB(1, finds(j), finds(i), lCompare) <> 0 Then
+                    finds(j) = vbNullString
+                End If
+            Next j
+        End If
+    Next i
+    
+    'Allocate buffer
     Dim lenBBuffer As Long: lenBBuffer = LenB(bytes) - (lStart - 1)
     Dim i As Long, j As Long
     If m > n Then
@@ -3153,16 +3186,6 @@ Public Function ReplaceMultipleB(ByRef bytes As String, _
     Dim index2 As Long
     Dim insertElement(0 To 2) As Long
     Dim heapSize As Long
-    For i = 0 To UBound(finds)
-        Dim nextOcc As Long
-        nextOcc = InStrB(lStart, bytes, finds(i), lCompare)
-        If nextOcc <> 0 Then
-            insertElement(0) = nextOcc
-            insertElement(1) = i
-            insertElement(2) = i Mod m
-            GoSub HeapInsert
-        End If
-    Next i
     
     Dim lenBReplaces() As Long: ReDim lenBReplaces(0 To UBound(replaces))
     For i = 0 To UBound(replaces)
@@ -3172,6 +3195,22 @@ Public Function ReplaceMultipleB(ByRef bytes As String, _
     For i = 0 To UBound(finds)
         lenBFinds(i) = LenB(finds(i))
     Next i
+    
+    For i = 0 To UBound(finds)
+        Dim nextOcc As Long
+        If lenBFinds(i) = 0 Then
+            nextOcc = 0
+        Else
+            nextOcc = InStr(lStart, str, finds(i), lCompare) * 2 - 1
+        End If
+        If nextOcc <> 0 Then
+            insertElement(0) = nextOcc
+            insertElement(1) = i
+            insertElement(2) = i Mod m
+            GoSub HeapInsert
+        End If
+    Next i
+    
     Dim lastOccurrence As Long: lastOccurrence = lStart
     Dim currOccurrence As Long: currOccurrence = nextOccsHeap(0, 0)
     Dim currReplaceIdx As Long: currReplaceIdx = nextOccsHeap(0, 2)
@@ -3192,8 +3231,12 @@ Public Function ReplaceMultipleB(ByRef bytes As String, _
         End If
         count = count + 1
         lastOccurrence = currOccurrence + lenBFinds(nextOccsHeap(0, 1))
-        insertElement(0) = InStrB(lastOccurrence, bytes, _
-                                 finds(nextOccsHeap(0, 1)), lCompare)
+        If lenBFinds(nextOccsHeap(0, 1)) = 0 Then
+            insertElement(0) = 0
+        Else
+            insertElement(0) = InStrB(lastOccurrence, bytes, _
+                                      finds(nextOccsHeap(0, 1)), lCompare)
+        End If
         insertElement(1) = nextOccsHeap(0, 1)
         If m > n Then
             currReplaceIdx = currReplaceIdx + n

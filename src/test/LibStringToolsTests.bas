@@ -802,9 +802,9 @@ Sub TestReplaceMultiple()
     Dim s As String
     s = RandomStringFromChars(1000, "0123456789")
     Dim finds As Variant
-    finds = Array("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
+    finds = VBA.Array("1", "2", "3", "4", "5", "6", "7", "8", "9", "10")
     Dim replaces As Variant
-    replaces = Array("a", "b", "c", "d", "e", "f", "g", "h", "i", "j")
+     replaces = Array("a", "b", "c", "d", "e", "f", "g", "h", "i", "j")
     Debug.Print ReplaceMultiple(s, finds, replaces) = ReplaceMultipleMultiPass(s, finds, replaces)
 '    Debug.Print ReplaceMultiple(s, finds, replaces)
 '    Debug.Print ReplaceMultipleMultiPass(s, finds, replaces)
