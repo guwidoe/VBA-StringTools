@@ -39,7 +39,7 @@ Option Compare Binary
         Private Declare PtrSafe Function iconv_close Lib "/usr/lib/libiconv.dylib" (ByVal cd As LongPtr) As Long
         Private Declare PtrSafe Function iconv Lib "/usr/lib/libiconv.dylib" (ByVal cd As LongPtr, ByRef inBuf As LongPtr, ByRef inBytesLeft As LongPtr, ByRef outBuf As LongPtr, ByRef outBytesLeft As LongPtr) As LongPtr
 
-        Private Declare PtrSafe Function CopyMemory Lib "/usr/lib/libc.dylib" Alias "memmove" (Destination As Any, source As Any, ByVal length As LongPtr) As LongPtr
+        Private Declare PtrSafe Function CopyMemory Lib "/usr/lib/libc.dylib" Alias "memmove" (Destination As Any, Source As Any, ByVal length As LongPtr) As LongPtr
         Private Declare PtrSafe Function errno_location Lib "/usr/lib/libSystem.B.dylib" Alias "__error" () As LongPtr
     #Else
         Private Declare Function iconv Lib "/usr/lib/libiconv.dylib" (ByVal cd As Long, ByRef inBuf As Long, ByRef inBytesLeft As Long, ByRef outBuf As Long, ByRef outBytesLeft As Long) As Long
@@ -57,7 +57,7 @@ Option Compare Binary
         Private Declare PtrSafe Function GetLastError Lib "kernel32" () As Long
         Private Declare PtrSafe Sub SetLastError Lib "kernel32" (ByVal dwErrCode As Long)
 
-        Private Declare PtrSafe Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (Destination As Any, source As Any, ByVal length As Long)
+        Private Declare PtrSafe Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (Destination As Any, Source As Any, ByVal length As Long)
         Private Declare PtrSafe Function lstrlenW Lib "kernel32" (ByVal lpString As LongPtr) As Long
     #Else
         Private Declare Function MultiByteToWideChar Lib "kernel32" Alias "MultiByteToWideChar" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As Long, ByVal cchMultiByte As Long, ByVal lpWideCharStr As Long, ByVal cchWideChar As Long) As Long
@@ -966,10 +966,10 @@ End Function
 Public Function HexToString(ByRef hexStr As String) As String
     Const methodName As String = "HexToString"
     Const errPrefix As String = "Invalid Hex string literal. "
-    Dim size As Long: size = Len(hexStr)
+    Dim SIZE As Long: SIZE = Len(hexStr)
 
-    If size = 0 Then Exit Function
-    If size Mod 2 = 1 Then Err.Raise 5, methodName, errPrefix & "Uneven length"
+    If SIZE = 0 Then Exit Function
+    If SIZE Mod 2 = 1 Then Err.Raise 5, methodName, errPrefix & "Uneven length"
 
     Static nibbleMap(0 To 255) As Long 'Nibble: 0 to F. Byte: 00 to FF
     Static charMap(0 To 255) As String
@@ -995,7 +995,7 @@ Public Function HexToString(ByRef hexStr As String) As String
     Dim j As Long
     Dim charCode As Long
 
-    HexToString = MidB$(hexStr, 1, size / 2 - Sgn(startPos))
+    HexToString = MidB$(hexStr, 1, SIZE / 2 - Sgn(startPos))
     For i = startPos To UBound(b) Step 4
         j = j + 1
         charCode = nibbleMap(b(i)) * &H10& + nibbleMap(b(i + 2))
@@ -1271,9 +1271,9 @@ Private Sub InitEscape(ByRef escape As EscapeSequence, _
 End Sub
 
 Private Sub TryPythonEscape(ByRef escape As EscapeSequence, ByRef str As String)
-    Const h As String = "[0-9A-Fa-f]"
-    Const PYTHON_ESCAPE_PATTERN_NOT_BMP = "00[01]" & h & h & h & h & h
-    Const PYTHON_ESCAPE_PATTERN_BMP As String = h & h & h & h & "*"
+    Const H As String = "[0-9A-Fa-f]"
+    Const PYTHON_ESCAPE_PATTERN_NOT_BMP = "00[01]" & H & H & H & H & H
+    Const PYTHON_ESCAPE_PATTERN_BMP As String = H & H & H & H & "*"
     Dim potentialEscape As String
 
     With escape
@@ -1338,10 +1338,10 @@ End Sub
 
 Private Sub TryUPlusEscape(ByRef escape As EscapeSequence, _
                            ByRef str As String)
-    Const h As String = "[0-9A-Fa-f]"
-    Const UPLUS_ESCAPE_PATTERN_4_DIGITS = h & h & h & h & "*"
-    Const UPLUS_ESCAPE_PATTERN_5_DIGITS = h & h & h & h & h & "*"
-    Const UPLUS_ESCAPE_PATTERN_6_DIGITS = h & h & h & h & h & h
+    Const H As String = "[0-9A-Fa-f]"
+    Const UPLUS_ESCAPE_PATTERN_4_DIGITS = H & H & H & H & "*"
+    Const UPLUS_ESCAPE_PATTERN_5_DIGITS = H & H & H & H & H & "*"
+    Const UPLUS_ESCAPE_PATTERN_6_DIGITS = H & H & H & H & H & H
     Dim potentialEscape As String
     
     With escape
@@ -1696,9 +1696,9 @@ Private Function EncodeUTF8usingAdodbStream(ByRef utf16leStr As String) _
         .Charset = "utf-8"
         .Open
         .WriteText utf16leStr
-        .Position = 0
+        .position = 0
         .Type = 1 ' adTypeBinary
-        .Position = 3 ' Skip BOM (Byte Order Mark)
+        .position = 3 ' Skip BOM (Byte Order Mark)
         EncodeUTF8usingAdodbStream = .Read
         .Close
     End With
@@ -1717,7 +1717,7 @@ Private Function DecodeUTF8usingAdodbStream(ByRef utf8Str As String) As String
         .Type = 1 ' adTypeBinary
         .Open
         .Write b
-        .Position = 0
+        .position = 0
         .Type = 2 ' adTypeText
         .Charset = "utf-8"
         DecodeUTF8usingAdodbStream = .ReadText
@@ -1864,7 +1864,7 @@ Public Function RandomStringASCII(ByVal length As Long) As String
     Dim i As Long
     Dim b() As Byte: ReDim b(0 To length * 2 - 1)
     Randomize
-    For i = 0 To length * 2 - 1 Step 2
+    For i = 0 To length * 2 - 2 Step 2
         b(i) = Int(MAX_ASC * Rnd) + 1
     Next i
     RandomStringASCII = b
@@ -1884,7 +1884,7 @@ Public Function RandomStringBMP(ByVal length As Long) As String
     Dim b() As Byte:  ReDim b(0 To length * 2 - 1)
 
     Randomize
-    For i = 0 To length - 1 Step 2
+    For i = 0 To length * 2 - 2 Step 2
         Do
             char = Int(MAX_UINT * Rnd) + 1
         Loop Until (char < &HD800& Or char > &HDFFF&) _
@@ -1910,7 +1910,7 @@ Public Function RandomStringUnicode(ByVal length As Long) As String
 
     Randomize
     If length > 1 Then
-        For i = 0 To length - 2 Step 2
+        For i = 0 To length * 2 - 2 Step 2
             Do
                 char = Int(MAX_UNICODE * Rnd) + 1
             Loop Until (char < &HD800& Or char > &HDFFF&) _
@@ -1985,7 +1985,7 @@ Public Function RandomString(ByVal length As Long, _
 
     Randomize
     If length > 1 Then
-        For i = 0 To length - 2 Step 2
+        For i = 0 To length * 2 - 2 Step 2
             Do
                 char = Int(cpRange * Rnd) + minCodepoint
             Loop Until (char < &HD800& Or char > &HDFFF&) _
@@ -2013,7 +2013,7 @@ Public Function RandomString(ByVal length As Long, _
             char = Int(cpRange * Rnd) + minCodepoint
         Loop Until (char < &HD800& Or char > &HDFFF&) _
                And (char <> &HFEFF&) _
-               And (char <= MAX_UNICODE)
+               And (char <= MAX_UINT)
         Mid$(RandomString, Len(RandomString), 1) = ChrW(char)
     End If
 End Function
@@ -2947,7 +2947,7 @@ Public Function ReplaceMultiple(ByRef str As String, _
             Next j
         End If
     Next i
-    
+
     'Allocate buffer
     Dim lenBBuffer As Long: lenBBuffer = LenB(str) - (lStart - 1) * 2
     If m > n Then
@@ -3414,3 +3414,171 @@ Public Function ArrayReplaceMultiple(ByVal strOrStrArr As Variant, _
     ArrayReplaceMultiple = strOrStrArr
 End Function
 
+'This function splits a string into a given number of chunks of a given length.
+'If a number of chunks and a chunkLength is specified, it creates chunks of the
+'given length until either the number of chunks is reached, or the string ends.
+'If no number of chunks is specified, the entire string will chunkified into
+'chunks of length chunkLength.
+'If no chunkLength is specified, the chunk length will be automatically
+'calculated as Len(str) / numberOfChunks.
+'If no chunkLength and no number of chunks is specified, the string will be
+'split into parts of length 1.
+'If discardIncompleteChunks = False, tha last chunk can have a different length
+'than specified if Len(str) is not divisible by chunkLength
+'If splitUTF16Surrogates = False, UTF-16 surrogate pairs will always remain
+'together, this means that Len(chunk) can differ from the specified chunkLength
+'by up to 1 in that case.
+Public Function ChunkifyString(ByRef str As String, _
+                      Optional ByVal numberOfChunks As Long = 0, _
+                      Optional ByVal chunkLength As Long = 0, _
+                      Optional ByVal discardIncompleteChunks As Boolean = False, _
+                      Optional ByVal splitUTF16Surrogates As Boolean = True) _
+                               As String()
+    Dim lenStr As Long: lenStr = Len(str)
+    
+    If chunkLength = 0 And numberOfChunks = 0 Then
+        chunkLength = 1
+    ElseIf chunkLength = 0 And numberOfChunks > 0 Then
+        chunkLength = Len(str) \ numberOfChunks
+        If chunkLength = 0 Then chunkLength = 1
+    End If
+    
+    If numberOfChunks = 0 Then
+        numberOfChunks = Len(str) \ chunkLength
+        If Len(str) Mod chunkLength > 0 Then numberOfChunks = numberOfChunks + 1
+    End If
+
+    Dim chunks() As String: ReDim chunks(0 To numberOfChunks - 1)
+    
+    Dim currentChunkLength As Long
+    Dim chunkIndex As Long
+    Dim position As Long:           position = 1
+    
+    For chunkIndex = 0 To numberOfChunks - 1
+        If position > lenStr Then Exit For
+        
+        currentChunkLength = chunkLength
+        If Not splitUTF16Surrogates And position + currentChunkLength - 1 < lenStr Then
+            If AscU(Mid$(str, position + currentChunkLength - 1, 2)) > &HFFFF& Then
+                currentChunkLength = currentChunkLength - 1
+            End If
+        End If
+        
+        If position + currentChunkLength - 1 > lenStr Then
+            If discardIncompleteChunks Then Exit For
+            currentChunkLength = lenStr - position + 1
+        End If
+        
+        chunks(chunkIndex) = Mid$(str, position, currentChunkLength)
+        position = position + currentChunkLength
+    Next chunkIndex
+    
+    ' If the last chunk was not used, shrink the array
+    If position > lenStr And discardIncompleteChunks Then
+        ReDim Preserve chunks(0 To chunkIndex - 2)
+    End If
+    
+    ' Return the chunks array
+    ChunkifyString = chunks
+End Function
+
+'Prints an one or two dimensional array to the immediate window
+Public Sub DebugPrintArray(ByRef arr As Variant, _
+                  Optional ByRef delimiter As String = "; ", _
+                  Optional ByVal maxCharsPerLine As Long = 100, _
+                  Optional ByVal maxLines As Long = 10, _
+                  Optional ByVal maxCharsPerElement As Long = 20, _
+                  Optional ByVal escapeNonPrintableCodepoints As Boolean = True)
+    Dim elem As Variant
+    Dim i As Long, j As Long
+    Dim lineCount As Long
+    Dim truncatedElem As String
+    Dim colWidths() As Long
+    Dim tempElem As String
+    
+    If Not IsArray(arr) Then
+        Debug.Print arr
+        Exit Sub
+    End If
+    
+    ' Determine the maximum width necessary for each column
+    If GetArrayDimsCount(arr) = 2 Then
+        ReDim colWidths(LBound(arr, 2) To UBound(arr, 2))
+        For i = LBound(arr, 1) To UBound(arr, 1)
+            For j = LBound(arr, 2) To UBound(arr, 2)
+                tempElem = CStr(arr(i, j))
+                If escapeNonPrintableCodepoints Then
+                    tempElem = EscapeUnicode(tempElem)
+                End If
+                
+                colWidths(j) = Max(Len(tempElem), colWidths(j))
+            Next j
+        Next i
+        For j = LBound(colWidths) To UBound(colWidths)
+            colWidths(j) = Min(colWidths(j), maxCharsPerElement)
+        Next j
+    End If
+
+    Select Case GetArrayDimsCount(arr)
+        Case 1
+            Dim outputLine As String: outputLine = ""
+            For i = LBound(arr) To UBound(arr)
+                truncatedElem = CStr(arr(i))
+                If Len(truncatedElem) > maxCharsPerElement Then
+                    truncatedElem = Left(truncatedElem, maxCharsPerElement - 3) & "..."
+                End If
+                If escapeNonPrintableCodepoints Then
+                    truncatedElem = EscapeUnicode(truncatedElem)
+                End If
+                
+                outputLine = outputLine & PadRightB(truncatedElem, maxCharsPerElement) & delimiter
+                
+                ' Check if max characters per line is exceeded
+                If LenB(outputLine) >= maxCharsPerLine Then
+                    Debug.Print outputLine
+                    outputLine = ""
+                    lineCount = lineCount + 1
+                    If lineCount >= maxLines Then Exit For
+                End If
+            Next i
+            If outputLine <> "" Then Debug.Print outputLine ' print remaining elements
+        
+        Case 2
+            For i = LBound(arr, 1) To UBound(arr, 1)
+                outputLine = ""
+                For j = LBound(arr, 2) To UBound(arr, 2)
+                    truncatedElem = CStr(arr(i, j))
+                    If Len(truncatedElem) > maxCharsPerElement Then
+                        truncatedElem = Left(truncatedElem, maxCharsPerElement - 3) & "..."
+                    End If
+                    If escapeNonPrintableCodepoints Then
+                        truncatedElem = EscapeUnicode(truncatedElem)
+                    End If
+                    
+                    outputLine = outputLine & PadRightB(truncatedElem, colWidths(j)) & delimiter
+                    
+                    ' Check if max characters per line is exceeded
+                    If LenB(outputLine) >= maxCharsPerLine Then
+                        Debug.Print outputLine
+                        outputLine = ""
+                        lineCount = lineCount + 1
+                        If lineCount >= maxLines Then Exit For
+                    End If
+                Next j
+                If outputLine <> "" Then Debug.Print outputLine ' print remaining elements
+                If lineCount >= maxLines Then Exit For
+            Next i
+            
+        Case Else
+            Debug.Print "Array dimensions not supported"
+            
+    End Select
+End Sub
+
+Function Max(a As Long, b As Long) As Long
+    If a > b Then Max = a Else Max = b
+End Function
+
+Function Min(a As Long, b As Long) As Long
+    If a < b Then Min = a Else Min = b
+End Function

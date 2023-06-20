@@ -486,166 +486,166 @@ Private Sub TestSplitB()
 End Sub
 
 Private Static Property Get AllCodePages() As Collection
-    Dim c As Collection
-    If Not c Is Nothing Then
-        Set AllCodePages = c
+    Dim C As Collection
+    If Not C Is Nothing Then
+        Set AllCodePages = C
         Exit Function
     End If
-    Set c = New Collection
+    Set C = New Collection
           'Item: Enum ID, Key:=.NET Name
-    c.Add Item:=cpIBM037, Key:="IBM037"
-    c.Add Item:=cpIBM437, Key:="IBM437"
-    c.Add Item:=cpIBM500, Key:="IBM500"
-    c.Add Item:=cpASMO_708, Key:="ASMO-708"
-    c.Add Item:=cpASMO_449, Key:="ASMO-449"
-    c.Add Item:=cpTransparent_Arabic, Key:="Transparent-Arabic"
-    c.Add Item:=cpDOS_720, Key:="DOS-720"
-    c.Add Item:=cpIbm737, Key:="ibm737"
-    c.Add Item:=cpIbm775, Key:="ibm775"
-    c.Add Item:=cpIbm850, Key:="ibm850"
-    c.Add Item:=cpIbm852, Key:="ibm852"
-    c.Add Item:=cpIBM855, Key:="IBM855"
-    c.Add Item:=cpIbm857, Key:="ibm857"
-    c.Add Item:=cpIBM00858, Key:="IBM00858"
-    c.Add Item:=cpIBM860, Key:="IBM860"
-    c.Add Item:=cpIbm861, Key:="ibm861"
-    c.Add Item:=cpDOS_862, Key:="DOS-862"
-    c.Add Item:=cpIBM863, Key:="IBM863"
-    c.Add Item:=cpIBM864, Key:="IBM864"
-    c.Add Item:=cpIBM865, Key:="IBM865"
-    c.Add Item:=cpCp866, Key:="cp866"
-    c.Add Item:=cpIbm869, Key:="ibm869"
-    c.Add Item:=cpIBM870, Key:="IBM870"
-    c.Add Item:=cpWindows_874, Key:="windows-874"
-    c.Add Item:=cpCp875, Key:="cp875"
-    c.Add Item:=cpShift_jis, Key:="shift_jis"
-    c.Add Item:=cpGb2312, Key:="gb2312"
-    c.Add Item:=cpKs_c_5601_1987, Key:="ks_c_5601-1987"
-    c.Add Item:=cpBig5, Key:="big5"
-    c.Add Item:=cpIBM1026, Key:="IBM1026"
-    c.Add Item:=cpIBM01047, Key:="IBM01047"
-    c.Add Item:=cpIBM01140, Key:="IBM01140"
-    c.Add Item:=cpIBM01141, Key:="IBM01141"
-    c.Add Item:=cpIBM01142, Key:="IBM01142"
-    c.Add Item:=cpIBM01143, Key:="IBM01143"
-    c.Add Item:=cpIBM01144, Key:="IBM01144"
-    c.Add Item:=cpIBM01145, Key:="IBM01145"
-    c.Add Item:=cpIBM01146, Key:="IBM01146"
-    c.Add Item:=cpIBM01147, Key:="IBM01147"
-    c.Add Item:=cpIBM01148, Key:="IBM01148"
-    c.Add Item:=cpIBM01149, Key:="IBM01149"
-    c.Add Item:=cpUTF_16, Key:="utf-16"
-    c.Add Item:=cpUnicodeFFFE, Key:="unicodeFFFE"
-    c.Add Item:=cpWindows_1250, Key:="windows-1250"
-    c.Add Item:=cpWindows_1251, Key:="windows-1251"
-    c.Add Item:=cpWindows_1252, Key:="windows-1252"
-    c.Add Item:=cpWindows_1253, Key:="windows-1253"
-    c.Add Item:=cpWindows_1254, Key:="windows-1254"
-    c.Add Item:=cpWindows_1255, Key:="windows-1255"
-    c.Add Item:=cpWindows_1256, Key:="windows-1256"
-    c.Add Item:=cpWindows_1257, Key:="windows-1257"
-    c.Add Item:=cpWindows_1258, Key:="windows-1258"
-    c.Add Item:=cpJohab, Key:="Johab"
-    c.Add Item:=cpMacintosh, Key:="macintosh"
-    c.Add Item:=cpX_mac_japanese, Key:="x-mac-japanese"
-    c.Add Item:=cpX_mac_chinesetrad, Key:="x-mac-chinesetrad"
-    c.Add Item:=cpX_mac_korean, Key:="x-mac-korean"
-    c.Add Item:=cpX_mac_arabic, Key:="x-mac-arabic"
-    c.Add Item:=cpX_mac_hebrew, Key:="x-mac-hebrew"
-    c.Add Item:=cpX_mac_greek, Key:="x-mac-greek"
-    c.Add Item:=cpX_mac_cyrillic, Key:="x-mac-cyrillic"
-    c.Add Item:=cpX_mac_chinesesimp, Key:="x-mac-chinesesimp"
-    c.Add Item:=cpX_mac_romanian, Key:="x-mac-romanian"
-    c.Add Item:=cpX_mac_ukrainian, Key:="x-mac-ukrainian"
-    c.Add Item:=cpX_mac_thai, Key:="x-mac-thai"
-    c.Add Item:=cpX_mac_ce, Key:="x-mac-ce"
-    c.Add Item:=cpX_mac_icelandic, Key:="x-mac-icelandic"
-    c.Add Item:=cpX_mac_turkish, Key:="x-mac-turkish"
-    c.Add Item:=cpX_mac_croatian, Key:="x-mac-croatian"
-    c.Add Item:=cpUTF_32, Key:="utf-32"
-    c.Add Item:=cpUTF_32BE, Key:="utf-32BE"
-    c.Add Item:=cpX_Chinese_CNS, Key:="x-Chinese_CNS"
-    c.Add Item:=cpX_cp20001, Key:="x-cp20001"
-    c.Add Item:=cpX_Chinese_Eten, Key:="x_Chinese-Eten"
-    c.Add Item:=cpX_cp20003, Key:="x-cp20003"
-    c.Add Item:=cpX_cp20004, Key:="x-cp20004"
-    c.Add Item:=cpX_cp20005, Key:="x-cp20005"
-    c.Add Item:=cpX_IA5, Key:="x-IA5"
-    c.Add Item:=cpX_IA5_German, Key:="x-IA5-German"
-    c.Add Item:=cpX_IA5_Swedish, Key:="x-IA5-Swedish"
-    c.Add Item:=cpX_IA5_Norwegian, Key:="x-IA5-Norwegian"
-    c.Add Item:=cpUs_ascii, Key:="us-ascii"
-    c.Add Item:=cpX_cp20261, Key:="x-cp20261"
-    c.Add Item:=cpX_cp20269, Key:="x-cp20269"
-    c.Add Item:=cpIBM273, Key:="IBM273"
-    c.Add Item:=cpIBM277, Key:="IBM277"
-    c.Add Item:=cpIBM278, Key:="IBM278"
-    c.Add Item:=cpIBM280, Key:="IBM280"
-    c.Add Item:=cpIBM284, Key:="IBM284"
-    c.Add Item:=cpIBM285, Key:="IBM285"
-    c.Add Item:=cpIBM290, Key:="IBM290"
-    c.Add Item:=cpIBM297, Key:="IBM297"
-    c.Add Item:=cpIBM420, Key:="IBM420"
-    c.Add Item:=cpIBM423, Key:="IBM423"
-    c.Add Item:=cpIBM424, Key:="IBM424"
-    c.Add Item:=cpX_EBCDIC_KoreanExtended, Key:="x-EBCDIC-KoreanExtended"
-    c.Add Item:=cpIBM_Thai, Key:="IBM-Thai"
-    c.Add Item:=cpKoi8_r, Key:="koi8-r"
-    c.Add Item:=cpIBM871, Key:="IBM871"
-    c.Add Item:=cpIBM880, Key:="IBM880"
-    c.Add Item:=cpIBM905, Key:="IBM905"
-    c.Add Item:=cpIBM00924, Key:="IBM00924"
-    c.Add Item:=cpEuc_jp, Key:="EUC-JP"
-    c.Add Item:=cpX_cp20936, Key:="x-cp20936"
-    c.Add Item:=cpX_cp20949, Key:="x-cp20949"
-    c.Add Item:=cpCp1025, Key:="cp1025"
-    c.Add Item:=cpDeprecated, Key:="deprecated"
-    c.Add Item:=cpKoi8_u, Key:="koi8-u"
-    c.Add Item:=cpIso_8859_1, Key:="iso-8859-1"
-    c.Add Item:=cpIso_8859_2, Key:="iso-8859-2"
-    c.Add Item:=cpIso_8859_3, Key:="iso-8859-3"
-    c.Add Item:=cpIso_8859_4, Key:="iso-8859-4"
-    c.Add Item:=cpIso_8859_5, Key:="iso-8859-5"
-    c.Add Item:=cpIso_8859_6, Key:="iso-8859-6"
-    c.Add Item:=cpIso_8859_7, Key:="iso-8859-7"
-    c.Add Item:=cpIso_8859_8, Key:="iso-8859-8"
-    c.Add Item:=cpIso_8859_9, Key:="iso-8859-9"
-    c.Add Item:=cpIso_8859_13, Key:="iso-8859-13"
-    c.Add Item:=cpIso_8859_15, Key:="iso-8859-15"
-    c.Add Item:=cpX_Europa, Key:="x-Europa"
-    c.Add Item:=cpIso_8859_8_i, Key:="iso-8859-8-i"
-    c.Add Item:=cpIso_2022_jp, Key:="iso-2022-jp"
-    c.Add Item:=cpCsISO2022JP, Key:="csISO2022JP"
-    c.Add Item:=cpIso_2022_jp_w_1b_Kana, Key:="iso-2022-jp_w-1b-Kana"
-    c.Add Item:=cpIso_2022_kr, Key:="iso-2022-kr"
-    c.Add Item:=cpX_cp50227, Key:="x-cp50227"
-    c.Add Item:=cpISO_2022_Trad_Chinese, Key:="ISO-2022-Traditional-Chinese"
-    c.Add Item:=cpEBCDIC_Jap_Katakana_Ext, Key:="EBCDIC-Japanese-Katakana-Extended"
-    c.Add Item:=cpEBCDIC_US_Can_and_Jap, Key:="EBCDIC-US-Canada-and-Japanese"
-    c.Add Item:=cpEBCDIC_Kor_Ext_and_Kor, Key:="EBCDIC-Korean-Extended-and-Korean"
-    c.Add Item:=cpEBCDIC_Simp_Chin_Ext, Key:="EBCDIC-Simplified-Chinese-Extended-and-Simplified-Chinese"
-    c.Add Item:=cpEBCDIC_Simp_Chin, Key:="EBCDIC-Simplified-Chinese"
-    c.Add Item:=cpEBCDIC_US_Can_Trad_Chin, Key:="EBCDIC-US-Canada-and-Traditional-Chinese"
-    c.Add Item:=cpEBCDIC_Jap_Latin_Ext, Key:="EBCDIC-Japanese-Latin-Extended-and-Japaneseeuc_jp"
-    c.Add Item:=cpEUC_CN, Key:="EUC-CN"
-    c.Add Item:=cpEuc_kr, Key:="euc-kr"
-    c.Add Item:=cpEUC_Traditional_Chinese, Key:="EUC-Traditional-Chinese"
-    c.Add Item:=cpHz_gb_2312, Key:="hz-gb-2312"
-    c.Add Item:=cpGB18030, Key:="GB18030"
-    c.Add Item:=cpX_iscii_de, Key:="x-iscii-de"
-    c.Add Item:=cpX_iscii_be, Key:="x-iscii-be"
-    c.Add Item:=cpX_iscii_ta, Key:="x-iscii-ta"
-    c.Add Item:=cpX_iscii_te, Key:="x-iscii-te"
-    c.Add Item:=cpX_iscii_as, Key:="x-iscii-as"
-    c.Add Item:=cpX_iscii_or, Key:="x-iscii-or"
-    c.Add Item:=cpX_iscii_ka, Key:="x-iscii-ka"
-    c.Add Item:=cpX_iscii_ma, Key:="x-iscii-ma"
-    c.Add Item:=cpX_iscii_gu, Key:="x-iscii-gu"
-    c.Add Item:=cpX_iscii_pa, Key:="x-iscii-pa"
-    c.Add Item:=cpUTF_7, Key:="utf-7"
-    c.Add Item:=cpUTF_8, Key:="utf-8"
+    C.Add Item:=cpIBM037, Key:="IBM037"
+    C.Add Item:=cpIBM437, Key:="IBM437"
+    C.Add Item:=cpIBM500, Key:="IBM500"
+    C.Add Item:=cpASMO_708, Key:="ASMO-708"
+    C.Add Item:=cpASMO_449, Key:="ASMO-449"
+    C.Add Item:=cpTransparent_Arabic, Key:="Transparent-Arabic"
+    C.Add Item:=cpDOS_720, Key:="DOS-720"
+    C.Add Item:=cpIbm737, Key:="ibm737"
+    C.Add Item:=cpIbm775, Key:="ibm775"
+    C.Add Item:=cpIbm850, Key:="ibm850"
+    C.Add Item:=cpIbm852, Key:="ibm852"
+    C.Add Item:=cpIBM855, Key:="IBM855"
+    C.Add Item:=cpIbm857, Key:="ibm857"
+    C.Add Item:=cpIBM00858, Key:="IBM00858"
+    C.Add Item:=cpIBM860, Key:="IBM860"
+    C.Add Item:=cpIbm861, Key:="ibm861"
+    C.Add Item:=cpDOS_862, Key:="DOS-862"
+    C.Add Item:=cpIBM863, Key:="IBM863"
+    C.Add Item:=cpIBM864, Key:="IBM864"
+    C.Add Item:=cpIBM865, Key:="IBM865"
+    C.Add Item:=cpCp866, Key:="cp866"
+    C.Add Item:=cpIbm869, Key:="ibm869"
+    C.Add Item:=cpIBM870, Key:="IBM870"
+    C.Add Item:=cpWindows_874, Key:="windows-874"
+    C.Add Item:=cpCp875, Key:="cp875"
+    C.Add Item:=cpShift_jis, Key:="shift_jis"
+    C.Add Item:=cpGb2312, Key:="gb2312"
+    C.Add Item:=cpKs_c_5601_1987, Key:="ks_c_5601-1987"
+    C.Add Item:=cpBig5, Key:="big5"
+    C.Add Item:=cpIBM1026, Key:="IBM1026"
+    C.Add Item:=cpIBM01047, Key:="IBM01047"
+    C.Add Item:=cpIBM01140, Key:="IBM01140"
+    C.Add Item:=cpIBM01141, Key:="IBM01141"
+    C.Add Item:=cpIBM01142, Key:="IBM01142"
+    C.Add Item:=cpIBM01143, Key:="IBM01143"
+    C.Add Item:=cpIBM01144, Key:="IBM01144"
+    C.Add Item:=cpIBM01145, Key:="IBM01145"
+    C.Add Item:=cpIBM01146, Key:="IBM01146"
+    C.Add Item:=cpIBM01147, Key:="IBM01147"
+    C.Add Item:=cpIBM01148, Key:="IBM01148"
+    C.Add Item:=cpIBM01149, Key:="IBM01149"
+    C.Add Item:=cpUTF_16, Key:="utf-16"
+    C.Add Item:=cpUnicodeFFFE, Key:="unicodeFFFE"
+    C.Add Item:=cpWindows_1250, Key:="windows-1250"
+    C.Add Item:=cpWindows_1251, Key:="windows-1251"
+    C.Add Item:=cpWindows_1252, Key:="windows-1252"
+    C.Add Item:=cpWindows_1253, Key:="windows-1253"
+    C.Add Item:=cpWindows_1254, Key:="windows-1254"
+    C.Add Item:=cpWindows_1255, Key:="windows-1255"
+    C.Add Item:=cpWindows_1256, Key:="windows-1256"
+    C.Add Item:=cpWindows_1257, Key:="windows-1257"
+    C.Add Item:=cpWindows_1258, Key:="windows-1258"
+    C.Add Item:=cpJohab, Key:="Johab"
+    C.Add Item:=cpMacintosh, Key:="macintosh"
+    C.Add Item:=cpX_mac_japanese, Key:="x-mac-japanese"
+    C.Add Item:=cpX_mac_chinesetrad, Key:="x-mac-chinesetrad"
+    C.Add Item:=cpX_mac_korean, Key:="x-mac-korean"
+    C.Add Item:=cpX_mac_arabic, Key:="x-mac-arabic"
+    C.Add Item:=cpX_mac_hebrew, Key:="x-mac-hebrew"
+    C.Add Item:=cpX_mac_greek, Key:="x-mac-greek"
+    C.Add Item:=cpX_mac_cyrillic, Key:="x-mac-cyrillic"
+    C.Add Item:=cpX_mac_chinesesimp, Key:="x-mac-chinesesimp"
+    C.Add Item:=cpX_mac_romanian, Key:="x-mac-romanian"
+    C.Add Item:=cpX_mac_ukrainian, Key:="x-mac-ukrainian"
+    C.Add Item:=cpX_mac_thai, Key:="x-mac-thai"
+    C.Add Item:=cpX_mac_ce, Key:="x-mac-ce"
+    C.Add Item:=cpX_mac_icelandic, Key:="x-mac-icelandic"
+    C.Add Item:=cpX_mac_turkish, Key:="x-mac-turkish"
+    C.Add Item:=cpX_mac_croatian, Key:="x-mac-croatian"
+    C.Add Item:=cpUTF_32, Key:="utf-32"
+    C.Add Item:=cpUTF_32BE, Key:="utf-32BE"
+    C.Add Item:=cpX_Chinese_CNS, Key:="x-Chinese_CNS"
+    C.Add Item:=cpX_cp20001, Key:="x-cp20001"
+    C.Add Item:=cpX_Chinese_Eten, Key:="x_Chinese-Eten"
+    C.Add Item:=cpX_cp20003, Key:="x-cp20003"
+    C.Add Item:=cpX_cp20004, Key:="x-cp20004"
+    C.Add Item:=cpX_cp20005, Key:="x-cp20005"
+    C.Add Item:=cpX_IA5, Key:="x-IA5"
+    C.Add Item:=cpX_IA5_German, Key:="x-IA5-German"
+    C.Add Item:=cpX_IA5_Swedish, Key:="x-IA5-Swedish"
+    C.Add Item:=cpX_IA5_Norwegian, Key:="x-IA5-Norwegian"
+    C.Add Item:=cpUs_ascii, Key:="us-ascii"
+    C.Add Item:=cpX_cp20261, Key:="x-cp20261"
+    C.Add Item:=cpX_cp20269, Key:="x-cp20269"
+    C.Add Item:=cpIBM273, Key:="IBM273"
+    C.Add Item:=cpIBM277, Key:="IBM277"
+    C.Add Item:=cpIBM278, Key:="IBM278"
+    C.Add Item:=cpIBM280, Key:="IBM280"
+    C.Add Item:=cpIBM284, Key:="IBM284"
+    C.Add Item:=cpIBM285, Key:="IBM285"
+    C.Add Item:=cpIBM290, Key:="IBM290"
+    C.Add Item:=cpIBM297, Key:="IBM297"
+    C.Add Item:=cpIBM420, Key:="IBM420"
+    C.Add Item:=cpIBM423, Key:="IBM423"
+    C.Add Item:=cpIBM424, Key:="IBM424"
+    C.Add Item:=cpX_EBCDIC_KoreanExtended, Key:="x-EBCDIC-KoreanExtended"
+    C.Add Item:=cpIBM_Thai, Key:="IBM-Thai"
+    C.Add Item:=cpKoi8_r, Key:="koi8-r"
+    C.Add Item:=cpIBM871, Key:="IBM871"
+    C.Add Item:=cpIBM880, Key:="IBM880"
+    C.Add Item:=cpIBM905, Key:="IBM905"
+    C.Add Item:=cpIBM00924, Key:="IBM00924"
+    C.Add Item:=cpEuc_jp, Key:="EUC-JP"
+    C.Add Item:=cpX_cp20936, Key:="x-cp20936"
+    C.Add Item:=cpX_cp20949, Key:="x-cp20949"
+    C.Add Item:=cpCp1025, Key:="cp1025"
+    C.Add Item:=cpDeprecated, Key:="deprecated"
+    C.Add Item:=cpKoi8_u, Key:="koi8-u"
+    C.Add Item:=cpIso_8859_1, Key:="iso-8859-1"
+    C.Add Item:=cpIso_8859_2, Key:="iso-8859-2"
+    C.Add Item:=cpIso_8859_3, Key:="iso-8859-3"
+    C.Add Item:=cpIso_8859_4, Key:="iso-8859-4"
+    C.Add Item:=cpIso_8859_5, Key:="iso-8859-5"
+    C.Add Item:=cpIso_8859_6, Key:="iso-8859-6"
+    C.Add Item:=cpIso_8859_7, Key:="iso-8859-7"
+    C.Add Item:=cpIso_8859_8, Key:="iso-8859-8"
+    C.Add Item:=cpIso_8859_9, Key:="iso-8859-9"
+    C.Add Item:=cpIso_8859_13, Key:="iso-8859-13"
+    C.Add Item:=cpIso_8859_15, Key:="iso-8859-15"
+    C.Add Item:=cpX_Europa, Key:="x-Europa"
+    C.Add Item:=cpIso_8859_8_i, Key:="iso-8859-8-i"
+    C.Add Item:=cpIso_2022_jp, Key:="iso-2022-jp"
+    C.Add Item:=cpCsISO2022JP, Key:="csISO2022JP"
+    C.Add Item:=cpIso_2022_jp_w_1b_Kana, Key:="iso-2022-jp_w-1b-Kana"
+    C.Add Item:=cpIso_2022_kr, Key:="iso-2022-kr"
+    C.Add Item:=cpX_cp50227, Key:="x-cp50227"
+    C.Add Item:=cpISO_2022_Trad_Chinese, Key:="ISO-2022-Traditional-Chinese"
+    C.Add Item:=cpEBCDIC_Jap_Katakana_Ext, Key:="EBCDIC-Japanese-Katakana-Extended"
+    C.Add Item:=cpEBCDIC_US_Can_and_Jap, Key:="EBCDIC-US-Canada-and-Japanese"
+    C.Add Item:=cpEBCDIC_Kor_Ext_and_Kor, Key:="EBCDIC-Korean-Extended-and-Korean"
+    C.Add Item:=cpEBCDIC_Simp_Chin_Ext, Key:="EBCDIC-Simplified-Chinese-Extended-and-Simplified-Chinese"
+    C.Add Item:=cpEBCDIC_Simp_Chin, Key:="EBCDIC-Simplified-Chinese"
+    C.Add Item:=cpEBCDIC_US_Can_Trad_Chin, Key:="EBCDIC-US-Canada-and-Traditional-Chinese"
+    C.Add Item:=cpEBCDIC_Jap_Latin_Ext, Key:="EBCDIC-Japanese-Latin-Extended-and-Japaneseeuc_jp"
+    C.Add Item:=cpEUC_CN, Key:="EUC-CN"
+    C.Add Item:=cpEuc_kr, Key:="euc-kr"
+    C.Add Item:=cpEUC_Traditional_Chinese, Key:="EUC-Traditional-Chinese"
+    C.Add Item:=cpHz_gb_2312, Key:="hz-gb-2312"
+    C.Add Item:=cpGB18030, Key:="GB18030"
+    C.Add Item:=cpX_iscii_de, Key:="x-iscii-de"
+    C.Add Item:=cpX_iscii_be, Key:="x-iscii-be"
+    C.Add Item:=cpX_iscii_ta, Key:="x-iscii-ta"
+    C.Add Item:=cpX_iscii_te, Key:="x-iscii-te"
+    C.Add Item:=cpX_iscii_as, Key:="x-iscii-as"
+    C.Add Item:=cpX_iscii_or, Key:="x-iscii-or"
+    C.Add Item:=cpX_iscii_ka, Key:="x-iscii-ka"
+    C.Add Item:=cpX_iscii_ma, Key:="x-iscii-ma"
+    C.Add Item:=cpX_iscii_gu, Key:="x-iscii-gu"
+    C.Add Item:=cpX_iscii_pa, Key:="x-iscii-pa"
+    C.Add Item:=cpUTF_7, Key:="utf-7"
+    C.Add Item:=cpUTF_8, Key:="utf-8"
 
-    Set AllCodePages = c
+    Set AllCodePages = C
 End Property
 
 Sub TestAPI()
@@ -800,20 +800,75 @@ End Sub
 Sub TestReplaceMultiple()
 
     Dim s As String
-    s = "467" 'RandomStringBMP(1000000)
+    s = RandomStringAlphanumeric(100000)
     Dim finds As Variant
-    finds = Array("1", "2", "3") 'VBA.Array("1", "2", "3", "4", "5", "6", "7", "8", "9", "10")
+    finds = StringToCodepointStrings(RandomStringUnicode(10000)) 'VBA.Array("1", "2", "3", "4", "5", "6", "7", "8", "9", "10")
     Dim replaces As Variant
-     replaces = Array("a", "b", "c", "d", "e", "f", "g", "h", "i", "j")
+     replaces = StringToCodepointStrings(RandomStringUnicode(5000)) ' Array("a", "b", "c", "d", "e", "f", "g", "h", "i", "j")
     'Debug.Print ReplaceMultiple(s, finds, replaces) = ReplaceMultipleMultiPass(s, finds, replaces)
-    Debug.Print ReplaceMultiple(s, finds, replaces)
-'    Debug.Print ReplaceMultipleMultiPass(s, finds, replaces)
+    'Debug.Print ReplaceMultiple(s, finds, replaces)
+    'Debug.Print ReplaceMultipleMultiPass(s, finds, replaces)
     st
     ReplaceMultiple s, finds, replaces
-    RT , , True
-    'ReplaceMultipleMultiPass s, finds, replaces
-    RT
+    RT "ReplaceMultiple", , True
+    ReplaceMultipleMultiPass s, finds, replaces
+    RT "ReplaceMultipleMultiPass"
     
     'Debug.Print ReplaceMultipleB(s, Array("1", "2", "3"), Array("44", "55"))
+End Sub
+
+Public Sub TestDebugPrintArray()
+    
+    ' Test Case 1: Single dimensional array of integers
+    Dim array1DInt(1 To 5) As Integer
+    array1DInt(1) = 1
+    array1DInt(2) = 2
+    array1DInt(3) = 3
+    array1DInt(4) = 4
+    array1DInt(5) = 5
+    Debug.Print "Test Case 1: Single dimensional array of integers"
+    DebugPrintArray array1DInt
+    
+    ' Test Case 2: Single dimensional array of strings
+    Dim array1DStr(1 To 3) As String
+    array1DStr(1) = "Alice"
+    array1DStr(2) = "Bob"
+    array1DStr(3) = "Charlie"
+    Debug.Print "Test Case 2: Single dimensional array of strings"
+    DebugPrintArray array1DStr
+    
+    ' Test Case 3: Two dimensional array of integers
+    Dim array2DInt(1 To 3, 1 To 3) As Integer
+    Dim i As Integer, j As Integer
+    For i = 1 To 3
+        For j = 1 To 3
+            array2DInt(i, j) = i * j
+        Next j
+    Next i
+    Debug.Print "Test Case 3: Two dimensional array of integers"
+    DebugPrintArray array2DInt
+    
+    ' Test Case 4: Two dimensional array of strings
+    Dim array2DStr(1 To 2, 1 To 2) As String
+    array2DStr(1, 1) = "Apple"
+    array2DStr(1, 2) = "Banana"
+    array2DStr(2, 1) = "Cherry"
+    array2DStr(2, 2) = "Durian"
+    Debug.Print "Test Case 4: Two dimensional array of strings"
+    DebugPrintArray array2DStr
+    
+    ' Test Case 5: Array containing random strings with special characters
+    Dim arrayRandom(1 To 3) As String
+    arrayRandom(1) = RandomString(10, 33, 127) ' printable ASCII characters
+    arrayRandom(2) = RandomString(10, 256, 500) ' extended ASCII characters
+    arrayRandom(3) = RandomString(10, &H1F600, &H1F64F) ' emojis
+    Debug.Print "Test Case 5: Array containing random strings with special characters"
+    DebugPrintArray arrayRandom, escapeNonPrintableCodepoints:=False
+    
+    ' Test Case 6: Empty array
+    Dim emptyArray() As Integer
+    Debug.Print "Test Case 6: Empty array"
+    DebugPrintArray emptyArray
+
 End Sub
 
