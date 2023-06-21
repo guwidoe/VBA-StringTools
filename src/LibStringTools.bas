@@ -3634,7 +3634,8 @@ Private Function Stringify1dArray(ByRef arr As Variant, _
             s = s & line & vbNewLine
             line = ""
             Dim lineCount As Long: lineCount = lineCount + 1
-            If lineCount >= settings.maxLines Then Exit For
+            If lineCount >= settings.maxLines _
+            Or Len(s) > settings.maxChars Then Exit For
         End If
     Next i
     Stringify1dArray = s & line & BStringify(arr(UBound(arr)), settings) & "]"
@@ -3645,21 +3646,15 @@ End Function
 Private Function Stringify2dimArray(ByRef arr As Variant, _
                                     ByRef settings As StringificationSettings) _
                                     As String
-    Dim sett As StringificationSettings
-    sett = settings
-    With sett
-        If StrPtr(.delimiter) = 0 Then .delimiter = "  "
-        If .maxChars = 0 Then .maxChars = &H7FFFFFFF
-        If .maxCharsPerElement = 0 Then .maxCharsPerElement = &H7FFFFFFF
-        If .maxCharsPerLine = 0 Then .maxCharsPerLine = &H7FFFFFFF
-        If .maxLines = 0 Then .maxLines = &H7FFFFFFF
+    Dim delimiter As String: delimiter = settings.delimiter
+    If StrPtr(settings.delimiter) = 0 Then delimiter = "  "
     
-    
+    With settings
         Dim colWidths() As Long
-        colWidths = CalculateColumnWidths(arr, sett)
+        colWidths = CalculateColumnWidths(arr, settings)
         Dim numCols As Long
         numCols = CalculateNumColumnsToFit(colWidths, .maxCharsPerLine, _
-                                           Len(.delimiter))
+                                           Len(delimiter))
     
         Dim numRows As Long: numRows = UBound(arr, 1) - LBound(arr, 1) + 1
         Dim firstRows As Long: firstRows = Min(.maxLines \ 2, numRows)
@@ -3668,24 +3663,30 @@ Private Function Stringify2dimArray(ByRef arr As Variant, _
     End With
     Dim s As String
 
-    If sett.inklColIndices Then _
-        s = BuildColHeadersLine(arr, colWidths, numCols, sett) & vbNewLine
+    If settings.inklColIndices Then _
+        s = BuildColHeadersLine(arr, colWidths, numCols, delimiter, settings) _
+            & vbNewLine
                           
     Dim i As Long
     For i = LBound(arr, 1) To LBound(arr, 1) + firstRows - 1
-        s = s & BuildLine(arr, colWidths, numCols, i, sett) & vbNewLine
+        If Len(s) > settings.maxChars Then Exit For
+        s = s & BuildLine(arr, colWidths, numCols, delimiter, i, settings) _
+            & vbNewLine
     Next i
     
-    If numRows > sett.maxLines Then _
-        s = s & BuildDotsLine(arr, colWidths, numCols, sett) & vbNewLine
+    If numRows > settings.maxLines And Len(s) < settings.maxChars Then _
+        s = s & BuildDotsLine(arr, colWidths, numCols, delimiter, settings) _
+            & vbNewLine
     
     For i = UBound(arr, 1) - lastRows + 1 To UBound(arr, 1)
-        s = s & BuildLine(arr, colWidths, numCols, i, sett) & vbNewLine
+        If Len(s) > settings.maxChars Then Exit For
+        s = s & BuildLine(arr, colWidths, numCols, delimiter, i, settings) _
+            & vbNewLine
     Next i
-    Stringify2dimArray = s & "(" & numRows & " rows * " & _
-                         UBound(arr, 2) - LBound(arr, 2) + 1 & " columns," & _
-                         " of those, " & Min(numRows, sett.maxLines) & _
-                         " rows * " & numCols & " columns stringified)"
+    Stringify2dimArray = s & "(" & numRows & "*" & _
+                         UBound(arr, 2) - LBound(arr, 2) + 1 & ", " & _
+                         " " & Min(numRows, settings.maxLines) & _
+                         "*" & numCols & " output)"
 End Function
 
 Private Function StringifyMultiDimArray(ByRef arr As Variant) As String
@@ -3702,18 +3703,19 @@ End Function
 Private Function BuildColHeadersLine(ByRef arr As Variant, _
                                      ByRef colWidths() As Long, _
                                      ByVal numCols As Long, _
+                                     ByVal delimiter As String, _
                                      ByRef settings As StringificationSettings) _
                                      As String
     Dim rowNumPadding As Long
     rowNumPadding = Max(Len(CStr(UBound(arr, 1))), Len(CStr(LBound(arr, 1)))) + 2
-    Dim lenDelim As Long: lenDelim = Len(settings.delimiter)
+    
+    Dim lenDelim As Long: lenDelim = Len(delimiter)
     Dim j As Long
-    Dim truncElem As String
     If numCols = UBound(arr, 2) - LBound(arr, 2) + 1 Then
         For j = LBound(arr, 2) To UBound(arr, 2)
             BuildColHeadersLine = BuildColHeadersLine & _
                                   PadLeft(CStr(j), colWidths(j)) _
-                                  & settings.delimiter
+                                  & delimiter
         Next j
         If settings.inklRowIndices Then _
             BuildColHeadersLine = Space(rowNumPadding) & BuildColHeadersLine
@@ -3743,16 +3745,17 @@ End Function
 Private Function BuildDotsLine(ByRef arr As Variant, _
                                ByRef colWidths() As Long, _
                                ByVal numCols As Long, _
+                               ByVal delimiter As String, _
                                ByRef settings As StringificationSettings) _
                                As String
     Dim rowNumPadding As Long
     rowNumPadding = Max(Len(CStr(UBound(arr, 1))), Len(CStr(LBound(arr, 1)))) + 2
-    Dim lenDelim As Long: lenDelim = Len(settings.delimiter)
+    Dim lenDelim As Long: lenDelim = Len(delimiter)
     Dim j As Long
     If numCols = UBound(arr, 2) - LBound(arr, 2) + 1 Then
         For j = LBound(arr, 2) To UBound(arr, 2)
             BuildDotsLine = BuildDotsLine & PadLeft("...", colWidths(j)) _
-                                          & settings.delimiter
+                                          & delimiter
         Next j
         If settings.inklRowIndices Then _
                 BuildDotsLine = PadRight("..", rowNumPadding) & BuildDotsLine
@@ -3780,17 +3783,19 @@ End Function
 Private Function BuildLine(ByRef arr As Variant, _
                            ByRef colWidths() As Long, _
                            ByVal numCols As Long, _
+                           ByVal delimiter As String, _
                            ByVal rowIndex As Long, _
                            ByRef settings As StringificationSettings) As String
     Dim rowNumPadding As Long
     rowNumPadding = Max(Len(CStr(UBound(arr, 1))), Len(CStr(LBound(arr, 1)))) + 2
-    Dim lenDelim As Long: lenDelim = Len(settings.delimiter)
+    
+    Dim lenDelim As Long: lenDelim = Len(delimiter)
     Dim j As Long
     If numCols = UBound(arr, 2) - LBound(arr, 2) + 1 Then
         For j = LBound(arr, 2) To UBound(arr, 2)
             BuildLine = BuildLine & _
                         PadLeft(BStringify(arr(rowIndex, j), settings), _
-                                colWidths(j)) & settings.delimiter
+                                colWidths(j)) & delimiter
         Next j
         If settings.inklRowIndices Then _
             BuildLine = PadRight(CStr(rowIndex), rowNumPadding) & BuildLine
@@ -3803,8 +3808,8 @@ Private Function BuildLine(ByRef arr As Variant, _
     For j = 0 To numCols \ 2 - 1 'numCols is always even
         leftPart = leftPart & PadLeft(BStringify(arr(rowIndex, _
                    LBound(arr, 2) + j), settings), _
-                   colWidths(LBound(arr, 2) + j)) & settings.delimiter
-        rightPart = settings.delimiter & PadLeft(BStringify(arr(rowIndex, _
+                   colWidths(LBound(arr, 2) + j)) & delimiter
+        rightPart = delimiter & PadLeft(BStringify(arr(rowIndex, _
                     UBound(arr, 2) - j), settings), _
                     colWidths(UBound(arr, 2) - j)) & rightPart
     Next j
