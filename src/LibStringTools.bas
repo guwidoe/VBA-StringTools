@@ -1162,7 +1162,8 @@ End Function
 '     `UnescapeUnicode("\uD801", , True)`. This will return invalid UTF-16.
 Public Function UnescapeUnicode(ByRef str As String, _
                        Optional ByVal escapeFormat As UnicodeEscapeFormat = efAll, _
-                       Optional ByVal allowSingleSurrogates As Boolean = False) As String
+                       Optional ByVal allowSingleSurrogates As Boolean = False) _
+                                As String
     If escapeFormat < [_efMin] Or escapeFormat > [_efMax] Then
         Err.Raise 5, "EscapeUnicode", "Invalid escape format"
     End If
@@ -3529,11 +3530,22 @@ Public Function Stringify(ByVal value As Variant, _
                  Optional ByVal maxLines As Long = 10, _
                  Optional ByVal inklColIndices As Boolean = True, _
                  Optional ByVal inklRowIndices As Boolean = True)
+    Const methodName As String = "Stringify"
+    
+    If maxChars < 0 Then _
+        Err.Raise 5, methodName, "'maxChars' can't be < 0"
+    If maxCharsPerElement < 0 Then _
+        Err.Raise 5, methodName, "'maxCharsPerElement' can't be < 0"
+    If maxCharsPerLine < 0 Then _
+        Err.Raise 5, methodName, "'maxCharsPerLine' can't be < 0"
+    If maxLines < 0 Then _
+        Err.Raise 5, methodName, "'maxLines' can't be < 0"
     
     If maxChars = 0 Then maxChars = &H7FFFFFFF
     If maxCharsPerElement = 0 Then maxCharsPerElement = &H7FFFFFFF
     If maxCharsPerLine = 0 Then maxCharsPerLine = &H7FFFFFFF
     If maxLines = 0 Then maxLines = &H7FFFFFFF
+    
     Dim settings As StringificationSettings
     With settings
         .maxChars = maxChars
@@ -3551,8 +3563,6 @@ End Function
 'Recursive "Backend" function for 'Stringify'
 Private Function BStringify(ByVal value As Variant, _
                             ByRef settings As StringificationSettings) As String
-    Const methodName As String = "BStringify"
-    
     'Don't use exit function in this Function! Instead use: GoTo CleanExit
     Static isRecursiveCall As Boolean
     Dim wasRecursiveCall As Boolean: wasRecursiveCall = isRecursiveCall
