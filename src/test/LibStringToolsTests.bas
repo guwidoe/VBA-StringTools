@@ -818,6 +818,7 @@ Sub TestReplaceMultiple()
 End Sub
 
 Public Sub TestDebugPrintArray()
+
     
     ' Test Case 1: Single dimensional array of integers
     Dim array1DInt(1 To 100) As Integer
@@ -837,26 +838,28 @@ Public Sub TestDebugPrintArray()
     DebugPrintArray array1DStr
     
     ' Test Case 3: Two dimensional array of integers
+    Const COLS_LARGE_ARRAY As Long = 30
+    Const ROWS_LARGE_ARRAY As Long = 30
     Dim array2DInt() As Long
-    ReDim array2DInt(1 To 100, 1 To 100)
+    ReDim array2DInt(1 To ROWS_LARGE_ARRAY, 1 To COLS_LARGE_ARRAY)
     Dim j As Integer
-    For i = 1 To 100
-        For j = 1 To 100
+    For i = 1 To ROWS_LARGE_ARRAY
+        For j = 1 To COLS_LARGE_ARRAY
             array2DInt(i, j) = i * j
         Next j
     Next i
     Debug.Print "Test Case 3: Two dimensional array of integers"
-    DebugPrintArray array2DInt
+    DebugPrintArray array2DInt, maxCharsPerLine:=40
 
     Dim array2DStr() As String
-    ReDim array2DStr(1 To 100, 1 To 100)
-    For i = 1 To 100
-        For j = 1 To 100
+    ReDim array2DStr(1 To ROWS_LARGE_ARRAY, 1 To COLS_LARGE_ARRAY)
+    For i = 1 To ROWS_LARGE_ARRAY
+        For j = 1 To COLS_LARGE_ARRAY
             array2DStr(i, j) = RandomStringAlphanumeric(Rnd * 15)
         Next j
     Next i
     Debug.Print "Test Case 3: Two dimensional array of Strings"
-    DebugPrintArray array2DStr
+    DebugPrintArray array2DStr, , , , 10
 
     ' Test Case 4: Two dimensional array of strings
     ReDim array2DStr(1 To 2, 1 To 2) As String
@@ -873,8 +876,8 @@ Public Sub TestDebugPrintArray()
     arrayRandom(2) = RandomString(10, 256, 500) ' extended ASCII characters
     arrayRandom(3) = RandomString(10, &H1F600, &H1F64F) ' emojis
     Debug.Print "Test Case 5: Array containing random strings with special characters"
-    DebugPrintArray arrayRandom, escapeNonPrintableCodepoints:=False
-    DebugPrintArray arrayRandom, escapeNonPrintableCodepoints:=True
+    DebugPrintArray arrayRandom, escapeNonPrintable:=False
+    DebugPrintArray arrayRandom, escapeNonPrintable:=True
     
     ' Test Case 6: Empty array
     Dim emptyArray() As Integer
