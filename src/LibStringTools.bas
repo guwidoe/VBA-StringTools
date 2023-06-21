@@ -1056,6 +1056,7 @@ Public Function EscapeUnicode(ByRef str As String, _
         "`maxNonEscapedCharCode` must be greater than 0."
     If escapeFormat < [_efMin] Or escapeFormat > [_efMax] Then _
         Err.Raise 5, methodName, "Invalid escape type."
+    If Len(str) = 0 Then Exit Function
     Dim i As Long
     Dim j As Long:                j = 1
     Dim result() As String:       ReDim result(1 To Len(str))
@@ -3484,7 +3485,7 @@ End Function
 
 'Prints an one or two dimensional array to the immediate window
 Public Sub DebugPrintArray(ByRef arr As Variant, _
-                  Optional ByRef delimiter As String = "; ", _
+                  Optional ByRef delimiter As String = vbNullString, _
                   Optional ByVal maxCharsPerLine As Long = 100, _
                   Optional ByVal maxLines As Long = 10, _
                   Optional ByVal maxCharsPerElement As Long = 20, _
@@ -3495,12 +3496,14 @@ Public Sub DebugPrintArray(ByRef arr As Variant, _
     Dim truncatedElem As String
     Dim colWidths() As Long
     Dim tempElem As String
-    
+
+    Dim delimiterWasSet As Boolean: delimiterWasSet = StrPtr(delimiter) <> 0
+
     If Not IsArray(arr) Then
         Debug.Print arr
         Exit Sub
     End If
-    
+
     ' Determine the maximum width necessary for each column
     If GetArrayDimsCount(arr) = 2 Then
         ReDim colWidths(LBound(arr, 2) To UBound(arr, 2))
@@ -3510,7 +3513,7 @@ Public Sub DebugPrintArray(ByRef arr As Variant, _
                 If escapeNonPrintableCodepoints Then
                     tempElem = EscapeUnicode(tempElem)
                 End If
-                
+
                 colWidths(j) = Max(Len(tempElem), colWidths(j))
             Next j
         Next i
@@ -3521,7 +3524,8 @@ Public Sub DebugPrintArray(ByRef arr As Variant, _
 
     Select Case GetArrayDimsCount(arr)
         Case 1
-            Dim outputLine As String: outputLine = ""
+            If Not delimiterWasSet Then delimiter = ", "
+            Dim outputLine As String: outputLine = "["
             For i = LBound(arr) To UBound(arr)
                 truncatedElem = CStr(arr(i))
                 If Len(truncatedElem) > maxCharsPerElement Then
@@ -3530,23 +3534,49 @@ Public Sub DebugPrintArray(ByRef arr As Variant, _
                 If escapeNonPrintableCodepoints Then
                     truncatedElem = EscapeUnicode(truncatedElem)
                 End If
-                
-                outputLine = outputLine & PadRightB(truncatedElem, maxCharsPerElement) & delimiter
-                
+
+                outputLine = outputLine & truncatedElem
+                If i < UBound(arr) Then
+                    outputLine = outputLine & delimiter
+                End If
+
                 ' Check if max characters per line is exceeded
-                If LenB(outputLine) >= maxCharsPerLine Then
+                If Len(outputLine) >= maxCharsPerLine Then
                     Debug.Print outputLine
                     outputLine = ""
                     lineCount = lineCount + 1
                     If lineCount >= maxLines Then Exit For
                 End If
             Next i
-            If outputLine <> "" Then Debug.Print outputLine ' print remaining elements
-        
+            If outputLine <> "" Then Debug.Print outputLine & "]" ' print remaining elements
+
         Case 2
-            For i = LBound(arr, 1) To UBound(arr, 1)
+            If Not delimiterWasSet Then
+                delimiter = "  "
+            End If
+
+            Dim startCol As Long, endCol As Long
+            startCol = LBound(arr, 2)
+            endCol = UBound(arr, 2)
+
+            Dim colsFitting As Boolean
+            colsFitting = True
+
+            Dim totalWidth As Long
+            totalWidth = (endCol - startCol + 1) * (maxCharsPerElement + Len(delimiter))
+
+            If totalWidth > maxCharsPerLine Then
+                colsFitting = False
+                endCol = startCol + (maxCharsPerLine \ (maxCharsPerElement + Len(delimiter))) \ 2 - 1
+            End If
+
+            Dim rowsBeforeDots As Long, rowsAfterDots As Long
+            rowsBeforeDots = Min((maxLines - 1) \ 2, UBound(arr, 1) - LBound(arr, 1) + 1)
+            rowsAfterDots = Min(maxLines - 1 - rowsBeforeDots, UBound(arr, 1) - LBound(arr, 1) + 1 - rowsBeforeDots)
+
+            For i = LBound(arr, 1) To LBound(arr, 1) + rowsBeforeDots - 1
                 outputLine = ""
-                For j = LBound(arr, 2) To UBound(arr, 2)
+                For j = startCol To endCol
                     truncatedElem = CStr(arr(i, j))
                     If Len(truncatedElem) > maxCharsPerElement Then
                         truncatedElem = Left(truncatedElem, maxCharsPerElement - 3) & "..."
@@ -3555,23 +3585,75 @@ Public Sub DebugPrintArray(ByRef arr As Variant, _
                         truncatedElem = EscapeUnicode(truncatedElem)
                     End If
                     
-                    outputLine = outputLine & PadRightB(truncatedElem, colWidths(j)) & delimiter
-                    
-                    ' Check if max characters per line is exceeded
-                    If LenB(outputLine) >= maxCharsPerLine Then
-                        Debug.Print outputLine
-                        outputLine = ""
-                        lineCount = lineCount + 1
-                        If lineCount >= maxLines Then Exit For
-                    End If
+                    outputLine = outputLine & PadRight(truncatedElem, colWidths(j)) & delimiter
                 Next j
-                If outputLine <> "" Then Debug.Print outputLine ' print remaining elements
-                If lineCount >= maxLines Then Exit For
+                
+                If Not colsFitting Then
+                    outputLine = outputLine & "... "
+                    
+                    ' Only include the last columns if there are enough columns that they don't fit in a line
+                    For j = UBound(arr, 2) - endCol + startCol To UBound(arr, 2)
+                        truncatedElem = CStr(arr(i, j))
+                        If Len(truncatedElem) > maxCharsPerElement Then
+                            truncatedElem = Left(truncatedElem, maxCharsPerElement - 3) & "..."
+                        End If
+                        If escapeNonPrintableCodepoints Then
+                            truncatedElem = EscapeUnicode(truncatedElem)
+                        End If
+                        
+                        outputLine = outputLine & PadRight(truncatedElem, colWidths(j)) & delimiter
+                    Next j
+                End If
+                Debug.Print outputLine
             Next i
             
+            If UBound(arr, 1) - LBound(arr, 1) + 1 > maxLines - 1 Then
+                outputLine = ""
+                For j = startCol To endCol
+                    outputLine = outputLine & PadRight("...", colWidths(j)) & delimiter
+                Next j
+                If Not colsFitting Then
+                    outputLine = outputLine & "... "
+                End If
+                For j = UBound(arr, 2) - endCol + startCol To UBound(arr, 2)
+                    outputLine = outputLine & PadRight("...", colWidths(j)) & delimiter
+                Next j
+                Debug.Print outputLine
+            End If
+            
+            For i = UBound(arr, 1) - rowsAfterDots + 1 To UBound(arr, 1)
+                outputLine = ""
+                For j = startCol To endCol
+                    truncatedElem = CStr(arr(i, j))
+                    If Len(truncatedElem) > maxCharsPerElement Then
+                        truncatedElem = Left(truncatedElem, maxCharsPerElement - 3) & "..."
+                    End If
+                    If escapeNonPrintableCodepoints Then
+                        truncatedElem = EscapeUnicode(truncatedElem)
+                    End If
+
+                    outputLine = outputLine & PadRight(truncatedElem, colWidths(j)) & delimiter
+                Next j
+                If Not colsFitting Then
+                    outputLine = outputLine & "... "
+                End If
+                For j = UBound(arr, 2) - endCol + startCol To UBound(arr, 2)
+                    truncatedElem = CStr(arr(i, j))
+                    If Len(truncatedElem) > maxCharsPerElement Then
+                        truncatedElem = Left(truncatedElem, maxCharsPerElement - 3) & "..."
+                    End If
+                    If escapeNonPrintableCodepoints Then
+                        truncatedElem = EscapeUnicode(truncatedElem)
+                    End If
+
+                    outputLine = outputLine & PadRight(truncatedElem, colWidths(j)) & delimiter
+                Next j
+                Debug.Print outputLine
+            Next i
+
         Case Else
             Debug.Print "Array dimensions not supported"
-            
+
     End Select
 End Sub
 

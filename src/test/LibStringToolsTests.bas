@@ -820,12 +820,11 @@ End Sub
 Public Sub TestDebugPrintArray()
     
     ' Test Case 1: Single dimensional array of integers
-    Dim array1DInt(1 To 5) As Integer
-    array1DInt(1) = 1
-    array1DInt(2) = 2
-    array1DInt(3) = 3
-    array1DInt(4) = 4
-    array1DInt(5) = 5
+    Dim array1DInt(1 To 100) As Integer
+    Dim i As Long
+    For i = 1 To 100
+        array1DInt(i) = i
+    Next i
     Debug.Print "Test Case 1: Single dimensional array of integers"
     DebugPrintArray array1DInt
     
@@ -838,18 +837,29 @@ Public Sub TestDebugPrintArray()
     DebugPrintArray array1DStr
     
     ' Test Case 3: Two dimensional array of integers
-    Dim array2DInt(1 To 3, 1 To 3) As Integer
-    Dim i As Integer, j As Integer
-    For i = 1 To 3
-        For j = 1 To 3
+    Dim array2DInt() As Long
+    ReDim array2DInt(1 To 100, 1 To 100)
+    Dim j As Integer
+    For i = 1 To 100
+        For j = 1 To 100
             array2DInt(i, j) = i * j
         Next j
     Next i
     Debug.Print "Test Case 3: Two dimensional array of integers"
     DebugPrintArray array2DInt
-    
+
+    Dim array2DStr() As String
+    ReDim array2DStr(1 To 100, 1 To 100)
+    For i = 1 To 100
+        For j = 1 To 100
+            array2DStr(i, j) = RandomStringAlphanumeric(Rnd * 15)
+        Next j
+    Next i
+    Debug.Print "Test Case 3: Two dimensional array of Strings"
+    DebugPrintArray array2DStr
+
     ' Test Case 4: Two dimensional array of strings
-    Dim array2DStr(1 To 2, 1 To 2) As String
+    ReDim array2DStr(1 To 2, 1 To 2) As String
     array2DStr(1, 1) = "Apple"
     array2DStr(1, 2) = "Banana"
     array2DStr(2, 1) = "Cherry"
@@ -864,6 +874,7 @@ Public Sub TestDebugPrintArray()
     arrayRandom(3) = RandomString(10, &H1F600, &H1F64F) ' emojis
     Debug.Print "Test Case 5: Array containing random strings with special characters"
     DebugPrintArray arrayRandom, escapeNonPrintableCodepoints:=False
+    DebugPrintArray arrayRandom, escapeNonPrintableCodepoints:=True
     
     ' Test Case 6: Empty array
     Dim emptyArray() As Integer
@@ -872,3 +883,51 @@ Public Sub TestDebugPrintArray()
 
 End Sub
 
+Public Sub Array2DToImmediate(ByVal arr As Variant, _
+                                Optional ByVal spaces_between_columns As Long = 2, _
+                                Optional ByVal NrOfColsToOutlineLeft As Long = 2)
+'Prints a 2D-array of values to a table (with same sized column widhts) in the immmediate window
+
+'Each character in the Immediate window of VB Editor (CTRL+G to show) has the same pixel width,
+'thus giving the option to output a proper looking 2D-array (a table with variable string lenghts).
+Dim i As Long, j As Long
+Dim arrMaxLenPerCol() As Long
+Dim str As String
+Dim maxLength As Long: maxLength = 198 * 1021& 'capacity of Immediate window is about 200 lines of 1021 characters per line.
+
+'determine max stringlength per column
+ReDim arrMaxLenPerCol(UBound(arr, 1))
+For i = LBound(arr, 1) To UBound(arr, 1)
+    For j = LBound(arr, 2) To UBound(arr, 2)
+        arrMaxLenPerCol(i) = IIf(Len(arr(i, j)) > arrMaxLenPerCol(i), Len(arr(i, j)), arrMaxLenPerCol(i))
+    Next j
+Next i
+
+'build table
+For j = LBound(arr, 2) To UBound(arr, 2)
+    For i = LBound(arr, 1) To UBound(arr, 1)
+        'outline left --> value & spaces & column_spaces
+        If i < NrOfColsToOutlineLeft Then
+            On Error Resume Next
+            str = str & arr(i, j) & Space$((arrMaxLenPerCol(i) - Len(arr(i, j)) + spaces_between_columns) * 1)
+        
+        'last column to outline left --> value & spaces
+        ElseIf i = NrOfColsToOutlineLeft Then
+            On Error Resume Next
+            str = str & arr(i, j) & Space$((arrMaxLenPerCol(i) - Len(arr(i, j))) * 1)
+                    
+        'outline right --> spaces & column_spaces & value
+        Else 'i > NrOfColsToOutlineLeft Then
+            On Error Resume Next
+            str = str & Space$((arrMaxLenPerCol(i) - Len(arr(i, j)) + spaces_between_columns) * 1) & arr(i, j)
+        End If
+    Next i
+    str = str & vbNewLine
+    If Len(str) > maxLength Then GoTo theEnd
+Next j
+
+theEnd:
+'capacity of Immediate window is about 200 lines of 1021 characters per line.
+If Len(str) > maxLength Then str = Left(str, maxLength) & vbNewLine & " - Table to large for Immediate window"
+Debug.Print str
+End Sub
