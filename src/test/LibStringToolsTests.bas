@@ -828,6 +828,7 @@ Public Sub TestDebugPrintArray()
     Next i
     Debug.Print "Test Case 1: Single dimensional array of integers"
     DebugPrintArray array1DInt
+    Debug.Print vbNewLine
     
     ' Test Case 2: Single dimensional array of strings
     Dim array1DStr(1 To 3) As String
@@ -836,10 +837,11 @@ Public Sub TestDebugPrintArray()
     array1DStr(3) = "Charlie"
     Debug.Print "Test Case 2: Single dimensional array of strings"
     DebugPrintArray array1DStr
+    Debug.Print vbNewLine
     
     ' Test Case 3: Two dimensional array of integers
     Const COLS_LARGE_ARRAY As Long = 30
-    Const ROWS_LARGE_ARRAY As Long = 30
+    Const ROWS_LARGE_ARRAY As Long = 20
     Dim array2DInt() As Long
     ReDim array2DInt(1 To ROWS_LARGE_ARRAY, 1 To COLS_LARGE_ARRAY)
     Dim j As Integer
@@ -849,88 +851,63 @@ Public Sub TestDebugPrintArray()
         Next j
     Next i
     Debug.Print "Test Case 3: Two dimensional array of integers"
-    DebugPrintArray array2DInt, maxCharsPerLine:=40
-
-    Dim array2DStr() As String
+    DebugPrintArray array2DInt
+    Debug.Print vbNewLine
+    
+    Dim array2DStr() As Variant
     ReDim array2DStr(1 To ROWS_LARGE_ARRAY, 1 To COLS_LARGE_ARRAY)
     For i = 1 To ROWS_LARGE_ARRAY
         For j = 1 To COLS_LARGE_ARRAY
             array2DStr(i, j) = RandomStringAlphanumeric(Rnd * 15)
         Next j
     Next i
-    Debug.Print "Test Case 3: Two dimensional array of Strings"
-    DebugPrintArray array2DStr, , , , 10
-
+    Debug.Print "Test Case 4: Two dimensional array of Strings"
+    DebugPrintArray array2DStr
+    Debug.Print vbNewLine
+    
     ' Test Case 4: Two dimensional array of strings
-    ReDim array2DStr(1 To 2, 1 To 2) As String
+    ReDim array2DStr(1 To 2, 1 To 2)
     array2DStr(1, 1) = "Apple"
     array2DStr(1, 2) = "Banana"
     array2DStr(2, 1) = "Cherry"
     array2DStr(2, 2) = "Durian"
-    Debug.Print "Test Case 4: Two dimensional array of strings"
+    Debug.Print "Test Case 5: Two dimensional array of strings"
     DebugPrintArray array2DStr
+    Debug.Print vbNewLine
     
     ' Test Case 5: Array containing random strings with special characters
     Dim arrayRandom(1 To 3) As String
     arrayRandom(1) = RandomString(10, 33, 127) ' printable ASCII characters
     arrayRandom(2) = RandomString(10, 256, 500) ' extended ASCII characters
     arrayRandom(3) = RandomString(10, &H1F600, &H1F64F) ' emojis
-    Debug.Print "Test Case 5: Array containing random strings with special characters"
+    Debug.Print "Test Case 6: Array containing random strings with special characters"
     DebugPrintArray arrayRandom, escapeNonPrintable:=False
+    Debug.Print vbNewLine
     DebugPrintArray arrayRandom, escapeNonPrintable:=True
+    Debug.Print vbNewLine
     
     ' Test Case 6: Empty array
     Dim emptyArray() As Integer
-    Debug.Print "Test Case 6: Empty array"
+    Debug.Print "Test Case 7: Empty array"
     DebugPrintArray emptyArray
-
+    Debug.Print vbNewLine
+    
+    Debug.Print "Test Case 8: Empty array 2"
+    DebugPrintArray Array()
+    Debug.Print vbNewLine
+    
+    ' Test Case 6: Array containing various weird stuff
+    Dim weirdArray() As Variant
+    Dim nested2DimArray() As Variant
+    ReDim nested2DimArray(1 To 3, 1 To 3)
+    ReDim weirdArray(1 To 3, 1 To 3)
+    weirdArray(1, 1) = Array(1, 2, 3, 4)
+    weirdArray(1, 2) = Array(Array(1, 2, 3), 2, 3, 4)
+    Set weirdArray(2, 1) = New Collection
+    weirdArray(2, 2) = CCur(1000)
+    weirdArray(3, 2) = nested2DimArray
+    Debug.Print "Test Case 9: Weird array"
+    DebugPrintArray weirdArray
+    Debug.Print vbNewLine
 End Sub
 
-Public Sub Array2DToImmediate(ByVal arr As Variant, _
-                                Optional ByVal spaces_between_columns As Long = 2, _
-                                Optional ByVal NrOfColsToOutlineLeft As Long = 2)
-'Prints a 2D-array of values to a table (with same sized column widhts) in the immmediate window
-
-'Each character in the Immediate window of VB Editor (CTRL+G to show) has the same pixel width,
-'thus giving the option to output a proper looking 2D-array (a table with variable string lenghts).
-Dim i As Long, j As Long
-Dim arrMaxLenPerCol() As Long
-Dim str As String
-Dim maxLength As Long: maxLength = 198 * 1021& 'capacity of Immediate window is about 200 lines of 1021 characters per line.
-
-'determine max stringlength per column
-ReDim arrMaxLenPerCol(UBound(arr, 1))
-For i = LBound(arr, 1) To UBound(arr, 1)
-    For j = LBound(arr, 2) To UBound(arr, 2)
-        arrMaxLenPerCol(i) = IIf(Len(arr(i, j)) > arrMaxLenPerCol(i), Len(arr(i, j)), arrMaxLenPerCol(i))
-    Next j
-Next i
-
-'build table
-For j = LBound(arr, 2) To UBound(arr, 2)
-    For i = LBound(arr, 1) To UBound(arr, 1)
-        'outline left --> value & spaces & column_spaces
-        If i < NrOfColsToOutlineLeft Then
-            On Error Resume Next
-            str = str & arr(i, j) & Space$((arrMaxLenPerCol(i) - Len(arr(i, j)) + spaces_between_columns) * 1)
-        
-        'last column to outline left --> value & spaces
-        ElseIf i = NrOfColsToOutlineLeft Then
-            On Error Resume Next
-            str = str & arr(i, j) & Space$((arrMaxLenPerCol(i) - Len(arr(i, j))) * 1)
-                    
-        'outline right --> spaces & column_spaces & value
-        Else 'i > NrOfColsToOutlineLeft Then
-            On Error Resume Next
-            str = str & Space$((arrMaxLenPerCol(i) - Len(arr(i, j)) + spaces_between_columns) * 1) & arr(i, j)
-        End If
-    Next i
-    str = str & vbNewLine
-    If Len(str) > maxLength Then GoTo theEnd
-Next j
-
-theEnd:
-'capacity of Immediate window is about 200 lines of 1021 characters per line.
-If Len(str) > maxLength Then str = Left(str, maxLength) & vbNewLine & " - Table to large for Immediate window"
-Debug.Print str
-End Sub

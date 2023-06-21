@@ -1994,7 +1994,7 @@ Public Function RandomString(ByVal length As Long, _
 
             If char < &H10000 Then
                 b(i) = char And &HFF
-                b(1) = char \ &H100& And &HFF
+                b(i + 1) = char \ &H100& And &HFF
             Else
                 Dim m As Long: m = char - &H10000
                 Dim highSurrogate As Long: highSurrogate = &HD800& + (m \ &H400&)
@@ -3477,49 +3477,112 @@ Public Function ChunkifyString(ByRef str As String, _
     Next chunkIndex
     
     ' If the last chunk was not used, shrink the array
-    If position > lenStr And discardIncompleteChunks Then
-        ReDim Preserve chunks(0 To chunkIndex - 2)
+    If position >= lenStr And discardIncompleteChunks Then
+        ReDim Preserve chunks(0 To chunkIndex - 1)
     End If
     
-    ' Return the chunks array
     ChunkifyString = chunks
 End Function
 
-'Prints an one or two dimensional array to the immediate window
+'Prints an one or two dimensional array to the immediate window.
 Public Sub DebugPrintArray(ByRef arr As Variant, _
                   Optional ByRef delimiter As String = vbNullString, _
-                  Optional ByVal maxCharsPerLine As Long = 100, _
+                  Optional ByVal maxCharsPerElement As Long = 25, _
+                  Optional ByVal maxCharsPerLine As Long = 80, _
                   Optional ByVal maxLines As Long = 10, _
-                  Optional ByVal maxCharsPerElement As Long = 20, _
-                  Optional ByVal escapeNonPrintable As Boolean = True)
-    If Not IsArray(arr) Then
-        Debug.Print arr
-        Exit Sub
-    End If
-
-    Select Case GetArrayDimsCount(arr)
-        Case 1
-            DebugPrint1dArray arr, delimiter, maxCharsPerLine, maxLines, _
-                              maxCharsPerElement, escapeNonPrintable
-        Case 2
-            DebugPrint2dArray arr, delimiter, maxCharsPerLine, maxLines, _
-                              maxCharsPerElement, escapeNonPrintable
-        Case Else
-            Debug.Print "Array dimensions not supported."
-    End Select
+                  Optional ByVal escapeNonPrintable As Boolean = True, _
+                  Optional ByVal printColIndices As Boolean = True, _
+                  Optional ByVal printRowIndices As Boolean = True)
+    Debug.Print Stringify(arr, , escapeNonPrintable, delimiter, _
+                          maxCharsPerLine, maxLines, maxCharsPerElement, _
+                          printColIndices, printRowIndices)
 End Sub
 
-Public Sub DebugPrint1dArray(ByRef arr As Variant, _
-                     Optional ByRef delimiter As String = vbNullString, _
-                     Optional ByVal maxCharsPerLine As Long = 100, _
-                     Optional ByVal maxLines As Long = 10, _
-                     Optional ByVal maxCharsPerElement As Long = 20, _
-                     Optional ByVal escapeNonPrintable As Boolean = True)
+'This function can convert any variable into a convenient string for printing.
+'The last 6 parameters are only relevant for arrays, the last 2 only for
+'two dimensional arrays.
+''maxChars' is the maximum length of the returned value
+''escapeNonPrintable = True' will convert all non ANSI chars to escape sequences
+''delimiter' can be used to manually define a delimiter for the returned arrays.
+''maxCharsPerLine' will make the output contain newLine characters at least
+'                  every 'maxCharsPerLine' characters.
+''inklColIndices = True' will print column indices above the columns if the
+'                        input is a two dimensional array.
+''inklRowIndices = True' does the same for the row indices.
+Public Function Stringify(ByVal value As Variant, _
+                 Optional ByVal maxChars As Long = 0, _
+                 Optional ByVal escapeNonPrintable As Boolean = True, _
+                 Optional ByRef delimiter As String = vbNullString, _
+                 Optional ByVal maxCharsPerLine As Long = 80, _
+                 Optional ByVal maxLines As Long = 10, _
+                 Optional ByVal maxCharsPerElement As Long = 25, _
+                 Optional ByVal inklColIndices As Boolean = True, _
+                 Optional ByVal inklRowIndices As Boolean = True) As String
+    Static isRecursiceCall As Boolean
+    Dim wasRecursiveCall As Boolean: wasRecursiveCall = isRecursiceCall
+    isRecursiceCall = True
+    
+    If maxChars = 0 Then maxChars = &H7FFFFFFF
+    Dim s As String
+    Dim i As Long
+    If IsArray(value) Then
+        Select Case GetArrayDimsCount(value)
+            Case 0
+                s = "[]"
+            Case 1
+                If wasRecursiveCall Then maxCharsPerLine = 0 '(Don't split)
+                s = Stringify1dArray(value, delimiter, maxCharsPerLine, _
+                                     maxLines, maxCharsPerElement, _
+                                     escapeNonPrintable)
+            Case 2
+                If wasRecursiveCall Then
+                    s = StringifyMultiDimArray(value)
+                Else
+                    s = Stringify2dimArray(value, delimiter, maxCharsPerLine, _
+                                           maxLines, maxCharsPerElement, _
+                                           escapeNonPrintable, inklColIndices, _
+                                           inklRowIndices)
+                End If
+            Case Else
+                s = StringifyMultiDimArray(value)
+        End Select
+    ElseIf IsObject(value) Then
+        s = TypeName(value)
+    ElseIf IsEmpty(value) Then
+        s = "Empty"
+    Else
+        s = CStr(value)
+    End If
+    
+    If Len(s) > maxChars Then
+        Stringify = Left(s, Max(maxChars - 3, 0)) & Left("...", maxChars)
+    Else
+        Stringify = s
+    End If
+    
+    If escapeNonPrintable Then Stringify = EscapeUnicode(Stringify, 255)
+    If VarType(value) = vbString Then Stringify = "'" & Stringify & "'"
+    
+CleanExit:
+    If Not wasRecursiveCall Then isRecursiceCall = False
+End Function
+
+Private Function Stringify1dArray(ByRef arr As Variant, _
+                         Optional ByRef delimiter As String = vbNullString, _
+                         Optional ByVal maxCharsPerLine As Long = 100, _
+                         Optional ByVal maxLines As Long = 10, _
+                         Optional ByVal maxCharsPerElement As Long = 20, _
+                         Optional ByVal escapeNonPrintable As Boolean = True) _
+                                  As String
+    If maxCharsPerLine = 0 Then maxCharsPerLine = &H7FFFFFFF
     Dim s As String
     If StrPtr(delimiter) = 0 Then delimiter = ", "
-    If UBound(arr) - LBound(arr) = 0 Then
-        Debug.Print "[" & arr(UBound(arr)) & "]"
-        Exit Sub
+    If UBound(arr) - LBound(arr) = -1 Then
+        Stringify1dArray = "[]"
+        Exit Function
+    ElseIf UBound(arr) - LBound(arr) = 0 Then
+        Stringify1dArray = "[" & arr(UBound(arr)) & "]"
+        Exit Function
     End If
     Dim mcpe As Long: mcpe = maxCharsPerElement
     Dim mcpl As Long: mcpl = maxCharsPerLine
@@ -3537,31 +3600,21 @@ Public Sub DebugPrint1dArray(ByRef arr As Variant, _
             If lineCount >= maxLines Then Exit For
         End If
     Next i
-    Debug.Print s & oLine & Stringify(arr(UBound(arr)), mcpe, _
+    Stringify1dArray = s & oLine & Stringify(arr(UBound(arr)), mcpe, _
                                       escapeNonPrintable) & "]"
-End Sub
-
-Private Function Stringify(ByVal v As Variant, _
-                  Optional ByVal maxChars As Long = 0, _
-                  Optional ByVal escapeNonPrintable As Boolean = True) As String
-    If maxChars = 0 Then maxChars = &H7FFFFFFF
-    If Len(CStr(v)) > maxChars Then
-        Stringify = Left(CStr(v), Max(maxChars - 3, 0)) & Left("...", maxChars)
-    Else
-        Stringify = CStr(v)
-    End If
-    If escapeNonPrintable Then Stringify = EscapeUnicode(Stringify, 255)
-    If VarType(v) = vbString Then Stringify = "'" & Stringify & "'"
 End Function
 
-Private Sub DebugPrint2dArray(ByRef arr As Variant, _
-                     Optional ByRef delimiter As String = vbNullString, _
-                     Optional ByVal maxCharsPerLine As Long = 100, _
-                     Optional ByVal maxLines As Long = 10, _
-                     Optional ByVal maxCharsPerElement As Long = 20, _
-                     Optional ByVal escapeNonPrintable As Boolean = True)
-
+Private Function Stringify2dimArray(ByRef arr As Variant, _
+                           Optional ByRef delimiter As String = vbNullString, _
+                           Optional ByVal maxCharsPerLine As Long = 100, _
+                           Optional ByVal maxLines As Long = 10, _
+                           Optional ByVal maxCharsPerElement As Long = 20, _
+                           Optional ByVal escapeNonPrintable As Boolean = True, _
+                           Optional ByVal printColIndices As Boolean = True, _
+                           Optional ByVal printRowIndices As Boolean = True) _
+                                    As String
     If StrPtr(delimiter) = 0 Then delimiter = "  "
+    If maxCharsPerLine = 0 Then maxCharsPerLine = &H7FFFFFFF
     
     Dim colWidths() As Long
     colWidths = CalculateColumnWidths(arr, maxCharsPerLine, maxLines, _
@@ -3572,25 +3625,50 @@ Private Sub DebugPrint2dArray(ByRef arr As Variant, _
 
     Dim numRows As Long: numRows = UBound(arr, 1) - LBound(arr, 1) + 1
     Dim firstRows As Long: firstRows = Min(maxLines \ 2, numRows)
-    Dim lastRows As Long: lastRows = Min(maxLines - firstRows, numRows - firstRows)
+    Dim lastRows As Long
+    lastRows = Min(maxLines - firstRows, numRows - firstRows)
     
+    Dim s As String
+    If printColIndices Then _
+        s = BuildLine(arr, colWidths, numCols, 0, delimiter, maxCharsPerElement _
+                    , escapeNonPrintable, 1, printColIndices, printRowIndices) _
+                      & vbNewLine
+                          
     Dim i As Long
     For i = LBound(arr, 1) To LBound(arr, 1) + firstRows - 1
-        Debug.Print BuildLine(arr, colWidths, numCols, _
-                          i, delimiter, maxCharsPerElement, escapeNonPrintable, False)
+        s = s & BuildLine(arr, colWidths, numCols, i, delimiter, _
+                          maxCharsPerElement, escapeNonPrintable, 0, _
+                          printColIndices, printRowIndices) & vbNewLine
     Next i
     
     If numRows > maxLines Then
-        Debug.Print BuildLine(arr, colWidths, numCols, _
-                          i, delimiter, maxCharsPerElement, escapeNonPrintable, True)
+        s = s & BuildLine(arr, colWidths, numCols, i, delimiter, _
+                          maxCharsPerElement, escapeNonPrintable, 2, _
+                          printColIndices, printRowIndices) & vbNewLine
     End If
     
     For i = UBound(arr, 1) - lastRows + 1 To UBound(arr, 1)
-        Debug.Print BuildLine(arr, colWidths, numCols, _
-                          i, delimiter, maxCharsPerElement, escapeNonPrintable, False)
+        s = s & BuildLine(arr, colWidths, numCols, i, delimiter, _
+                          maxCharsPerElement, escapeNonPrintable, 0, _
+                          printColIndices, printRowIndices) & vbNewLine
     Next i
-End Sub
+    Stringify2dimArray = s & "(" & numRows & " rows * " & _
+                         UBound(arr, 2) - LBound(arr, 2) + 1 & " columns," & _
+                         " of those, " & Min(numRows, maxLines) & " rows * " & _
+                         numCols & " columns printed)"
+End Function
 
+Private Function StringifyMultiDimArray(ByRef arr As Variant) As String
+    Dim s As String
+    s = "Array("
+    Dim i As Long
+    For i = 1 To GetArrayDimsCount(arr)
+        s = s & LBound(arr, i) & " to " & UBound(arr, i) & ", "
+    Next i
+    StringifyMultiDimArray = Left(s, Len(s) - 2) & ")"
+End Function
+
+'Utility function for 'Stringify2dimArray'
 Private Function BuildLine(ByRef arr As Variant, _
                            ByRef colWidths() As Long, _
                            ByVal numCols As Long, _
@@ -3598,53 +3676,77 @@ Private Function BuildLine(ByRef arr As Variant, _
                            ByVal delimiter As String, _
                            ByVal maxCharsPerElement As Long, _
                            ByVal escapeNonPrintable As Boolean, _
-                           ByVal isDotLine As Boolean) As String
+                           ByVal isSpecialLine As Long, _
+                           ByVal printColIndices As Boolean, _
+                           ByVal printRowIndices As Boolean) As String
     Dim rowNumPadding As Long
     rowNumPadding = Max(Len(CStr(UBound(arr, 1))), Len(CStr(LBound(arr, 1)))) + 2
     Dim j As Long
     Dim truncElem As String
     If numCols = UBound(arr, 2) - LBound(arr, 2) + 1 Then
         For j = LBound(arr, 2) To UBound(arr, 2)
-            If isDotLine Then
-                truncElem = "..."
-            Else
+            If isSpecialLine = 0 Then 'No special line
                 truncElem = Stringify(arr(rowIndex, j), _
                                       maxCharsPerElement, escapeNonPrintable)
+            ElseIf isSpecialLine = 1 Then 'colHeadersLine
+                truncElem = CStr(j)
+            ElseIf isSpecialLine = 2 Then 'dotLine
+                truncElem = "..."
             End If
             BuildLine = BuildLine & PadLeft(truncElem, colWidths(j)) & delimiter
         Next j
-        BuildLine = PadRight(IIf(isDotLine, "..", CStr(rowIndex)), _
-                             rowNumPadding) & _
-                    Left(BuildLine, Len(BuildLine) - Len(delimiter))
+        If printRowIndices Then
+            If isSpecialLine = 0 Then _
+                BuildLine = PadRight(CStr(rowIndex), rowNumPadding) & BuildLine
+            If isSpecialLine = 1 Then _
+                BuildLine = Space(rowNumPadding) & BuildLine
+            If isSpecialLine = 2 Then _
+                BuildLine = PadRight("..", rowNumPadding) & BuildLine
+        End If
+        BuildLine = Left(BuildLine, Len(BuildLine) - Len(delimiter))
         Exit Function
     End If
     
     Dim leftPart As String
     Dim rightPart As String
-    If isDotLine Then
-        For j = 0 To numCols \ 2 'numCols is always even
-            leftPart = leftPart & _
-                PadLeft("...", colWidths(LBound(arr, 2) + j)) & delimiter
-            rightPart = rightPart & _
-                PadLeft("...", colWidths(UBound(arr, 2) - j)) & delimiter
-        Next j
-    Else
-        For j = 0 To numCols \ 2 'numCols is always even
+    If isSpecialLine = 0 Then
+        For j = 0 To numCols \ 2 - 1 'numCols is always even
             leftPart = leftPart & PadLeft(Stringify(arr(rowIndex, _
                        LBound(arr, 2) + j), maxCharsPerElement, _
                        escapeNonPrintable), colWidths(LBound(arr, 2) + j)) _
                        & delimiter
-            rightPart = rightPart & PadLeft(Stringify(arr(rowIndex, _
+            rightPart = delimiter & PadLeft(Stringify(arr(rowIndex, _
                         UBound(arr, 2) - j), maxCharsPerElement, _
                         escapeNonPrintable), colWidths(UBound(arr, 2) - j)) _
-                        & delimiter
+                        & rightPart
+        Next j
+    ElseIf isSpecialLine = 1 Then 'colHeadersLine
+        For j = 0 To numCols \ 2 - 1 'numCols is always even
+            leftPart = leftPart & PadLeft(CStr(LBound(arr, 2) + j), _
+                colWidths(LBound(arr, 2) + j)) & Space(Len(delimiter))
+            rightPart = Space(Len(delimiter)) & _
+                                PadLeft(CStr(UBound(arr, 2) - j), _
+                            colWidths(UBound(arr, 2) - j)) & rightPart
+        Next j
+    ElseIf isSpecialLine = 2 Then 'dotLine
+        For j = 0 To numCols \ 2 - 1 'numCols is always even
+            leftPart = leftPart & PadLeft("...", _
+                colWidths(LBound(arr, 2) + j)) & Space(Len(delimiter))
+            rightPart = Space(Len(delimiter)) & PadLeft("...", _
+                colWidths(UBound(arr, 2) - j)) & rightPart
         Next j
     End If
-    BuildLine = PadRight(IIf(isDotLine, "..", CStr(rowIndex)), rowNumPadding) _
-                & Left(leftPart, Len(leftPart) - Len(delimiter)) & " ... " _
-                & Left(rightPart, Len(rightPart) - Len(delimiter))
+    If printRowIndices Then
+        If isSpecialLine = 0 Then _
+            BuildLine = PadRight(CStr(rowIndex), rowNumPadding)
+        If isSpecialLine = 1 Then BuildLine = Space(rowNumPadding)
+        If isSpecialLine = 2 Then BuildLine = PadRight("..", rowNumPadding)
+    End If
+    BuildLine = BuildLine & Left(leftPart, Len(leftPart) - Len(delimiter)) & _
+                " ... " & Right(rightPart, Len(rightPart) - Len(delimiter))
 End Function
 
+'Utility function for 'Stringify2dimArray'
 Private Function CalculateColumnWidths(ByRef arr As Variant, _
                                        ByVal maxCharsPerLine As Long, _
                                        ByVal maxLines As Long, _
@@ -3697,6 +3799,7 @@ Private Function CalculateColumnWidths(ByRef arr As Variant, _
     CalculateColumnWidths = colWidths
 End Function
 
+'Utility function for 'Stringify2dimArray'
 Private Function CalculateNumColumnsToFit(ByRef colWidths() As Long, _
                                           ByVal maxCharsPerLine As Long, _
                                           ByVal delimLength As Long) As Long
