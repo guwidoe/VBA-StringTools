@@ -2102,6 +2102,39 @@ Public Function StringToCodepointNums(ByRef str As String) As Variant
     StringToCodepointNums = arr
 End Function
 
+Public Function RandomStringArray(ByVal numElements As Long, _
+                         Optional ByVal maxElementLength As Long = 10, _
+                         Optional ByVal minElementLength As Long = 0, _
+                         Optional ByVal minCodepoint As Long = 1, _
+                         Optional ByVal maxCodepoint As Long = &H10FFFF) _
+                                  As String()
+    Const methodName As String = "RandomStringArray"
+    Const MAX_UNICODE As Long = &H10FFFF
+    Const MAX_UINT As Long = &HFFFF&
+    If numElements < 0 Then Err.Raise 5, methodName, "numElements must be >= 0"
+    If maxCodepoint > MAX_UNICODE Or maxCodepoint < 0 Then Err.Raise 5, _
+        methodName, "'maxCodepoint' outside of valid unicode range."
+    If minCodepoint > MAX_UNICODE Or minCodepoint < 0 Then Err.Raise 5, _
+        methodName, "'minCodepoint' outside of valid unicode range."
+    If minCodepoint > maxCodepoint Then Err.Raise 5, methodName, _
+        "'minCodepoint' can't be greater than 'maxCodepoint'."
+    If minElementLength > maxElementLength Then Err.Raise 5, methodName, _
+        "'minElementLength' can't be greater than 'maxElementLength'."
+    Randomize
+    
+    Dim stringArray() As String: ReDim stringArray(0 To numElements - 1)
+    Dim i As Long
+    Dim strLength As Long
+    
+    For i = 0 To numElements - 1
+        strLength = Int((maxElementLength - minElementLength + 1) _
+                        * Rnd + minElementLength)
+        stringArray(i) = RandomString(strLength, minCodepoint, maxCodepoint)
+    Next i
+    
+    RandomStringArray = stringArray
+End Function
+
 'Removes all characters from a string (str) that are not in the string inklChars
 'Default inklChars are all alphanumeric characters including dot and space
 Public Function CleanString(ByRef str As String, _
@@ -3458,7 +3491,7 @@ Public Function ChunkifyString(ByRef str As String, _
                       Optional ByVal splitUTF16Surrogates As Boolean = True) _
                                As String()
     Dim lenStr As Long: lenStr = Len(str)
-    
+
     If chunkLength = 0 And numberOfChunks = 0 Then
         chunkLength = 1
     ElseIf chunkLength = 0 And numberOfChunks > 0 Then
@@ -3473,30 +3506,31 @@ Public Function ChunkifyString(ByRef str As String, _
 
     Dim chunks() As String: ReDim chunks(0 To numberOfChunks - 1)
     
-    Dim currentChunkLength As Long
+    Dim currChunkLength As Long
     Dim chunkIndex As Long
     Dim position As Long:           position = 1
     
     For chunkIndex = 0 To numberOfChunks - 1
         If position > lenStr Then Exit For
         
-        currentChunkLength = chunkLength
-        If Not splitUTF16Surrogates And position + currentChunkLength - 1 < lenStr Then
-            If AscU(Mid$(str, position + currentChunkLength - 1, 2)) > &HFFFF& Then
-                currentChunkLength = currentChunkLength - 1
+        currChunkLength = chunkLength
+        If Not splitUTF16Surrogates _
+        And position + currChunkLength - 1 < lenStr Then
+            If AscU(Mid$(str, position + currChunkLength - 1, 2)) > &HFFFF& Then
+                currChunkLength = currChunkLength - 1
             End If
         End If
         
-        If position + currentChunkLength - 1 > lenStr Then
+        If position + currChunkLength - 1 > lenStr Then
             If discardIncompleteChunks Then Exit For
-            currentChunkLength = lenStr - position + 1
+            currChunkLength = lenStr - position + 1
         End If
         
-        chunks(chunkIndex) = Mid$(str, position, currentChunkLength)
-        position = position + currentChunkLength
+        chunks(chunkIndex) = Mid$(str, position, currChunkLength)
+        position = position + currChunkLength
     Next chunkIndex
     
-    ' If the last chunk was not used, shrink the array
+    'If the last chunk was not used, shrink the array
     If position >= lenStr And discardIncompleteChunks Then
         ReDim Preserve chunks(0 To chunkIndex - 1)
     End If
@@ -3596,7 +3630,7 @@ Private Function BStringify(ByVal value As Variant, _
         End Select
     ElseIf IsObject(value) Then
         Select Case True
-            'Can add logic to BStringify any object here
+            'Can add custom logic to Stringify any object here
             'Case TypeOf value Is Collection
                 's = StringifyCollection(...
             Case Else
