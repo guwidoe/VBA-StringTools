@@ -2102,6 +2102,7 @@ Public Function StringToCodepointNums(ByRef str As String) As Variant
     StringToCodepointNums = arr
 End Function
 
+'Returns an array of 'numElements' random UTF-16 strings
 Public Function RandomStringArray(ByVal numElements As Long, _
                          Optional ByVal maxElementLength As Long = 10, _
                          Optional ByVal minElementLength As Long = 0, _
@@ -2120,6 +2121,9 @@ Public Function RandomStringArray(ByVal numElements As Long, _
         "'minCodepoint' can't be greater than 'maxCodepoint'."
     If minElementLength > maxElementLength Then Err.Raise 5, methodName, _
         "'minElementLength' can't be greater than 'maxElementLength'."
+    If minCodepoint > &HFFFF& And maxElementLength = minElementLength _
+    And maxElementLength Mod 2 = 1 Then Err.Raise 5, methodName, _
+        "Can't build string of uneven length from only Surrogate Pairs."
     Randomize
     
     Dim stringArray() As String: ReDim stringArray(0 To numElements - 1)
@@ -2127,8 +2131,15 @@ Public Function RandomStringArray(ByVal numElements As Long, _
     Dim strLength As Long
     
     For i = 0 To numElements - 1
-        strLength = Int((maxElementLength - minElementLength + 1) _
-                        * Rnd + minElementLength)
+        Do
+            strLength = Int((maxElementLength - minElementLength + 1) _
+                            * Rnd + minElementLength)
+            If minCodepoint > &HFFFF& Then
+                If strLength Mod 2 = 0 Then Exit Do
+            Else
+                Exit Do
+            End If
+        Loop
         stringArray(i) = RandomString(strLength, minCodepoint, maxCodepoint)
     Next i
     
