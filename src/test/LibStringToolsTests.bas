@@ -802,9 +802,11 @@ Sub TestReplaceMultiple()
     Dim s As String
     s = RandomStringAlphanumeric(100000)
     Dim finds As Variant
-    finds = StringToCodepointStrings(RandomStringUnicode(10000)) 'VBA.Array("1", "2", "3", "4", "5", "6", "7", "8", "9", "10")
+    finds = StringToCodepointStrings(RandomStringUnicode(6000)) '
+    'finds = VBA.Array("1", "2", "3", "4", "5", "6", "7", "8", "9", "10")
     Dim replaces As Variant
-     replaces = StringToCodepointStrings(RandomStringUnicode(5000)) ' Array("a", "b", "c", "d", "e", "f", "g", "h", "i", "j")
+    replaces = StringToCodepointStrings(RandomStringUnicode(5000)) '
+    'replaces = Array("a", "b", "c", "d", "e", "f", "g", "h", "i", "j")
     'Debug.Print ReplaceMultiple(s, finds, replaces) = ReplaceMultipleMultiPass(s, finds, replaces)
     'Debug.Print ReplaceMultiple(s, finds, replaces)
     'Debug.Print ReplaceMultipleMultiPass(s, finds, replaces)
@@ -818,8 +820,6 @@ Sub TestReplaceMultiple()
 End Sub
 
 Public Sub TestDebugPrintArray()
-
-    
     ' Test Case 1: Single dimensional array of integers
     Dim array1DInt(1 To 100) As Integer
     Dim i As Long
@@ -910,4 +910,160 @@ Public Sub TestDebugPrintArray()
     DebugPrintArray weirdArray
     Debug.Print vbNewLine
 End Sub
+
+Private Sub ProcessFindsUsingTrie(ByRef finds As Variant, _
+                                  ByVal lCompare As VbCompareMethod)
+    Dim trie As Object
+    Set trie = CreateObject("Scripting.Dictionary")
+    
+    Dim i As Long, j As Long, k As Long
+    Dim current As Object
+    Dim ch As String
+
+    For i = LBound(finds) To UBound(finds)
+        If Len(finds(i)) <> 0 Then
+            'Insert current string into the trie
+            Set current = trie
+            For j = 1 To Len(finds(i))
+                ch = Mid(finds(i), j, 1)
+                If lCompare = vbTextCompare Then ch = LCase(ch)
+                If Not current.Exists(ch) Then
+                    current.Add ch, CreateObject("Scripting.Dictionary")
+                End If
+                Set current = current(ch)
+            Next j
+            current("end") = True
+            
+            'Check remaining strings against the trie
+            For k = i + 1 To UBound(finds)
+                If Len(finds(k)) <> 0 Then
+                    Set current = trie
+                    For j = 1 To Len(finds(k))
+                        ch = Mid(finds(k), j, 1)
+                        If lCompare = vbTextCompare Then ch = LCase(ch)
+                        If Not current.Exists(ch) Then Exit For
+                        Set current = current(ch)
+                        
+                        If current.Exists("end") And j < Len(finds(k)) Then
+                            finds(k) = vbNullString
+                            Exit For
+                        End If
+                    Next j
+                End If
+            Next k
+        End If
+    Next i
+End Sub
+
+Private Sub ProcessFindsNormally(ByRef finds As Variant, _
+                                 ByVal lCompare As VbCompareMethod)
+    Dim i As Long, j As Long
+    For i = 0 To UBound(finds)
+        If Len(finds(i)) <> 0 Then
+            For j = i + 1 To UBound(finds)
+                If InStr(1, finds(j), finds(i), lCompare) <> 0 Then
+                    finds(j) = vbNullString
+                End If
+            Next j
+        End If
+    Next i
+End Sub
+
+Private Sub CompareFindProcessingProcedures()
+    Dim tests As Variant
+    Dim i As Long
+    Dim original() As Variant, expected() As Variant, actual() As Variant
+    
+    ' Define test cases
+    tests = Array( _
+        Array("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"), _
+        Array("hello", "helloworld", "he", "hell", "cat", "dog"), _
+        Array("a", "b", "c", "d", "e", "f", "g", "h", "i", "j"), _
+        Array("aa", "a", "bb", "b", "cc", "c"), _
+        Array("a", "aa", "bb", "b", "c", "cc"), _
+        Array("hello", "helloworld", "he", "hell", "cat", "dog") _
+    )
+    
+    For i = LBound(tests) To UBound(tests)
+        ' Copy original array
+        original = tests(i)
+        
+        ' Use ProcessFindsNormally as reference for the expected result
+        expected = original
+        st i = 0
+        ProcessFindsNormally expected, vbTextCompare
+        RT "ProcessFindsNormally " & i + 1
+        
+        ' Test ProcessFindsUsingTrie procedure
+        actual = original
+        st False
+        ProcessFindsUsingTrie actual, vbTextCompare
+        RT "ProcessFindsUsingTrie " & i + 1
+        
+        If Not ArraysAreEqual(actual, expected) Then
+            Debug.Print "Test " & i + 1 & " failed for ProcessFindsUsingTrie procedure"
+            Debug.Print "Expected: " & Stringify(expected)
+            Debug.Print "Actual: " & Stringify(actual)
+        Else
+            Debug.Print "Test " & i + 1 & " passed."
+        End If
+    Next i
+End Sub
+
+Private Sub DemonstrateBigOcomplexityOfTrieVsNaive()
+    Dim timeTaken As Currency
+    st
+    Dim i As Long
+    Dim finds1 As Variant
+    Dim finds2 As Variant
+    Dim timeTrie As Currency
+    Dim timeNaive As Currency
+    Dim totalChars As Long
+    Dim numChunks As Long
+    Dim increaseFactor As Long
+    increaseFactor = 2
+    totalChars = 50
+    numChunks = 10
+    Randomize
+    Do Until timeTaken > StoUs(3)
+        ReDim finds1(0 To numChunks - 1)
+        For i = 0 To numChunks - 1
+            finds1(i) = RandomStringAlphanumeric(Rnd * totalChars \ numChunks * 2)
+        Next i
+        'finds1 = ChunkifyString(RandomStringAlphanumeric(totalChars), , 10)
+        finds2 = finds1
+        st False
+        ProcessFindsUsingTrie finds1, vbTextCompare
+        timeTrie = RT("Processed" & totalChars \ numChunks & "Finds Using Trie")
+        st False
+        ProcessFindsNormally finds2, vbTextCompare
+        timeNaive = RT("Processed" & totalChars \ numChunks & _
+                                      "Finds Using Nested Loop with Instr")
+        
+        Debug.Print "TimeTrie / TimeNaive = " & timeTrie / timeNaive
+        timeTaken = timeTrie + timeNaive
+        
+        totalChars = totalChars * increaseFactor
+        numChunks = numChunks * increaseFactor
+        DoEvents
+    Loop
+End Sub
+
+Private Function ArraysAreEqual(arr1 As Variant, arr2 As Variant) As Boolean
+    Dim i As Long
+    
+    If UBound(arr1) <> UBound(arr2) Then
+        ArraysAreEqual = False
+        Exit Function
+    End If
+    
+    For i = LBound(arr1) To UBound(arr1)
+        If arr1(i) <> arr2(i) Then
+            ArraysAreEqual = False
+            Exit Function
+        End If
+    Next i
+    
+    ArraysAreEqual = True
+End Function
 

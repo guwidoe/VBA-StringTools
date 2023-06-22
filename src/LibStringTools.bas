@@ -1877,7 +1877,7 @@ Public Function RandomStringASCII(ByVal length As Long) As String
     Dim i As Long
     Dim b() As Byte: ReDim b(0 To length * 2 - 1)
     Randomize
-    For i = 0 To length * 2 - 2 Step 2
+    For i = 0 To length * 2 - 1 Step 2
         b(i) = Int(MAX_ASC * Rnd) + 1
     Next i
     RandomStringASCII = b
@@ -1897,7 +1897,7 @@ Public Function RandomStringBMP(ByVal length As Long) As String
     Dim b() As Byte:  ReDim b(0 To length * 2 - 1)
 
     Randomize
-    For i = 0 To length * 2 - 2 Step 2
+    For i = 0 To length * 2 - 1 Step 2
         Do
             char = Int(MAX_UINT * Rnd) + 1
         Loop Until (char < &HD800& Or char > &HDFFF&) _
@@ -1923,7 +1923,7 @@ Public Function RandomStringUnicode(ByVal length As Long) As String
 
     Randomize
     If length > 1 Then
-        For i = 0 To length * 2 - 2 Step 2
+        For i = 0 To length * 2 - 3 Step 2
             Do
                 char = Int(MAX_UNICODE * Rnd) + 1
             Loop Until (char < &HD800& Or char > &HDFFF&) _
@@ -1998,7 +1998,7 @@ Public Function RandomString(ByVal length As Long, _
 
     Randomize
     If length > 1 Then
-        For i = 0 To length * 2 - 2 Step 2
+        For i = 0 To length * 2 - 3 Step 2
             Do
                 char = Int(cpRange * Rnd) + minCodepoint
             Loop Until (char < &HD800& Or char > &HDFFF&) _
@@ -2948,10 +2948,16 @@ Public Function ReplaceMultiple(ByRef str As String, _
     End If
     
     'Clean input arrays to deal with cases where one "find" contains another one
-    'TODO: Use a Trie instead in certain cases to avoid n^2 runtime complexity
-    'https://en.wikipedia.org/wiki/Trie
-    Dim n As Long:          n = UBound(finds) + 1
-    Dim m As Long:          m = UBound(replaces) + 1
+    
+    'Unfortunately, this part of the algorithm introduces an O(n^2 * m)
+    'complexity (n = number of finds, m average length of finds) which can make
+    'this function very slow for more than a few 1000 finds. This can
+    'theoretically be improved by uging a Trie instead in certain cases to avoid
+    'n^2 runtime complexity: https://en.wikipedia.org/wiki/Trie
+    'A simple implementation of the trie algorithm has been tested, the
+    'procedure is available in the test module ('ProcessFindsUsingTrie')
+    'Unfortunately it performs at least 20 times slower than the naïve approach
+    'implemented here:
     Dim i As Long, j As Long
     For i = 0 To UBound(finds)
         If Len(finds(i)) <> 0 Then
@@ -2962,8 +2968,12 @@ Public Function ReplaceMultiple(ByRef str As String, _
             Next j
         End If
     Next i
+    
+    'ProcessFindsUsingTrie finds, lCompare '<-- at least 20 times slower
 
     'Allocate buffer
+    Dim n As Long:          n = UBound(finds) + 1
+    Dim m As Long:          m = UBound(replaces) + 1
     Dim lenBBuffer As Long: lenBBuffer = LenB(str) - (lStart - 1) * 2
     If m > n Then
         For i = 0 To UBound(finds)
@@ -3156,10 +3166,6 @@ Public Function ReplaceMultipleB(ByRef bytes As String, _
     End If
     
     'Clean input arrays to deal with cases where one "find" contains another one
-    'TODO: Use a Trie instead in certain cases to avoid n^2 runtime complexity
-    'https://en.wikipedia.org/wiki/Trie
-    Dim n As Long:          n = UBound(finds) + 1
-    Dim m As Long:          m = UBound(replaces) + 1
     Dim i As Long, j As Long
     For i = 0 To UBound(finds)
         If LenB(finds(i)) <> 0 Then
@@ -3172,6 +3178,8 @@ Public Function ReplaceMultipleB(ByRef bytes As String, _
     Next i
     
     'Allocate buffer
+    Dim n As Long:          n = UBound(finds) + 1
+    Dim m As Long:          m = UBound(replaces) + 1
     Dim lenBBuffer As Long: lenBBuffer = LenB(bytes) - (lStart - 1)
     If m > n Then
         For i = 0 To UBound(finds)
