@@ -2951,6 +2951,14 @@ End Function
 '         numbered occurrence of "1" gets replaced by "5" and every occurrence
 '         of "2" gets replaced by "4"
 '         ReplaceMultiple("123123123", ...) returns "343543343"
+'Notes:
+''ReplaceMultipleMultiPass' is almost always faster than this function, but
+'   does not support the n < m case and also the behavior can differ and be less
+'   predictable, if for example finds appear in the string through prior
+'   replacements that can then get replaced again in the next iteration.
+'This function should not be used with more than a few thousand finds at once
+'   because the runtime is proportional to n^2 because of an important check
+'   as commented in the code!
 Public Function ReplaceMultiple(ByRef str As String, _
                                 ByRef sFindOrFinds As Variant, _
                                 ByRef sReplaceOrReplaces As Variant, _

@@ -802,20 +802,24 @@ Sub TestReplaceMultiple()
     Dim s As String
     s = RandomStringAlphanumeric(100000)
     Dim finds As Variant
-    finds = StringToCodepointStrings(RandomStringUnicode(6000)) '
+    'finds = RandomStringArray(20000, 10, 8, 30, 255) '  '
     'finds = VBA.Array("1", "2", "3", "4", "5", "6", "7", "8", "9", "10")
+    'finds = StringToCodepointStrings(RandomStringUnicode(6000))
     Dim replaces As Variant
-    replaces = StringToCodepointStrings(RandomStringUnicode(5000)) '
+    'replaces = RandomStringArray(5000, 10, 8, 30, 255) ' '
     'replaces = Array("a", "b", "c", "d", "e", "f", "g", "h", "i", "j")
+    'replaces = StringToCodepointStrings(RandomStringUnicode(5000))
     'Debug.Print ReplaceMultiple(s, finds, replaces) = ReplaceMultipleMultiPass(s, finds, replaces)
     'Debug.Print ReplaceMultiple(s, finds, replaces)
     'Debug.Print ReplaceMultipleMultiPass(s, finds, replaces)
+    Dim rsingle As String
+    Dim rmulti As String
     st
-    ReplaceMultiple s, finds, replaces
+    rsingle = ReplaceMultiple(s, finds, replaces)
     RT "ReplaceMultiple", , True
-    ReplaceMultipleMultiPass s, finds, replaces
+    rmulti = ReplaceMultipleMultiPass(s, finds, replaces)
     RT "ReplaceMultipleMultiPass"
-    
+    Debug.Print rsingle = rmulti
     'Debug.Print ReplaceMultipleB(s, Array("1", "2", "3"), Array("44", "55"))
 End Sub
 
