@@ -120,7 +120,7 @@ Private Sub TestEncodersAndDecoders()
     
     'VBA natively implemented Encoders/Decoders
     Debug.Print "Native UTF-8 Encoder/Decoder Test Basic Multilingual Plane: " & _
-        IIf(DecodeUTF8native(EncodeUTF8native(bmpUnicode)) = bmpUnicode, "passed", "failed")
+        IIf(DecodeUTF8(EncodeUTF8(bmpUnicode)) = bmpUnicode, "passed", "failed")
         
      Debug.Print "ADODB.Stream UTF-8 Encoder/Decoder Test Basic Multilingual Plane: " & _
          IIf(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(bmpUnicode)) = bmpUnicode, "passed", "failed")
@@ -132,7 +132,7 @@ Private Sub TestEncodersAndDecoders()
         IIf(DecodeUTF32LE(EncodeUTF32LE(bmpUnicode)) = bmpUnicode, "passed", "failed")
         
     Debug.Print "Native UTF-8 Encoder/Decoder Test full Unicode: " & _
-        IIf(DecodeUTF8native(EncodeUTF8native(fullUnicode)) = fullUnicode, "passed", "failed")
+        IIf(DecodeUTF8(EncodeUTF8(fullUnicode)) = fullUnicode, "passed", "failed")
     
     #If Mac = 0 Then
         Debug.Print "ADODB.Stream UTF-8 Encoder/Decoder Test full Unicode: " & _
@@ -178,7 +178,7 @@ Private Sub TestUTF8EncodersPerformance()
         'VBA Native UTF-8 Encoder:
         t = AccurateTimer
         For j = 1 To numReps
-            EncodeUTF8native s
+            EncodeUTF8 s
         Next j
         Debug.Print "EncodeUTF8native took: " & AccurateTimer - t & description
             
@@ -224,14 +224,14 @@ Private Sub TestUTF8DecodersPerformance()
         's = RandomStringBMP(strLength)
         's = RandomStringASCII(strLength)
         
-        s = EncodeUTF8native(s)
+        s = EncodeUTF8(s)
         description = " seconds to encode a string of length " & _
                       strLength & " " & numReps & " times."
                       
         'VBA Native UTF-8 Decoder:
         t = AccurateTimer
         For j = 1 To numReps
-            DecodeUTF8native s
+            DecodeUTF8 s
         Next j
         Debug.Print "DecodeUTF8native took: " & AccurateTimer - t & description
         
@@ -866,7 +866,7 @@ Public Sub TestDebugPrintArray()
         Next j
     Next i
     Debug.Print "Test Case 4: Two dimensional array of Strings"
-    DebugPrintArray array2DStr
+    DebugPrintArray array2DStr, , , 1000
     Debug.Print vbNewLine
     
     ' Test Case 4: Two dimensional array of strings

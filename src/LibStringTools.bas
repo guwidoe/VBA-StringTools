@@ -31,8 +31,6 @@ Option Explicit
 Option Base 0
 Option Compare Binary
 
-#Const TEST_MODE = True
-
 #If Mac Then
     #If VBA7 Then 'https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/iconv.3.html
         Private Declare PtrSafe Function iconv_open Lib "/usr/lib/libiconv.dylib" (ByVal toCode As LongPtr, ByVal fromCode As LongPtr) As LongPtr
@@ -1084,7 +1082,6 @@ Public Function EscapeUnicode(ByRef str As String, _
                 numescapeFormats = numescapeFormats + 1
             End If
         Next i
-        Randomize
     End If
     For i = 1 To Len(str)
         Dim codepoint As Long: codepoint = AscU(Mid$(str, i, 2))
@@ -1464,18 +1461,39 @@ Public Function AscU(ByRef char As String) As Long
     End If
 End Function
 
-'Function transcoding an ANSI encoded string to the VBA-native UTF-16LE
-Public Function DecodeANSI(ByRef ansiStr As String) As String
+'Function transcoding a VBA-native UTF-16LE encoded string to an ASCII string
+'Note: Information will be lost for codepoints > 127!
+Public Function EncodeASCII(ByRef utf16leStr As String) As String
     Dim i As Long
     Dim j As Long:         j = 0
-    Dim ansi() As Byte:    ansi = ansiStr
-    Dim utf16le() As Byte: ReDim utf16le(0 To LenB(ansiStr) * 2 - 1)
+    Dim utf16le() As Byte: utf16le = utf16leStr
+    Dim ascii() As Byte
 
-    For i = LBound(ansi) To UBound(ansi)
-        utf16le(j) = ansi(i)
+    ReDim ascii(1 To Len(utf16leStr))
+    For i = LBound(ascii) To UBound(ascii)
+        If utf16le(j) < 128 And utf16le(j + 1) = 0 Then
+            ascii(i) = utf16le(j)
+            j = j + 2
+        Else
+            ascii(i) = &H3F 'Chr(&H3F) = "?"
+            j = j + 2
+        End If
+    Next i
+    EncodeASCII = ascii
+End Function
+
+'Function transcoding an ASCII encoded string to the VBA-native UTF-16LE
+Public Function DecodeASCII(ByRef asciiStr As String) As String
+    Dim i As Long
+    Dim j As Long:         j = 0
+    Dim ascii() As Byte:   ascii = asciiStr
+    Dim utf16le() As Byte: ReDim utf16le(0 To LenB(asciiStr) * 2 - 1)
+
+    For i = LBound(ascii) To UBound(ascii)
+        utf16le(j) = ascii(i)
         j = j + 2
     Next i
-    DecodeANSI = utf16le
+    DecodeASCII = utf16le
 End Function
 
 'Function transcoding a VBA-native UTF-16LE encoded string to an ANSI string
@@ -1499,34 +1517,24 @@ Public Function EncodeANSI(ByRef utf16leStr As String) As String
     EncodeANSI = ansi
 End Function
 
-Public Function EncodeUTF8(ByRef utf16leStr As String, _
-                  Optional ByVal raiseErrors As Boolean = False) As String
-    If Len(utf16leStr) < 50 Then
-        EncodeUTF8 = EncodeUTF8native(utf16leStr, raiseErrors)
-    Else
-        EncodeUTF8 = Encode(utf16leStr, cpUTF_8, raiseErrors)
-    End If
-End Function
+'Function transcoding an ANSI encoded string to the VBA-native UTF-16LE
+Public Function DecodeANSI(ByRef ansiStr As String) As String
+    Dim i As Long
+    Dim j As Long:         j = 0
+    Dim ansi() As Byte:    ansi = ansiStr
+    Dim utf16le() As Byte: ReDim utf16le(0 To LenB(ansiStr) * 2 - 1)
 
-Public Function DecodeUTF8(ByRef utf8Str As String, _
-                  Optional ByVal raiseErrors As Boolean = False) As String
-    If Len(utf8Str) < 50 Then
-        DecodeUTF8 = DecodeUTF8native(utf8Str, raiseErrors)
-    Else
-        DecodeUTF8 = Decode(utf8Str, cpUTF_8, raiseErrors)
-    End If
+    For i = LBound(ansi) To UBound(ansi)
+        utf16le(j) = ansi(i)
+        j = j + 2
+    Next i
+    DecodeANSI = utf16le
 End Function
 
 'Function transcoding an VBA-native UTF-16LE encoded string to UTF-8
-#If TEST_MODE Then
-Public Function EncodeUTF8native(ByRef utf16leStr As String, _
-                         Optional ByVal raiseErrors As Boolean = False) _
+Public Function EncodeUTF8(ByRef utf16leStr As String, _
+                  Optional ByVal raiseErrors As Boolean = False) _
                                   As String
-#Else
-Private Function EncodeUTF8native(ByRef utf16leStr As String, _
-                         Optional ByVal raiseErrors As Boolean = False) _
-                                  As String
-#End If
     Const methodName As String = "EncodeUTF8native"
     Dim codepoint As Long
     Dim lowSurrogate As Long
@@ -1584,18 +1592,13 @@ Private Function EncodeUTF8native(ByRef utf16leStr As String, _
 
         i = i + 1
     Loop
-    EncodeUTF8native = MidB$(utf8, 1, j)
+    EncodeUTF8 = MidB$(utf8, 1, j)
 End Function
 
 'Function transcoding an UTF-8 encoded string to the VBA-native UTF-16LE
 'Function transcoding an VBA-native UTF-16LE encoded string to UTF-8
-#If TEST_MODE Then
-Public Function DecodeUTF8native(ByRef utf8Str As String, _
-                   Optional ByVal raiseErrors As Boolean = False) As String
-#Else
-Private Function DecodeUTF8native(ByRef utf8Str As String, _
-                   Optional ByVal raiseErrors As Boolean = False) As String
-#End If
+Public Function DecodeUTF8(ByRef utf8Str As String, _
+                  Optional ByVal raiseErrors As Boolean = False) As String
 
     Const methodName As String = "DecodeUTF8native"
     Dim i As Long
@@ -1691,19 +1694,14 @@ insertErrChar:  utf16(j) = &HFD
         End If
 nextCp: i = i + numBytesOfCodePoint 'Move to the next UTF-8 codepoint
     Loop
-    DecodeUTF8native = MidB$(utf16, 1, j)
+    DecodeUTF8 = MidB$(utf16, 1, j)
 End Function
 
 #If Mac = 0 Then
 'Transcoding a VBA-native UTF-16LE encoded string to UTF-8 using ADODB.Stream
 'Much faster than EncodeUTF8native, but only available on Windows
-#If TEST_MODE Then
 Public Function EncodeUTF8usingAdodbStream(ByRef utf16leStr As String) _
                                             As String
-#Else
-Private Function EncodeUTF8usingAdodbStream(ByRef utf16leStr As String) _
-                                            As String
-#End If
     With CreateObject("ADODB.Stream")
         .Type = 2 ' adTypeText
         .Charset = "utf-8"
@@ -1720,11 +1718,7 @@ End Function
 'Transcoding an UTF-8 encoded string to VBA-native UTF-16LE using ADODB.Stream
 'Faster than DeocdeUTF8native for some strings but only available on Windows
 'Warning: This function performs extremely slow for strings bigger than ~5MB
-#If TEST_MODE Then
 Public Function DecodeUTF8usingAdodbStream(ByRef utf8Str As String) As String
-#Else
-Private Function DecodeUTF8usingAdodbStream(ByRef utf8Str As String) As String
-#End If
     Dim b() As Byte: b = utf8Str
     With CreateObject("ADODB.Stream")
         .Type = 1 ' adTypeBinary
@@ -1859,7 +1853,6 @@ Public Function RandomStringAlphanumeric(ByVal length As Long) As String
     If length = 0 Then Exit Function
     If length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
     Dim b() As Byte: ReDim b(0 To length * 2 - 1)
-    Randomize
     Dim i As Long
     For i = 0 To length * 2 - 1 Step 2
         b(i) = chars(Int(Rnd * numPossChars))
@@ -1876,7 +1869,6 @@ Public Function RandomStringASCII(ByVal length As Long) As String
     If length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
     Dim i As Long
     Dim b() As Byte: ReDim b(0 To length * 2 - 1)
-    Randomize
     For i = 0 To length * 2 - 1 Step 2
         b(i) = Int(MAX_ASC * Rnd) + 1
     Next i
@@ -1896,7 +1888,6 @@ Public Function RandomStringBMP(ByVal length As Long) As String
     Dim char As Long
     Dim b() As Byte:  ReDim b(0 To length * 2 - 1)
 
-    Randomize
     For i = 0 To length * 2 - 1 Step 2
         Do
             char = Int(MAX_UINT * Rnd) + 1
@@ -1921,7 +1912,6 @@ Public Function RandomStringUnicode(ByVal length As Long) As String
     Dim char As Long
     Dim b() As Byte: ReDim b(0 To length * 2 - 1)
 
-    Randomize
     If length > 1 Then
         For i = 0 To length * 2 - 3 Step 2
             Do
@@ -1960,7 +1950,7 @@ Public Function RandomBytes(ByVal numBytes As Long) As String
     Const methodName As String = "RandomBytes"
     If numBytes = 0 Then Exit Function
     If numBytes < 0 Then Err.Raise 5, methodName, "numBytes must be >= 0"
-    Randomize
+
     Dim bytes() As Byte: ReDim bytes(0 To numBytes - 1)
     Dim i As Long
     For i = 0 To numBytes - 1
@@ -1996,7 +1986,6 @@ Public Function RandomString(ByVal length As Long, _
     Dim char As Long
     Dim b() As Byte: ReDim b(0 To length * 2 - 1)
 
-    Randomize
     If length > 1 Then
         For i = 0 To length * 2 - 3 Step 2
             Do
@@ -2051,7 +2040,7 @@ Public Function RandomStringFromChars(ByVal length As Long, _
     methodName, "Can't build string of uneven length from only Surrogate Pairs."
         
     RandomStringFromChars = Space$(length)
-    Randomize
+
     Dim i As Long
     For i = 1 To length - 1
         Dim idx As String: idx = Int(Rnd * numChars)
@@ -2124,7 +2113,6 @@ Public Function RandomStringArray(ByVal numElements As Long, _
     If minCodepoint > &HFFFF& And maxElementLength = minElementLength _
     And maxElementLength Mod 2 = 1 Then Err.Raise 5, methodName, _
         "Can't build string of uneven length from only Surrogate Pairs."
-    Randomize
     
     Dim stringArray() As String: ReDim stringArray(0 To numElements - 1)
     Dim i As Long
