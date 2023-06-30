@@ -4073,7 +4073,7 @@ Public Function Printf(ParamArray args() As Variant) As String
             Exit For
         End If
     Next arg
-    Printf = SuperTrim(s, vbCrLf)
+    Printf = TrimX(s, vbCrLf)
     Debug.Print Printf
 End Function
 
@@ -4093,9 +4093,8 @@ End Sub
 
 'Works like the inbuilt trim but instead of just spaces, it will trim any
 'characters occurring in 'charactersToTrim' from the edges of 'str'
-Public Function SuperTrim(ByRef str As String, _
-                 Optional ByRef charactersToTrim As String = " " & vbCrLf) _
-                          As String
+Public Function TrimX(ByRef str As String, _
+             Optional ByRef charactersToTrim As String = " " & vbCrLf) As String
     Dim strLen As Long:   strLen = Len(str)
     Dim startIdx As Long: startIdx = 1
     Dim endIdx As Long:   endIdx = strLen
@@ -4111,9 +4110,9 @@ Public Function SuperTrim(ByRef str As String, _
     Loop
 
     If startIdx <= endIdx Then
-        SuperTrim = Mid(str, startIdx, endIdx - startIdx + 1)
+        TrimX = Mid(str, startIdx, endIdx - startIdx + 1)
     Else
-        SuperTrim = ""
+        TrimX = ""
     End If
 End Function
 
