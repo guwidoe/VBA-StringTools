@@ -480,8 +480,11 @@ Private Sub TestSplitB()
     Dim v As Variant
     v = SplitB(bytes, sFind)
     Debug.Print StringToHex(CStr(v(0))), StringToHex(CStr(v(1))), StringToHex(CStr(v(2)))
-    Stop
+
     v = Split(bytes, sFind)
+
+    'v = SplitB(bytes, sFind, 0)
+    v = Split(bytes, , 0)
     Stop
 End Sub
 
@@ -802,11 +805,11 @@ Sub TestReplaceMultiple()
     Dim s As String
     s = RandomStringAlphanumeric(100000)
     Dim finds As Variant
-    'finds = RandomStringArray(20000, 10, 8, 30, 255) '  '
+    finds = RandomStringArray(7000, 10, 8, 30, 255) '  '
     'finds = VBA.Array("1", "2", "3", "4", "5", "6", "7", "8", "9", "10")
     'finds = StringToCodepointStrings(RandomStringUnicode(6000))
     Dim replaces As Variant
-    'replaces = RandomStringArray(5000, 10, 8, 30, 255) ' '
+    replaces = RandomStringArray(5000, 10, 8, 30, 255) ' '
     'replaces = Array("a", "b", "c", "d", "e", "f", "g", "h", "i", "j")
     'replaces = StringToCodepointStrings(RandomStringUnicode(5000))
     'Debug.Print ReplaceMultiple(s, finds, replaces) = ReplaceMultipleMultiPass(s, finds, replaces)
@@ -823,15 +826,15 @@ Sub TestReplaceMultiple()
     'Debug.Print ReplaceMultipleB(s, Array("1", "2", "3"), Array("44", "55"))
 End Sub
 
-Public Sub TestDebugPrintArray()
+Public Sub TestPrintVar()
     ' Test Case 1: Single dimensional array of integers
     Dim array1DInt(1 To 100) As Integer
     Dim i As Long
     For i = 1 To 100
         array1DInt(i) = i
     Next i
-    Debug.Print "Test Case 1: Single dimensional array of integers"
-    DebugPrintArray array1DInt
+    Printf "Test Case 1: Single dimensional array of integers"
+    PrintVar array1DInt
     Debug.Print vbNewLine
     
     ' Test Case 2: Single dimensional array of strings
@@ -840,7 +843,7 @@ Public Sub TestDebugPrintArray()
     array1DStr(2) = "Bob"
     array1DStr(3) = "Charlie"
     Debug.Print "Test Case 2: Single dimensional array of strings"
-    DebugPrintArray array1DStr
+    PrintVar array1DStr
     Debug.Print vbNewLine
     
     ' Test Case 3: Two dimensional array of integers
@@ -855,7 +858,7 @@ Public Sub TestDebugPrintArray()
         Next j
     Next i
     Debug.Print "Test Case 3: Two dimensional array of integers"
-    DebugPrintArray array2DInt
+    Printf array2DInt
     Debug.Print vbNewLine
     
     Dim array2DStr() As Variant
@@ -866,7 +869,7 @@ Public Sub TestDebugPrintArray()
         Next j
     Next i
     Debug.Print "Test Case 4: Two dimensional array of Strings"
-    DebugPrintArray array2DStr, , , 1000
+    PrintVar array2DStr, , , 1000
     Debug.Print vbNewLine
     
     ' Test Case 4: Two dimensional array of strings
@@ -876,7 +879,7 @@ Public Sub TestDebugPrintArray()
     array2DStr(2, 1) = "Cherry"
     array2DStr(2, 2) = "Durian"
     Debug.Print "Test Case 5: Two dimensional array of strings"
-    DebugPrintArray array2DStr
+    PrintVar array2DStr
     Debug.Print vbNewLine
     
     ' Test Case 5: Array containing random strings with special characters
@@ -885,19 +888,19 @@ Public Sub TestDebugPrintArray()
     arrayRandom(2) = RandomString(10, 256, 500) ' extended ASCII characters
     arrayRandom(3) = RandomString(10, &H1F600, &H1F64F) ' emojis
     Debug.Print "Test Case 6: Array containing random strings with special characters"
-    DebugPrintArray arrayRandom, escapeNonPrintable:=False
+    PrintVar arrayRandom, escapeNonPrintable:=False
     Debug.Print vbNewLine
-    DebugPrintArray arrayRandom, escapeNonPrintable:=True
+    PrintVar arrayRandom, escapeNonPrintable:=True
     Debug.Print vbNewLine
     
     ' Test Case 6: Empty array
     Dim emptyArray() As Integer
     Debug.Print "Test Case 7: Empty array"
-    DebugPrintArray emptyArray
+    PrintVar emptyArray
     Debug.Print vbNewLine
     
     Debug.Print "Test Case 8: Empty array 2"
-    DebugPrintArray Array()
+    PrintVar Array()
     Debug.Print vbNewLine
     
     ' Test Case 6: Array containing various weird stuff
@@ -911,7 +914,7 @@ Public Sub TestDebugPrintArray()
     weirdArray(2, 2) = CCur(1000)
     weirdArray(3, 2) = nested2DimArray
     Debug.Print "Test Case 9: Weird array"
-    DebugPrintArray weirdArray
+    PrintVar weirdArray
     Debug.Print vbNewLine
 End Sub
 
@@ -1038,11 +1041,11 @@ Private Sub DemonstrateBigOcomplexityOfTrieVsNaive()
         finds2 = finds1
         st False
         ProcessFindsUsingTrie finds1, vbTextCompare
-        timeTrie = RT("Processed" & totalChars \ numChunks & "Finds Using Trie")
+        timeTrie = RT("Processed " & numChunks & " Finds Using Trie")
         st False
         ProcessFindsNormally finds2, vbTextCompare
-        timeNaive = RT("Processed" & totalChars \ numChunks & _
-                                      "Finds Using Nested Loop with Instr")
+        timeNaive = RT("Processed " & numChunks & _
+                                      " Finds Using Nested Loop with Instr")
         
         Debug.Print "TimeTrie / TimeNaive = " & timeTrie / timeNaive
         timeTaken = timeTrie + timeNaive

@@ -140,6 +140,9 @@ Private Type StringificationSettings
     inklRowIndices As Boolean
 End Type
 
+Dim printfSettings As StringificationSettings
+Dim printfSettingsAreInitialized As Boolean
+
 Private Const WC_ERR_INVALID_CHARS As Long = &H80&
 Private Const MB_ERR_INVALID_CHARS As Long = &H8&
 
@@ -2214,22 +2217,28 @@ End Function
 
 'Counts the number of times a substring exists in a string. Does not count
 'overlapping occurrences of substring.
+''lLimit' can define a number after which the function should stop counting,
+'enables premature exiting of the procedure if for example the calling code
+'just needs the information if count >= lLimit
 'E.g.: CountSubstring("abababab", "abab") -> 2
 Public Function CountSubstring(ByRef str As String, _
                                ByRef subStr As String, _
                       Optional ByVal lStart As Long = 1, _
+                      Optional ByVal lLimit As Long = -1, _
                       Optional ByVal lCompare As VbCompareMethod _
                                                  = vbBinaryCompare) As Long
     Const methodName As String = "CountSubstring"
     If lStart < 1 Then Err.Raise 5, methodName, _
         "Argument 'Start' = " & lStart & " < 1, invalid"
+    If lLimit < -1 Then Err.Raise 5, methodName, _
+        "Argument 'lLimit' = " & lLimit & " < -1, invalid"
     If subStr = vbNullString Then Exit Function
 
     Dim lenSubStr As Long: lenSubStr = Len(subStr)
     Dim i As Long:         i = InStr(lStart, str, subStr, lCompare)
 
     CountSubstring = 0
-    Do Until i = 0
+    Do Until i = 0 Or lLimit = CountSubstring
         CountSubstring = CountSubstring + 1
         i = InStr(i + lenSubStr, str, subStr, lCompare)
     Loop
@@ -2246,18 +2255,21 @@ End Function
 Public Function CountSubstringB(ByRef bytes As String, _
                                 ByRef subStr As String, _
                        Optional ByVal lStart As Long = 1, _
+                       Optional ByVal lLimit As Long = -1, _
                        Optional ByVal lCompare As VbCompareMethod _
                                                = vbBinaryCompare) As Long
     Const methodName As String = "CountSubstringB"
     If lStart < 1 Then Err.Raise 5, methodName, _
         "Argument 'Start' = " & lStart & " < 1, invalid"
+    If lLimit < -1 Then Err.Raise 5, methodName, _
+        "Argument 'lLimit' = " & lLimit & " < -1, invalid"
     If subStr = vbNullString Then Exit Function
     
     Dim lenBSubStr As Long: lenBSubStr = LenB(subStr)
     Dim i As Long:          i = InStrB(lStart, bytes, subStr, lCompare)
 
     CountSubstringB = 0
-    Do Until i = 0
+    Do Until i = 0 Or lLimit = CountSubstringB
         CountSubstringB = CountSubstringB + 1
         i = InStrB(i + lenBSubStr, bytes, subStr, lCompare)
     Loop
@@ -2270,18 +2282,21 @@ End Function
 Public Function CountSubstringUnlessEscaped(ByRef str As String, _
                                             ByRef subStr As String, _
                                    Optional ByVal lStart As Long = 1, _
+                                   Optional ByVal lLimit As Long = -1, _
                                    Optional ByVal lCompare As VbCompareMethod _
                                                             = vbBinaryCompare) _
                                             As Long
     Const methodName As String = "CountSubstringUnlessEscaped"
     If lStart < 1 Then Err.Raise 5, methodName, _
         "Argument 'Start' = " & lStart & " < 1, invalid"
-
+    If lLimit < -1 Then Err.Raise 5, methodName, _
+        "Argument 'lLimit' = " & lLimit & " < -1, invalid"
+        
     Dim lenSubStr As Long: lenSubStr = Len(subStr)
     Dim i As Long:         i = InStr(lStart, str, subStr, lCompare)
 
     CountSubstringUnlessEscaped = 0
-    Do Until i = 0
+    Do Until i = 0 Or lLimit = CountSubstringUnlessEscaped
         If StrComp(subStr, Mid(str, i + lenSubStr, lenSubStr), lCompare) = 0 Then
             i = i + lenSubStr
         Else
@@ -2302,18 +2317,21 @@ End Function
 Public Function CountSubstringUnlessEscapedB(ByRef bytes As String, _
                                              ByRef subStr As String, _
                                     Optional ByVal lStart As Long = 1, _
+                                    Optional ByVal lLimit As Long = -1, _
                                     Optional ByVal lCompare As VbCompareMethod _
                                                             = vbBinaryCompare) _
                                              As Long
     Const methodName As String = "CountSubstringUnlessEscaped"
     If lStart < 1 Then Err.Raise 5, methodName, _
         "Argument 'Start' = " & lStart & " < 1, invalid"
+    If lLimit < -1 Then Err.Raise 5, methodName, _
+        "Argument 'lLimit' = " & lLimit & " < -1, invalid"
 
     Dim lenBSubStr As Long: lenBSubStr = LenB(subStr)
     Dim i As Long:          i = InStrB(lStart, bytes, subStr, lCompare)
 
     CountSubstringUnlessEscapedB = 0
-    Do Until i = 0
+    Do Until i = 0 Or lLimit = CountSubstringUnlessEscapedB
         If StrComp(subStr, MidB(bytes, i + lenBSubStr, lenBSubStr), _
                    lCompare) = 0 Then
             i = i + lenBSubStr
@@ -2351,12 +2369,10 @@ Public Function ReplaceB(ByRef bytes As String, _
 
     Dim lenBFind As Long:    lenBFind = LenB(sFind)
     Dim lenBReplace As Long: lenBReplace = LenB(sReplace)
-    Dim numRepl As Long:     numRepl = CountSubstringB(bytes, sFind, _
-                                                       lStart, lCompare)
-    If lCount < numRepl Then numRepl = lCount
 
     Dim buffer() As Byte
-    ReDim buffer(0 To LenB(bytes) - lStart + numRepl * (lenBReplace - lenBFind))
+    ReDim buffer(0 To LenB(bytes) - lStart + CountSubstringB(bytes, sFind, _
+                 lStart, lCount, lCompare) * (lenBReplace - lenBFind))
     ReplaceB = buffer
 
     Dim i As Long:              i = InStrB(lStart, bytes, sFind, lCompare)
@@ -2617,19 +2633,18 @@ Public Function SplitB(ByRef bytes As String, _
         "Argument 'lLimit' = " & lLimit & " < -1, invalid"
     lLimit = lLimit And &H7FFFFFFF
     
-    If LenB(bytes) = 0 Or LenB(sDelimiter) = 0 Or lLimit < 2 Then
-        Dim arr() As String:  ReDim arr(0 To 0)
+    If lLimit = 0 Then
+        SplitB = Split("", , 0) 'Return empty but allocated string array
+        Exit Function
+    ElseIf LenB(bytes) = 0 Or LenB(sDelimiter) = 0 Or lLimit < 2 Then
+        Dim arr() As String: ReDim arr(0 To 0)
         arr(0) = bytes
         SplitB = arr
         Exit Function
     End If
 
     Dim lenBDelim As Long:  lenBDelim = LenB(sDelimiter)
-    Dim numParts As Long:   numParts = CountSubstringB(bytes, sDelimiter, _
-                                                       1, lCompare) + 1
-    If lLimit < numParts Then numParts = lLimit
-
-    ReDim arr(0 To numParts - 1)
+    ReDim arr(0 To CountSubstringB(bytes, sDelimiter, 1, lLimit, lCompare))
     Dim i As Long:              i = InStrB(1, bytes, sDelimiter, lCompare)
     Dim lastOccurrence As Long: lastOccurrence = 1
     Dim count As Long:          count = 0
@@ -2659,7 +2674,10 @@ Public Function SplitUnlessEscaped(ByRef str As String, _
         "Argument 'lLimit' = " & lLimit & " < -1, invalid"
     lLimit = lLimit And &H7FFFFFFF
 
-    If Len(str) = 0 Or Len(sDelimiter) = 0 Or lLimit < 2 Then
+    If lLimit = 0 Then
+        SplitUnlessEscaped = Split("", , 0) 'Return empty but allocated str arr
+        Exit Function
+    ElseIf Len(str) = 0 Or Len(sDelimiter) = 0 Or lLimit < 2 Then
         Dim arr() As String:  ReDim arr(0 To 0)
         arr(0) = str
         SplitUnlessEscaped = arr
@@ -2667,11 +2685,8 @@ Public Function SplitUnlessEscaped(ByRef str As String, _
     End If
     
     Dim lenDelim As Long:   lenDelim = Len(sDelimiter)
-    Dim numParts As Long:   numParts = CountSubstringUnlessEscaped(str, _
-                                                    sDelimiter, 1, lCompare) + 1
-    If lLimit < numParts Then numParts = lLimit
-
-    ReDim arr(0 To numParts - 1)
+    ReDim arr(0 To CountSubstringUnlessEscaped(str, sDelimiter, 1, lLimit, _
+                                               lCompare))
     Dim partStart As Long:      partStart = 1
     Dim count As Long:          count = 0
     Dim lastOccurrence As Long: lastOccurrence = 1
@@ -2709,7 +2724,10 @@ Public Function SplitUnlessEscapedB(ByRef bytes As String, _
         "Argument 'lLimit' = " & lLimit & " < -1, invalid"
     lLimit = lLimit And &H7FFFFFFF
 
-    If LenB(bytes) = 0 Or LenB(sDelimiter) = 0 Or lLimit < 2 Then
+    If lLimit = 0 Then
+        SplitUnlessEscapedB = Split("", , 0) 'Return empty but allocated str arr
+        Exit Function
+    ElseIf LenB(bytes) = 0 Or LenB(sDelimiter) = 0 Or lLimit < 2 Then
         Dim arr() As String:  ReDim arr(0 To 0)
         arr(0) = bytes
         SplitUnlessEscapedB = arr
@@ -2717,11 +2735,8 @@ Public Function SplitUnlessEscapedB(ByRef bytes As String, _
     End If
     
     Dim lenBDelim As Long:   lenBDelim = LenB(sDelimiter)
-    Dim numParts As Long:    numParts = CountSubstringUnlessEscapedB(bytes, _
-                                                    sDelimiter, 1, lCompare) + 1
-    If lLimit < numParts Then numParts = lLimit
-
-    ReDim arr(0 To numParts - 1)
+    ReDim arr(0 To CountSubstringUnlessEscapedB(bytes, sDelimiter, 1, lLimit, _
+                                                lCompare))
     Dim partStart As Long:      partStart = 1
     Dim count As Long:          count = 0
     Dim lastOccurrence As Long: lastOccurrence = 1
@@ -2992,7 +3007,7 @@ Public Function ReplaceMultiple(ByRef str As String, _
     'Unfortunately, this part of the algorithm introduces an O(n^2 * m)
     'complexity (n = number of finds, m average length of finds) which can make
     'this function very slow for more than a few 1000 finds. This can
-    'theoretically be improved by uging a Trie instead in certain cases to avoid
+    'theoretically be improved by using a Trie instead in certain cases to avoid
     'n^2 runtime complexity: https://en.wikipedia.org/wiki/Trie
     'A simple implementation of the trie algorithm has been tested, the
     'procedure is available in the test module ('ProcessFindsUsingTrie')
@@ -3012,6 +3027,8 @@ Public Function ReplaceMultiple(ByRef str As String, _
     'ProcessFindsUsingTrie finds, lCompare '<-- at least 20 times slower
 
     'Allocate buffer
+    'Buffer calculation doesn't really take into account the parameter lCount.
+    'We'll take it into account at the end of the function instead
     Dim n As Long:          n = UBound(finds) + 1
     Dim m As Long:          m = UBound(replaces) + 1
     Dim lenBBuffer As Long: lenBBuffer = LenB(str) - (lStart - 1) * 2
@@ -3020,7 +3037,8 @@ Public Function ReplaceMultiple(ByRef str As String, _
             Dim numReplPerFind As Long
             numReplPerFind = IIf(i < m Mod n, (m \ n) + 1, (m \ n))
             Dim numOcc As Long
-            numOcc = CountSubstring(str, CStr(finds(i)), lStart, lCompare)
+            numOcc = CountSubstring(str, CStr(finds(i)), lStart, lCount, _
+                                    lCompare)
             For j = i To m - 1 Step n
                 lenBBuffer = lenBBuffer + (LenB(replaces(j)) - LenB(finds(i))) _
                              * IIf((j - i) \ n < numOcc Mod numReplPerFind _
@@ -3029,7 +3047,8 @@ Public Function ReplaceMultiple(ByRef str As String, _
         Next i
     Else
         For i = 0 To UBound(finds)
-            numOcc = CountSubstring(str, CStr(finds(i)), lStart, lCompare)
+            numOcc = CountSubstring(str, CStr(finds(i)), lStart, lCount, _
+                                    lCompare)
             lenBBuffer = lenBBuffer + _
                          (LenB(replaces(i Mod m)) - LenB(finds(i))) * numOcc
         Next i
@@ -3107,8 +3126,13 @@ Public Function ReplaceMultiple(ByRef str As String, _
         currReplaceIdx = nextOccsHeap(0, 2)
     Loop
     
+    Dim remainderStr As String: remainderStr = MidB$(str, lastOccurrence)
+    
     If builtStrPos <= LenB(ReplaceMultiple) Then _
-        MidB$(ReplaceMultiple, builtStrPos) = MidB$(str, lastOccurrence)
+        MidB$(ReplaceMultiple, builtStrPos, Len(remainderStr)) = remainderStr
+    'Because we didn't take lCount into account when calculating the buffer:
+    If count > lCount Then _
+       ReplaceMultiple = Left$(ReplaceMultiple, builtStrPos + Len(remainderStr))
     
     Exit Function
 HeapSwapElements:
@@ -3218,6 +3242,8 @@ Public Function ReplaceMultipleB(ByRef bytes As String, _
     Next i
     
     'Allocate buffer
+    'Buffer calculation doesn't really take into account the parameter lCount.
+    'We'll take it into account at the end of the function instead
     Dim n As Long:          n = UBound(finds) + 1
     Dim m As Long:          m = UBound(replaces) + 1
     Dim lenBBuffer As Long: lenBBuffer = LenB(bytes) - (lStart - 1)
@@ -3226,7 +3252,8 @@ Public Function ReplaceMultipleB(ByRef bytes As String, _
             Dim numReplPerFind As Long
             numReplPerFind = IIf(i < m Mod n, (m \ n) + 1, (m \ n))
             Dim numOcc As Long
-            numOcc = CountSubstringB(bytes, CStr(finds(i)), lStart, lCompare)
+            numOcc = CountSubstringB(bytes, CStr(finds(i)), lStart, lCount, _
+                                     lCompare)
             For j = i To m - 1 Step n
                 lenBBuffer = lenBBuffer + (LenB(replaces(j)) - LenB(finds(i))) _
                              * IIf((j - i) \ n < numOcc Mod numReplPerFind _
@@ -3235,7 +3262,8 @@ Public Function ReplaceMultipleB(ByRef bytes As String, _
         Next i
     Else
         For i = 0 To UBound(finds)
-            numOcc = CountSubstringB(bytes, CStr(finds(i)), lStart, lCompare)
+            numOcc = CountSubstringB(bytes, CStr(finds(i)), lStart, lCount, _
+                                     lCompare)
             lenBBuffer = lenBBuffer + _
                          (LenB(replaces(i Mod m)) - LenB(finds(i))) * numOcc
         Next i
@@ -3312,10 +3340,15 @@ Public Function ReplaceMultipleB(ByRef bytes As String, _
         currOccurrence = nextOccsHeap(0, 0)
         currReplaceIdx = nextOccsHeap(0, 2)
     Loop
+
+    Dim remainderStr As String: remainderStr = MidB$(bytes, lastOccurrence)
     
     If builtStrPos <= LenB(ReplaceMultipleB) Then _
-        MidB$(ReplaceMultipleB, builtStrPos) = MidB$(bytes, lastOccurrence)
-    
+        MidB$(ReplaceMultipleB, builtStrPos, Len(remainderStr)) = remainderStr
+    'Because we didn't take lCount into account when calculating the buffer:
+    If count > lCount Then _
+       ReplaceMultipleB = Left$(ReplaceMultipleB, builtStrPos + Len(remainderStr))
+       
     Exit Function
 HeapSwapElements:
     Dim temp(0 To 2) As Long
@@ -3544,20 +3577,6 @@ Public Function ChunkifyString(ByRef str As String, _
     
     ChunkifyString = chunks
 End Function
-
-'Prints an one or two dimensional array to the immediate window.
-Public Sub DebugPrintArray(ByRef arr As Variant, _
-                  Optional ByRef delimiter As String = vbNullString, _
-                  Optional ByVal maxCharsPerElement As Long = 25, _
-                  Optional ByVal maxCharsPerLine As Long = 80, _
-                  Optional ByVal maxLines As Long = 10, _
-                  Optional ByVal escapeNonPrintable As Boolean = True, _
-                  Optional ByVal printColIndices As Boolean = True, _
-                  Optional ByVal printRowIndices As Boolean = True)
-    Debug.Print Stringify(arr, , escapeNonPrintable, delimiter, _
-                          maxCharsPerElement, maxCharsPerLine, maxLines, _
-                          printColIndices, printRowIndices)
-End Sub
 
 'This function can convert any variable into a convenient string for printing.
 'The last 6 parameters are only relevant for arrays, the last 2 only for
@@ -3980,5 +3999,121 @@ End Function
 
 Private Function Min(a As Long, b As Long) As Long
     If a < b Then Min = a Else Min = b
+End Function
+
+'Sets the formatting rules adhered to by 'Printf'
+Public Sub SetPrintfSettings(Optional ByVal maxChars As Long = 0, _
+                          Optional ByVal escapeNonPrintable As Boolean = True, _
+                            Optional ByRef delimiter As String = vbNullString, _
+                             Optional ByVal maxCharsPerElement As Long = 25, _
+                             Optional ByVal maxCharsPerLine As Long = 80, _
+                             Optional ByVal maxLines As Long = 10, _
+                             Optional ByVal inklColIndices As Boolean = True, _
+                             Optional ByVal inklRowIndices As Boolean = True)
+    Const methodName As String = "SetPrintfSettings"
+    
+    If maxChars < 0 Then _
+        Err.Raise 5, methodName, "'maxChars' can't be < 0"
+    If maxCharsPerElement < 0 Then _
+        Err.Raise 5, methodName, "'maxCharsPerElement' can't be < 0"
+    If maxCharsPerLine < 0 Then _
+        Err.Raise 5, methodName, "'maxCharsPerLine' can't be < 0"
+    If maxLines < 0 Then _
+        Err.Raise 5, methodName, "'maxLines' can't be < 0"
+    
+    If maxChars = 0 Then maxChars = &H7FFFFFFF
+    If maxCharsPerElement = 0 Then maxCharsPerElement = &H7FFFFFFF
+    If maxCharsPerLine = 0 Then maxCharsPerLine = &H7FFFFFFF
+    If maxLines = 0 Then maxLines = &H7FFFFFFF
+    
+    With printfSettings
+        .maxChars = maxChars
+        .escapeNonPrintable = escapeNonPrintable
+        .delimiter = delimiter
+        .maxCharsPerElement = maxCharsPerElement
+        .maxCharsPerLine = maxCharsPerLine
+        .maxLines = maxLines
+        .inklColIndices = inklColIndices
+        .inklRowIndices = inklRowIndices
+    End With
+End Sub
+
+'Utility function for 'Printf'
+Private Function GetPrintfSettings() As StringificationSettings
+    If Not printfSettingsAreInitialized Then
+        SetPrintfSettings 'With only default arguments
+        printfSettingsAreInitialized = True
+    End If
+    GetPrintfSettings = printfSettings
+End Function
+
+'Prints any variables passed to this function. Uses formatting rules previously
+'set with 'SetPrintfSettings'
+Public Function Printf(ParamArray args() As Variant) As String
+    Dim arg As Variant
+    Dim sArg As Variant
+    Dim s As String
+    Dim settings As StringificationSettings: settings = GetPrintfSettings
+    For Each arg In args
+        If VarType(arg) = vbString Then
+            sArg = arg
+        Else
+            sArg = BStringify(arg, settings)
+        End If
+        If InStr(1, sArg, vbNewLine, vbBinaryCompare) <> 0 Then
+            s = s & vbNewLine & sArg & vbNewLine
+        ElseIf Len(s) - InStrRev(s, vbNewLine, , vbBinaryCompare) + Len(sArg) _
+               > settings.maxCharsPerLine - 2 Then
+            s = s & vbNewLine & sArg & "  "
+        Else
+            s = s & sArg & "  "
+        End If
+        If Len(s) > settings.maxChars Then
+            s = s & "..."
+            Exit For
+        End If
+    Next arg
+    Printf = SuperTrim(s, vbCrLf)
+    Debug.Print Printf
+End Function
+
+'Prints an one or two dimensional array to the immediate window.
+Public Sub PrintVar(ByRef arr As Variant, _
+           Optional ByRef delimiter As String = vbNullString, _
+           Optional ByVal maxCharsPerElement As Long = 25, _
+           Optional ByVal maxCharsPerLine As Long = 80, _
+           Optional ByVal maxLines As Long = 10, _
+           Optional ByVal escapeNonPrintable As Boolean = True, _
+           Optional ByVal printColIndices As Boolean = True, _
+           Optional ByVal printRowIndices As Boolean = True)
+    Debug.Print Stringify(arr, , escapeNonPrintable, delimiter, _
+                          maxCharsPerElement, maxCharsPerLine, maxLines, _
+                          printColIndices, printRowIndices)
+End Sub
+
+'Works like the inbuilt trim but instead of just spaces, it will trim any
+'characters occurring in 'charactersToTrim' from the edges of 'str'
+Public Function SuperTrim(ByRef str As String, _
+                 Optional ByRef charactersToTrim As String = " " & vbCrLf) _
+                          As String
+    Dim strLen As Long:   strLen = Len(str)
+    Dim startIdx As Long: startIdx = 1
+    Dim endIdx As Long:   endIdx = strLen
+
+    Do While startIdx <= strLen _
+         And InStr(charactersToTrim, Mid(str, startIdx, 1)) > 0
+        startIdx = startIdx + 1
+    Loop
+
+    Do While endIdx >= 1 _
+         And InStr(charactersToTrim, Mid(str, endIdx, 1)) > 0
+        endIdx = endIdx - 1
+    Loop
+
+    If startIdx <= endIdx Then
+        SuperTrim = Mid(str, startIdx, endIdx - startIdx + 1)
+    Else
+        SuperTrim = ""
+    End If
 End Function
 
