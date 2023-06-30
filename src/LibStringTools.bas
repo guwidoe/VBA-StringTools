@@ -3127,13 +3127,15 @@ Public Function ReplaceMultiple(ByRef str As String, _
     Loop
     
     Dim remainderStr As String: remainderStr = MidB$(str, lastOccurrence)
-    
+
     If builtStrPos <= LenB(ReplaceMultiple) Then _
-        MidB$(ReplaceMultiple, builtStrPos, Len(remainderStr)) = remainderStr
+        MidB$(ReplaceMultiple, builtStrPos, LenB(remainderStr)) = remainderStr
+        
     'Because we didn't take lCount into account when calculating the buffer:
     If count > lCount Then _
-       ReplaceMultiple = Left$(ReplaceMultiple, builtStrPos + Len(remainderStr))
-    
+        ReplaceMultiple = _
+            LeftB$(ReplaceMultiple, builtStrPos + LenB(remainderStr))
+
     Exit Function
 HeapSwapElements:
     Dim temp(0 To 2) As Long
@@ -3344,10 +3346,12 @@ Public Function ReplaceMultipleB(ByRef bytes As String, _
     Dim remainderStr As String: remainderStr = MidB$(bytes, lastOccurrence)
     
     If builtStrPos <= LenB(ReplaceMultipleB) Then _
-        MidB$(ReplaceMultipleB, builtStrPos, Len(remainderStr)) = remainderStr
+        MidB$(ReplaceMultipleB, builtStrPos, LenB(remainderStr)) = remainderStr
+        
     'Because we didn't take lCount into account when calculating the buffer:
     If count > lCount Then _
-       ReplaceMultipleB = Left$(ReplaceMultipleB, builtStrPos + Len(remainderStr))
+        ReplaceMultipleB = _
+            LeftB$(ReplaceMultipleB, builtStrPos + LenB(remainderStr))
        
     Exit Function
 HeapSwapElements:

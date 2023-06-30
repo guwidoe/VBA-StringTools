@@ -813,8 +813,8 @@ Sub TestReplaceMultiple()
     'replaces = Array("a", "b", "c", "d", "e", "f", "g", "h", "i", "j")
     'replaces = StringToCodepointStrings(RandomStringUnicode(5000))
     'Debug.Print ReplaceMultiple(s, finds, replaces) = ReplaceMultipleMultiPass(s, finds, replaces)
-    'Debug.Print ReplaceMultiple(s, finds, replaces)
-    'Debug.Print ReplaceMultipleMultiPass(s, finds, replaces)
+'    Debug.Print ReplaceMultiple(s, finds, replaces)
+'    Debug.Print ReplaceMultipleMultiPass(s, finds, replaces)
     Dim rsingle As String
     Dim rmulti As String
     st
