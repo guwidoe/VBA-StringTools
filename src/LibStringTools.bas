@@ -4120,3 +4120,30 @@ Public Function TrimX(ByRef str As String, _
     End If
 End Function
 
+'Returns the index of a given column letter in excel
+Public Function ColLetterToNumber(ByRef colLetterOrNumber As Variant) As Long
+    Const methodName As String = "ColLetterToNumber"
+    
+    If IsNumeric(colLetterOrNumber) Then
+        ColLetterToNumber = CLng(colLetterOrNumber)
+        If ColLetterToNumber > 16384 Then _
+            Err.Raise 5, methodName, _
+                "Only values up to 'XFD', or 16384 are allowed."
+    ElseIf Len(colLetterOrNumber) <= 3 _
+    And (CStr(UCase(colLetterOrNumber)) Like "[A-Z]" _
+    Or CStr(UCase(colLetterOrNumber)) Like "[A-Z][A-Z]" _
+    Or CStr(UCase(colLetterOrNumber)) Like "[A-Z][A-Z][A-Z]") Then
+        Dim i As Long
+        For i = 1 To Len(colLetterOrNumber)
+            ColLetterToNumber = ColLetterToNumber * 26 + _
+                (Asc(UCase(Mid(colLetterOrNumber, i, 1))) - 65 + 1)
+        Next i
+        If ColLetterToNumber > 16384 Then _
+            Err.Raise 5, methodName, _
+                "Only values up to 'XFD', or 16384 are allowed."
+    Else
+        Err.Raise 5, methodName, "The input must be up to 3 letters or 5 " & _
+            "digits long. Only values up to 'XFD', or 16384 are allowed and" & _
+            " no mixture of letters and digits is allowed."
+    End If
+End Function
