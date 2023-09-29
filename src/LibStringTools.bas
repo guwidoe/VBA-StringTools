@@ -2633,7 +2633,7 @@ Public Function SplitB(ByRef bytes As String, _
         "Argument 'lLimit' = " & lLimit & " < -1, invalid"
     lLimit = lLimit And &H7FFFFFFF
     
-    If lLimit = 0 Then
+    If lLimit = 0 Or bytes = vbNullString Then
         SplitB = Split("", , 0) 'Return empty but allocated string array
         Exit Function
     ElseIf LenB(bytes) = 0 Or LenB(sDelimiter) = 0 Or lLimit < 2 Then
