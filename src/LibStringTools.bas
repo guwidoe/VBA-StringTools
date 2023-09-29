@@ -3936,7 +3936,7 @@ Private Function CalculateColumnWidths(ByRef arr As Variant, _
     
     If settings.maxLines < numRows Then
         sumWidths = 0
-        For j = 0 To numCols \ 2 + 1
+        For j = 0 To numCols \ 2
             col1 = LBound(arr, 2) + j
             col2 = UBound(arr, 2) - j
             For i = UBound(arr, 1) - lastRows + 1 To UBound(arr, 1)

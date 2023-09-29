@@ -882,7 +882,17 @@ Public Sub TestPrintVar()
     PrintVar array2DStr
     Debug.Print vbNewLine
     
-    ' Test Case 5: Array containing random strings with special characters
+    ' Test Case 5: Two dimensional array of strings
+    ReDim array2DStr(1 To 40, 0 To 0)
+    For i = 1 To 40
+        array2DStr(i, 0) = i * i
+    Next i
+    
+    Debug.Print "Test Case 5: Two dimensional array of strings"
+    PrintVar array2DStr
+    Debug.Print vbNewLine
+    
+    ' Test Case 6: Array containing random strings with special characters
     Dim arrayRandom(1 To 3) As String
     arrayRandom(1) = RandomString(10, 33, 127) ' printable ASCII characters
     arrayRandom(2) = RandomString(10, 256, 500) ' extended ASCII characters
@@ -893,7 +903,7 @@ Public Sub TestPrintVar()
     PrintVar arrayRandom, escapeNonPrintable:=True
     Debug.Print vbNewLine
     
-    ' Test Case 6: Empty array
+    ' Test Case 7: Empty array
     Dim emptyArray() As Integer
     Debug.Print "Test Case 7: Empty array"
     PrintVar emptyArray
@@ -903,7 +913,7 @@ Public Sub TestPrintVar()
     PrintVar Array()
     Debug.Print vbNewLine
     
-    ' Test Case 6: Array containing various weird stuff
+    ' Test Case 8: Array containing various weird stuff
     Dim weirdArray() As Variant
     Dim nested2DimArray() As Variant
     ReDim nested2DimArray(1 To 3, 1 To 3)
