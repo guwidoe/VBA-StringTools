@@ -3593,7 +3593,10 @@ End Function
 ''inklColIndices = True' will print column indices above the columns if the
 '                        input is a two dimensional array.
 ''inklRowIndices = True' does the same for the row indices.
-Public Function Stringify(ByVal value As Variant, _
+'TODO: `ToString` doesn't comply to its settings with the desired rigour.
+'Problem Example:
+'Multiple recursion of nested 1d arrays will ignor the line length limit.
+Public Function ToString(ByVal value As Variant, _
                  Optional ByVal maxChars As Long = 0, _
                  Optional ByVal escapeNonPrintable As Boolean = True, _
                  Optional ByRef delimiter As String = vbNullString, _
@@ -3602,7 +3605,7 @@ Public Function Stringify(ByVal value As Variant, _
                  Optional ByVal maxLines As Long = 10, _
                  Optional ByVal inklColIndices As Boolean = True, _
                  Optional ByVal inklRowIndices As Boolean = True)
-    Const methodName As String = "Stringify"
+    Const methodName As String = "ToString"
     
     If maxChars < 0 Then _
         Err.Raise 5, methodName, "'maxChars' can't be < 0"
@@ -3629,11 +3632,11 @@ Public Function Stringify(ByVal value As Variant, _
         .inklColIndices = inklColIndices
         .inklRowIndices = inklRowIndices
     End With
-    Stringify = BStringify(value, settings)
+    ToString = BToString(value, settings)
 End Function
 
-'Recursive "Backend" function for 'Stringify'
-Private Function BStringify(ByVal value As Variant, _
+'Recursive "Backend" function for 'ToString'
+Private Function BToString(ByVal value As Variant, _
                             ByRef settings As StringificationSettings) As String
     'Don't use exit function in this Function! Instead use: GoTo CleanExit
     Static isRecursiveCall As Boolean
@@ -3648,21 +3651,21 @@ Private Function BStringify(ByVal value As Variant, _
                 s = TypeName(value)
             Case 1
                 If wasRecursiveCall Then settings.maxCharsPerLine = &H7FFFFFFF
-                s = Stringify1dArray(value, settings)
+                s = ToString1dArray(value, settings)
             Case 2
                 If wasRecursiveCall Then
-                    s = StringifyMultiDimArray(value) 'No settings required
+                    s = ToStringMultiDimArray(value) 'No settings required
                 Else
-                    s = Stringify2dimArray(value, settings)
+                    s = ToString2dimArray(value, settings)
                 End If
             Case Else
-                s = StringifyMultiDimArray(value) 'No settings required
+                s = ToStringMultiDimArray(value) 'No settings required
         End Select
     ElseIf IsObject(value) Then
         Select Case True
-            'Can add custom logic to Stringify any object here
+            'Can add custom logic to ToString any object here
             'Case TypeOf value Is Collection
-                's = StringifyCollection(...
+                's = ToStringCollection(...
             Case Else
                 s = TypeName(value)
         End Select
@@ -3674,23 +3677,23 @@ Private Function BStringify(ByVal value As Variant, _
     
     With settings
         If Len(s) > .maxChars Then
-            BStringify = Left(s, Max(.maxChars - 3, 0)) & Left("...", .maxChars)
+            BToString = Left(s, Max(.maxChars - 3, 0)) & Left("...", .maxChars)
         Else
-            BStringify = s
+            BToString = s
         End If
         
-        If .escapeNonPrintable Then BStringify = EscapeUnicode(BStringify, 255)
+        If .escapeNonPrintable Then BToString = EscapeUnicode(BToString, 255)
     End With
-    If VarType(value) = vbString Then BStringify = "'" & BStringify & "'"
+    If VarType(value) = vbString Then BToString = "'" & BToString & "'"
     
 CleanExit:
     If Not wasRecursiveCall Then isRecursiveCall = False
 End Function
 
-'Utility function for 'BStringify'
+'Utility function for 'BToString'
 'Note:
 ''maxChars' is only passed to exit the loop sooner in some cases
-Private Function Stringify1dArray(ByRef arr As Variant, _
+Private Function ToString1dArray(ByRef arr As Variant, _
                                   ByRef settings As StringificationSettings) _
                                   As String
     Dim s As String
@@ -3698,20 +3701,20 @@ Private Function Stringify1dArray(ByRef arr As Variant, _
     If StrPtr(delimiter) = 0 Then delimiter = ", "
     
     If UBound(arr) - LBound(arr) = -1 Then
-        Stringify1dArray = "[]"
+        ToString1dArray = "[]"
         Exit Function
     ElseIf UBound(arr) - LBound(arr) = 0 Then
-        Stringify1dArray = "[" & BStringify(arr(UBound(arr)), settings) & "]"
+        ToString1dArray = "[" & BToString(arr(UBound(arr)), settings) & "]"
         Exit Function
     End If
 
     Dim line As String: line = "["
     Dim i As Long
     For i = LBound(arr) To UBound(arr) - 1
-        line = line & BStringify(arr(i), settings) & delimiter
+        line = line & BToString(arr(i), settings) & delimiter
 
        'Check if max characters per line would be exceeded with the next element
-        If Len(line & BStringify(arr(i + 1), settings) & _
+        If Len(line & BToString(arr(i + 1), settings) & _
                delimiter) >= settings.maxCharsPerLine Then
             s = s & line & vbNewLine
             line = ""
@@ -3720,12 +3723,12 @@ Private Function Stringify1dArray(ByRef arr As Variant, _
             Or Len(s) > settings.maxChars Then Exit For
         End If
     Next i
-    Stringify1dArray = s & line & BStringify(arr(UBound(arr)), settings) & "]"
+    ToString1dArray = s & line & BToString(arr(UBound(arr)), settings) & "]"
 End Function
 
-'Utility function for 'BStringify'
-'Note: Will only be called in non-recursive calls of 'BStringify'
-Private Function Stringify2dimArray(ByRef arr As Variant, _
+'Utility function for 'BToString'
+'Note: Will only be called in non-recursive calls of 'BToString'
+Private Function ToString2dimArray(ByRef arr As Variant, _
                                     ByRef settings As StringificationSettings) _
                                     As String
     Dim delimiter As String: delimiter = settings.delimiter
@@ -3765,23 +3768,23 @@ Private Function Stringify2dimArray(ByRef arr As Variant, _
         s = s & BuildLine(arr, colWidths, numCols, delimiter, i, settings) _
             & vbNewLine
     Next i
-    Stringify2dimArray = s & "(" & numRows & "*" & _
+    ToString2dimArray = s & "(" & numRows & "*" & _
                          UBound(arr, 2) - LBound(arr, 2) + 1 & ", " & _
                          " " & Min(numRows, settings.maxLines) & _
                          "*" & numCols & " output)"
 End Function
 
-Private Function StringifyMultiDimArray(ByRef arr As Variant) As String
+Private Function ToStringMultiDimArray(ByRef arr As Variant) As String
     Dim s As String
     s = "Array("
     Dim i As Long
     For i = 1 To GetArrayDimsCount(arr)
         s = s & LBound(arr, i) & " to " & UBound(arr, i) & ", "
     Next i
-    StringifyMultiDimArray = Left(s, Len(s) - 2) & ")"
+    ToStringMultiDimArray = Left(s, Len(s) - 2) & ")"
 End Function
 
-'Utility function for 'Stringify2dimArray'
+'Utility function for 'ToString2dimArray'
 Private Function BuildColHeadersLine(ByRef arr As Variant, _
                                      ByRef colWidths() As Long, _
                                      ByVal numCols As Long, _
@@ -3823,7 +3826,7 @@ Private Function BuildColHeadersLine(ByRef arr As Variant, _
                           " ... " & Right(rightPart, Len(rightPart) - lenDelim)
 End Function
 
-'Utility function for 'Stringify2dimArray'
+'Utility function for 'ToString2dimArray'
 Private Function BuildDotsLine(ByRef arr As Variant, _
                                ByRef colWidths() As Long, _
                                ByVal numCols As Long, _
@@ -3861,7 +3864,7 @@ Private Function BuildDotsLine(ByRef arr As Variant, _
                     " ... " & Right(rightPart, Len(rightPart) - lenDelim)
 End Function
 
-'Utility function for 'Stringify2dimArray'
+'Utility function for 'ToString2dimArray'
 Private Function BuildLine(ByRef arr As Variant, _
                            ByRef colWidths() As Long, _
                            ByVal numCols As Long, _
@@ -3876,7 +3879,7 @@ Private Function BuildLine(ByRef arr As Variant, _
     If numCols = UBound(arr, 2) - LBound(arr, 2) + 1 Then
         For j = LBound(arr, 2) To UBound(arr, 2)
             BuildLine = BuildLine & _
-                        PadLeft(BStringify(arr(rowIndex, j), settings), _
+                        PadLeft(BToString(arr(rowIndex, j), settings), _
                                 colWidths(j)) & delimiter
         Next j
         If settings.inklRowIndices Then _
@@ -3888,10 +3891,10 @@ Private Function BuildLine(ByRef arr As Variant, _
     
     Dim leftPart As String, rightPart As String
     For j = 0 To numCols \ 2 - 1 'numCols is always even
-        leftPart = leftPart & PadLeft(BStringify(arr(rowIndex, _
+        leftPart = leftPart & PadLeft(BToString(arr(rowIndex, _
                    LBound(arr, 2) + j), settings), _
                    colWidths(LBound(arr, 2) + j)) & delimiter
-        rightPart = delimiter & PadLeft(BStringify(arr(rowIndex, _
+        rightPart = delimiter & PadLeft(BToString(arr(rowIndex, _
                     UBound(arr, 2) - j), settings), _
                     colWidths(UBound(arr, 2) - j)) & rightPart
     Next j
@@ -3903,7 +3906,7 @@ Private Function BuildLine(ByRef arr As Variant, _
                 " ... " & Right(rightPart, Len(rightPart) - lenDelim)
 End Function
 
-'Utility function for 'Stringify2dimArray'
+'Utility function for 'ToString2dimArray'
 Private Function CalculateColumnWidths(ByRef arr As Variant, _
                                        ByRef settings As StringificationSettings) _
                                        As Long()
@@ -3925,9 +3928,9 @@ Private Function CalculateColumnWidths(ByRef arr As Variant, _
         colWidths(col1) = Max(colWidths(col1), Len(CStr(col1))) 'Column labels
         colWidths(col2) = Max(colWidths(col2), Len(CStr(col2))) 'Column labels
         For i = LBound(arr, 1) To LBound(arr, 1) + firstRows - 1
-            colWidths(col1) = Max(Len(BStringify(arr(i, col1), settings)), _
+            colWidths(col1) = Max(Len(BToString(arr(i, col1), settings)), _
                                   colWidths(col1))
-            colWidths(col2) = Max(Len(BStringify(arr(i, col2), settings)), _
+            colWidths(col2) = Max(Len(BToString(arr(i, col2), settings)), _
                                   colWidths(col2))
         Next i
         sumWidths = sumWidths + colWidths(col1) + colWidths(col2)
@@ -3940,9 +3943,9 @@ Private Function CalculateColumnWidths(ByRef arr As Variant, _
             col1 = LBound(arr, 2) + j
             col2 = UBound(arr, 2) - j
             For i = UBound(arr, 1) - lastRows + 1 To UBound(arr, 1)
-                colWidths(col1) = Max(Len(BStringify(arr(i, col1), settings)), _
+                colWidths(col1) = Max(Len(BToString(arr(i, col1), settings)), _
                                       colWidths(col1))
-                colWidths(col2) = Max(Len(BStringify(arr(i, col2), settings)), _
+                colWidths(col2) = Max(Len(BToString(arr(i, col2), settings)), _
                                       colWidths(col2))
             Next i
             sumWidths = sumWidths + colWidths(col1) + colWidths(col2)
@@ -3953,7 +3956,7 @@ Private Function CalculateColumnWidths(ByRef arr As Variant, _
     CalculateColumnWidths = colWidths
 End Function
 
-'Utility function for 'Stringify2dimArray'
+'Utility function for 'ToString2dimArray'
 Private Function CalculateNumColumnsToFit(ByRef colWidths() As Long, _
                                           ByVal maxCharsPerLine As Long, _
                                           ByVal delimLength As Long) As Long
@@ -4062,7 +4065,7 @@ Public Function Printf(ParamArray args() As Variant) As String
         If VarType(arg) = vbString Then
             sArg = arg
         Else
-            sArg = BStringify(arg, settings)
+            sArg = BToString(arg, settings)
         End If
         If InStr(1, sArg, vbNewLine, vbBinaryCompare) <> 0 Then
             s = s & vbNewLine & sArg & vbNewLine
@@ -4090,7 +4093,7 @@ Public Sub PrintVar(ByRef arr As Variant, _
            Optional ByVal escapeNonPrintable As Boolean = True, _
            Optional ByVal printColIndices As Boolean = True, _
            Optional ByVal printRowIndices As Boolean = True)
-    Debug.Print Stringify(arr, , escapeNonPrintable, delimiter, _
+    Debug.Print ToString(arr, , escapeNonPrintable, delimiter, _
                           maxCharsPerElement, maxCharsPerLine, maxLines, _
                           printColIndices, printRowIndices)
 End Sub
