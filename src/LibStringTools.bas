@@ -37,7 +37,7 @@ Option Compare Binary
         Private Declare PtrSafe Function iconv_close Lib "/usr/lib/libiconv.dylib" (ByVal cd As LongPtr) As Long
         Private Declare PtrSafe Function iconv Lib "/usr/lib/libiconv.dylib" (ByVal cd As LongPtr, ByRef inBuf As LongPtr, ByRef inBytesLeft As LongPtr, ByRef outBuf As LongPtr, ByRef outBytesLeft As LongPtr) As LongPtr
 
-        Private Declare PtrSafe Function CopyMemory Lib "/usr/lib/libc.dylib" Alias "memmove" (Destination As Any, Source As Any, ByVal length As LongPtr) As LongPtr
+        Private Declare PtrSafe Function CopyMemory Lib "/usr/lib/libc.dylib" Alias "memmove" (Destination As Any, Source As Any, ByVal Length As LongPtr) As LongPtr
         Private Declare PtrSafe Function errno_location Lib "/usr/lib/libSystem.B.dylib" Alias "__error" () As LongPtr
     #Else
         Private Declare Function iconv Lib "/usr/lib/libiconv.dylib" (ByVal cd As Long, ByRef inBuf As Long, ByRef inBytesLeft As Long, ByRef outBuf As Long, ByRef outBytesLeft As Long) As Long
@@ -55,7 +55,7 @@ Option Compare Binary
         Private Declare PtrSafe Function GetLastError Lib "kernel32" () As Long
         Private Declare PtrSafe Sub SetLastError Lib "kernel32" (ByVal dwErrCode As Long)
 
-        Private Declare PtrSafe Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (Destination As Any, Source As Any, ByVal length As Long)
+        Private Declare PtrSafe Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (Destination As Any, Source As Any, ByVal Length As Long)
         Private Declare PtrSafe Function lstrlenW Lib "kernel32" (ByVal lpString As LongPtr) As Long
     #Else
         Private Declare Function MultiByteToWideChar Lib "kernel32" Alias "MultiByteToWideChar" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As Long, ByVal cchMultiByte As Long, ByVal lpWideCharStr As Long, ByVal cchWideChar As Long) As Long
@@ -655,11 +655,11 @@ End Function
 
 #If Mac = 0 Then
 Public Function GetBstrFromWideStringPtr(ByVal lpwString As LongPtr) As String
-    Dim length As Long
-    If lpwString Then length = lstrlenW(lpwString)
-    If length Then
-        GetBstrFromWideStringPtr = Space$(length)
-        CopyMemory ByVal StrPtr(GetBstrFromWideStringPtr), ByVal lpwString, length * 2
+    Dim Length As Long
+    If lpwString Then Length = lstrlenW(lpwString)
+    If Length Then
+        GetBstrFromWideStringPtr = Space$(Length)
+        CopyMemory ByVal StrPtr(GetBstrFromWideStringPtr), ByVal lpwString, Length * 2
     End If
 End Function
 #End If
@@ -978,10 +978,10 @@ End Function
 Public Function HexToString(ByRef hexStr As String) As String
     Const methodName As String = "HexToString"
     Const errPrefix As String = "Invalid Hex string literal. "
-    Dim SIZE As Long: SIZE = Len(hexStr)
+    Dim size As Long: size = Len(hexStr)
 
-    If SIZE = 0 Then Exit Function
-    If SIZE Mod 2 = 1 Then Err.Raise 5, methodName, errPrefix & "Uneven length"
+    If size = 0 Then Exit Function
+    If size Mod 2 = 1 Then Err.Raise 5, methodName, errPrefix & "Uneven length"
 
     Static nibbleMap(0 To 255) As Long 'Nibble: 0 to F. Byte: 00 to FF
     Static charMap(0 To 255) As String
@@ -1007,7 +1007,7 @@ Public Function HexToString(ByRef hexStr As String) As String
     Dim j As Long
     Dim charCode As Long
 
-    HexToString = MidB$(hexStr, 1, SIZE / 2 - Sgn(startPos))
+    HexToString = MidB$(hexStr, 1, size / 2 - Sgn(startPos))
     For i = startPos To UBound(b) Step 4
         j = j + 1
         charCode = nibbleMap(b(i)) * &H10& + nibbleMap(b(i + 2))
@@ -1840,7 +1840,7 @@ End Function
 
 'Returns a UTF-16 string containing all alphanumeric characters randomly equally
 'distributed. (0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz)
-Public Function RandomStringAlphanumeric(ByVal length As Long) As String
+Public Function RandomStringAlphanumeric(ByVal Length As Long) As String
     Const methodName As String = "RandomStringAlphanumeric"
     Const INKL_CHARS As String = _
         "01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
@@ -1853,11 +1853,11 @@ Public Function RandomStringAlphanumeric(ByVal length As Long) As String
         isInitialized = True
     End If
     
-    If length = 0 Then Exit Function
-    If length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
-    Dim b() As Byte: ReDim b(0 To length * 2 - 1)
+    If Length = 0 Then Exit Function
+    If Length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
+    Dim b() As Byte: ReDim b(0 To Length * 2 - 1)
     Dim i As Long
-    For i = 0 To length * 2 - 1 Step 2
+    For i = 0 To Length * 2 - 1 Step 2
         b(i) = chars(Int(Rnd * numPossChars))
     Next i
     RandomStringAlphanumeric = b
@@ -1865,14 +1865,14 @@ End Function
 
 'Returns a UTF-16 string containing all ASCII characters equally,
 'randomly distributed.
-Public Function RandomStringASCII(ByVal length As Long) As String
+Public Function RandomStringASCII(ByVal Length As Long) As String
     Const methodName As String = "RandomStringASCII"
     Const MAX_ASC As Long = &H7F&
-    If length = 0 Then Exit Function
-    If length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
+    If Length = 0 Then Exit Function
+    If Length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
     Dim i As Long
-    Dim b() As Byte: ReDim b(0 To length * 2 - 1)
-    For i = 0 To length * 2 - 1 Step 2
+    Dim b() As Byte: ReDim b(0 To Length * 2 - 1)
+    For i = 0 To Length * 2 - 1 Step 2
         b(i) = Int(MAX_ASC * Rnd) + 1
     Next i
     RandomStringASCII = b
@@ -1881,17 +1881,17 @@ End Function
 'Function returning a UTF-16 string containing all characters from the BMP
 '(Basic Multilingual Plane, so from all 2 byte UTF-16 chars) equally, randomly
 'distributed. Excludes surrogate range and BOM.
-Public Function RandomStringBMP(ByVal length As Long) As String
+Public Function RandomStringBMP(ByVal Length As Long) As String
     Const methodName As String = "RandomStringBMP"
     Const MAX_UINT As Long = &HFFFF&
-    If length = 0 Then Exit Function
-    If length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
+    If Length = 0 Then Exit Function
+    If Length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
 
     Dim i As Long
     Dim char As Long
-    Dim b() As Byte:  ReDim b(0 To length * 2 - 1)
+    Dim b() As Byte:  ReDim b(0 To Length * 2 - 1)
 
-    For i = 0 To length * 2 - 1 Step 2
+    For i = 0 To Length * 2 - 1 Step 2
         Do
             char = Int(MAX_UINT * Rnd) + 1
         Loop Until (char < &HD800& Or char > &HDFFF&) _
@@ -1905,18 +1905,18 @@ End Function
 'Returns a UTF-16 string containing all valid unicode characters equally,
 'randomly distributed. Excludes surrogate range and BOM.
 'Length in UTF-16 codepoints, (Len(result) = length)
-Public Function RandomStringUnicode(ByVal length As Long) As String
+Public Function RandomStringUnicode(ByVal Length As Long) As String
     Const methodName As String = "RandomStringUnicode"
     Const MAX_UNICODE As Long = &H10FFFF
-    If length = 0 Then Exit Function
-    If length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
+    If Length = 0 Then Exit Function
+    If Length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
 
     Dim i As Long
     Dim char As Long
-    Dim b() As Byte: ReDim b(0 To length * 2 - 1)
+    Dim b() As Byte: ReDim b(0 To Length * 2 - 1)
 
-    If length > 1 Then
-        For i = 0 To length * 2 - 3 Step 2
+    If Length > 1 Then
+        For i = 0 To Length * 2 - 3 Step 2
             Do
                 char = Int(MAX_UNICODE * Rnd) + 1
             Loop Until (char < &HD800& Or char > &HDFFF&) _
@@ -1966,31 +1966,31 @@ End Function
 'between 'minCodepoint' and 'maxCodepoint'.
 'E.g.: RandomString(10, 48, 57) will return a string of length 100 containing
 '      all the digit characters randomly, e.g. "3239107914"
-Public Function RandomString(ByVal length As Long, _
+Public Function RandomString(ByVal Length As Long, _
                     Optional ByVal minCodepoint As Long = 1, _
                     Optional ByVal maxCodepoint As Long = &H10FFFF) As String
     Const methodName As String = "RandomString"
     Const MAX_UNICODE As Long = &H10FFFF
     Const MAX_UINT As Long = &HFFFF&
-    If length = 0 Then Exit Function
-    If length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
+    If Length = 0 Then Exit Function
+    If Length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
     If maxCodepoint > MAX_UNICODE Or maxCodepoint < 0 Then Err.Raise 5, _
         methodName, "'maxCodepoint' outside of valid unicode range."
     If minCodepoint > MAX_UNICODE Or minCodepoint < 0 Then Err.Raise 5, _
         methodName, "'minCodepoint' outside of valid unicode range."
     If minCodepoint > maxCodepoint Then Err.Raise 5, methodName, _
         "'minCodepoint' can't be greater than 'maxCodepoint'."
-    If minCodepoint > MAX_UINT And length Mod 2 = 1 Then Err.Raise 5, methodName, _
+    If minCodepoint > MAX_UINT And Length Mod 2 = 1 Then Err.Raise 5, methodName, _
         "Can't build string of uneven length from only Surrogate Pairs."
         
     Dim cpRange As Long: cpRange = maxCodepoint - minCodepoint + 1
 
     Dim i As Long
     Dim char As Long
-    Dim b() As Byte: ReDim b(0 To length * 2 - 1)
+    Dim b() As Byte: ReDim b(0 To Length * 2 - 1)
 
-    If length > 1 Then
-        For i = 0 To length * 2 - 3 Step 2
+    If Length > 1 Then
+        For i = 0 To Length * 2 - 3 Step 2
             Do
                 char = Int(cpRange * Rnd) + minCodepoint
             Loop Until (char < &HD800& Or char > &HDFFF&) _
@@ -2027,34 +2027,34 @@ End Function
 'equally distributed.
 'E.g. if 'inklChars = "aab"', the returned string will, on average, contain
 '     about twice as many "a"s as "b"s
-Public Function RandomStringFromChars(ByVal length As Long, _
+Public Function RandomStringFromChars(ByVal Length As Long, _
                              Optional ByRef inklChars As String = _
     "01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz") As String
     Const methodName As String = "RandomStringFromChars"
-    If length = 0 Then Exit Function
+    If Length = 0 Then Exit Function
     If Len(inklChars) = 0 Then Err.Raise 5, methodName, _
         "No characters to build a string from specified in 'inklChars'"
-    If length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
+    If Length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
     
     Dim chars() As String:    chars = StringToCodepointStrings(inklChars)
     Dim codepoints() As Long: codepoints = StringToCodepointNums(inklChars)
     Dim numChars As Long:  numChars = UBound(chars) - LBound(chars) + 1
-    If numChars * 2 = Len(inklChars) And length Mod 2 = 1 Then Err.Raise 5, _
+    If numChars * 2 = Len(inklChars) And Length Mod 2 = 1 Then Err.Raise 5, _
     methodName, "Can't build string of uneven length from only Surrogate Pairs."
         
-    RandomStringFromChars = Space$(length)
+    RandomStringFromChars = Space$(Length)
 
     Dim i As Long
-    For i = 1 To length - 1
+    For i = 1 To Length - 1
         Dim idx As String: idx = Int(Rnd * numChars)
         Mid$(RandomStringFromChars, i) = chars(idx)
         If codepoints(idx) > &HFFFF& Then i = i + 1
     Next i
-    If Mid$(RandomStringFromChars, length) = Space$(1) Then
+    If Mid$(RandomStringFromChars, Length) = Space$(1) Then
         Do
             idx = Int(Rnd * numChars)
         Loop Until codepoints(idx) < &H10000
-        Mid$(RandomStringFromChars, length) = chars(idx)
+        Mid$(RandomStringFromChars, Length) = chars(idx)
     End If
 End Function
 
@@ -2548,43 +2548,43 @@ End Function
 'string reaches length 'Length'
 'E.g.: PadRight("asd", 11, "xyz") -> "asdxyzxyzxy"
 Public Function PadRight(ByRef str As String, _
-                         ByVal length As Long, _
+                         ByVal Length As Long, _
                 Optional ByVal fillerStr As String = " ") As String
-    PadRight = PadRightB(str, length * 2, fillerStr)
+    PadRight = PadRightB(str, Length * 2, fillerStr)
 End Function
 
 'Adds fillerStr to the left side of a string repeatedly until the resulting
 'string reaches length 'Length'
 'E.g.: PadLeft("asd", 11, "xyz") -> "yzxyzxyzasd"
 Public Function PadLeft(ByRef str As String, _
-                        ByVal length As Long, _
+                        ByVal Length As Long, _
                Optional ByVal fillerStr As String = " ") As String
-    PadLeft = PadLeftB(str, length * 2, fillerStr)
+    PadLeft = PadLeftB(str, Length * 2, fillerStr)
 End Function
 
 'Adds fillerStr to the right side of a string repeatedly until the resulting
 'string reaches length 'Length' in bytes!
 'E.g.: PadRightB("asd", 16, "xyz") -> "asdxyzxy"
 Public Function PadRightB(ByRef str As String, _
-                          ByVal length As Long, _
+                          ByVal Length As Long, _
                  Optional ByVal fillerStr As String = " ") As String
     Const methodName As String = "PadRightB"
-    If length < 0 Then Err.Raise 5, methodName, _
-        "Argument 'Length' = " & length & " < 0, invalid"
+    If Length < 0 Then Err.Raise 5, methodName, _
+        "Argument 'Length' = " & Length & " < 0, invalid"
     If LenB(fillerStr) = 0 Then Err.Raise 5, methodName, _
         "Argument 'fillerStr' = vbNullString, invalid"
 
-    If length > LenB(str) Then
+    If Length > LenB(str) Then
         If LenB(fillerStr) = 2 Then
-            PadRightB = str & String((length - LenB(str) + 1) \ 2, fillerStr)
-            If length Mod 2 = 1 Then _
+            PadRightB = str & String((Length - LenB(str) + 1) \ 2, fillerStr)
+            If Length Mod 2 = 1 Then _
                 PadRightB = LeftB$(PadRightB, LenB(PadRightB) - 1)
         Else
-            PadRightB = str & LeftB$(RepeatString(fillerStr, (((length - _
-                LenB(str))) + 1) \ LenB(fillerStr) + 1), length - LenB(str))
+            PadRightB = str & LeftB$(RepeatString(fillerStr, (((Length - _
+                LenB(str))) + 1) \ LenB(fillerStr) + 1), Length - LenB(str))
         End If
     Else
-        PadRightB = LeftB$(str, length)
+        PadRightB = LeftB$(str, Length)
     End If
 End Function
 
@@ -2594,25 +2594,25 @@ End Function
 'E.g.: PadLeftB("asd", 16, "xyz") -> "yzxyzasd"
 '      PadLeftB("asd", 11, "xyz") -> "?????"
 Public Function PadLeftB(ByRef str As String, _
-                         ByVal length As Long, _
+                         ByVal Length As Long, _
                 Optional ByVal fillerStr As String = " ") As String
     Const methodName As String = "PadLeftB"
-    If length < 0 Then Err.Raise 5, methodName, _
-        "Argument 'Length' = " & length & " < 0, invalid"
+    If Length < 0 Then Err.Raise 5, methodName, _
+        "Argument 'Length' = " & Length & " < 0, invalid"
     If LenB(fillerStr) = 0 Then Err.Raise 5, methodName, _
         "Argument 'fillerStr' = vbNullString, invalid"
 
-    If length > LenB(str) Then
+    If Length > LenB(str) Then
         If LenB(fillerStr) = 2 Then
-            PadLeftB = String((length - LenB(str) + 1) \ 2, fillerStr) & str
-            If length Mod 2 = 1 Then _
+            PadLeftB = String((Length - LenB(str) + 1) \ 2, fillerStr) & str
+            If Length Mod 2 = 1 Then _
                 PadLeftB = RightB$(PadLeftB, LenB(PadLeftB) - 1)
         Else
-            PadLeftB = RightB$(RepeatString(fillerStr, (((length - LenB(str))) _
-                          + 1) \ LenB(fillerStr) + 1), length - LenB(str)) & str
+            PadLeftB = RightB$(RepeatString(fillerStr, (((Length - LenB(str))) _
+                          + 1) \ LenB(fillerStr) + 1), Length - LenB(str)) & str
         End If
     Else
-        PadLeftB = RightB$(str, length)
+        PadLeftB = RightB$(str, Length)
     End If
 End Function
 
@@ -4146,4 +4146,34 @@ Public Function ColLetterToNumber(ByRef colLetterOrNumber As Variant) As Long
             "digits long. Only values up to 'XFD', or 16384 are allowed and" & _
             " no mixture of letters and digits is allowed."
     End If
+End Function
+
+'Converts a string to date based on a format specified in 'dateFormat'
+'E.g. DateParser("27.04.1993", "DD.MM.YYYY") = DateParser("042793", "MMDDYY")
+'Follows the idea by Scott Craner: https://stackoverflow.com/a/64813581/12287457
+Public Function DateParser(ByRef str As String, _
+                           ByRef dateFormat As String) As Date
+    Const methodName As String = "DateParser"
+    
+    If Len(str) <> Len(dateFormat) Then Err.Raise 5, methodName, _
+        "The input string must be of same length as the format string."
+    
+    Dim i As Long
+    For i = 1 To Len(str)
+        If UCase(Mid(dateFormat, i, 1)) = "D" Then
+            Dim lDay As Long: lDay = lDay * 10 + CLng(Mid(str, i, 1))
+        ElseIf UCase(Mid(dateFormat, i, 1)) = "Y" Then
+            Dim lYear As Long: lYear = lYear * 10 + CLng(Mid(str, i, 1))
+        ElseIf UCase(Mid(dateFormat, i, 1)) = "M" Then
+            Dim sMonth As String: sMonth = sMonth & Mid(str, i, 1)
+        End If
+    Next i
+    
+    If IsNumeric(sMonth) Then
+        Dim lMonth As Long: lMonth = CLng(sMonth)
+    Else
+        lMonth = Month(CDate("01 " & sMonth & " 2023"))
+    End If
+    
+    DateParser = DateSerial(lYear, lMonth, lDay)
 End Function
