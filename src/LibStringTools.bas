@@ -1059,13 +1059,14 @@ End Function
 '     chosen at random for each replacement.
 '   - If `escapeFormat` is set to efAll, it will replace every character in the
 '     scope with a randomly chosen format of all available fotrmats.
+'   - To escape every character, set `maxNonEscapedCharCode = -1`
 Public Function EscapeUnicode(ByRef str As String, _
                      Optional ByVal maxNonEscapedCharCode As Long = &HFF, _
                      Optional ByVal escapeFormat As UnicodeEscapeFormat _
                                                 = efPython) As String
     Const methodName As String = "EscapeUnicode"
-    If maxNonEscapedCharCode < 0 Then Err.Raise 5, methodName, _
-        "`maxNonEscapedCharCode` must be greater than 0."
+    If maxNonEscapedCharCode < -1 Then Err.Raise 5, methodName, _
+        "`maxNonEscapedCharCode` must be greater or equal -1."
     If escapeFormat < [_efMin] Or escapeFormat > [_efMax] Then _
         Err.Raise 5, methodName, "Invalid escape type."
     If Len(str) = 0 Then Exit Function
@@ -3597,14 +3598,14 @@ End Function
 'Problem Example:
 'Multiple recursion of nested 1d arrays will ignor the line length limit.
 Public Function ToString(ByVal value As Variant, _
-                 Optional ByVal maxChars As Long = 0, _
-                 Optional ByVal escapeNonPrintable As Boolean = True, _
-                 Optional ByRef delimiter As String = vbNullString, _
-                 Optional ByVal maxCharsPerElement As Long = 25, _
-                 Optional ByVal maxCharsPerLine As Long = 80, _
-                 Optional ByVal maxLines As Long = 10, _
-                 Optional ByVal inklColIndices As Boolean = True, _
-                 Optional ByVal inklRowIndices As Boolean = True)
+                Optional ByVal maxChars As Long = 0, _
+                Optional ByVal escapeNonPrintable As Boolean = True, _
+                Optional ByRef delimiter As String = vbNullString, _
+                Optional ByVal maxCharsPerElement As Long = 25, _
+                Optional ByVal maxCharsPerLine As Long = 80, _
+                Optional ByVal maxLines As Long = 10, _
+                Optional ByVal inklColIndices As Boolean = True, _
+                Optional ByVal inklRowIndices As Boolean = True)
     Const methodName As String = "ToString"
     
     If maxChars < 0 Then _
@@ -3637,7 +3638,7 @@ End Function
 
 'Recursive "Backend" function for 'ToString'
 Private Function BToString(ByVal value As Variant, _
-                            ByRef settings As StringificationSettings) As String
+                           ByRef settings As StringificationSettings) As String
     'Don't use exit function in this Function! Instead use: GoTo CleanExit
     Static isRecursiveCall As Boolean
     Dim wasRecursiveCall As Boolean: wasRecursiveCall = isRecursiveCall
@@ -3694,8 +3695,8 @@ End Function
 'Note:
 ''maxChars' is only passed to exit the loop sooner in some cases
 Private Function ToString1dArray(ByRef arr As Variant, _
-                                  ByRef settings As StringificationSettings) _
-                                  As String
+                                 ByRef settings As StringificationSettings) _
+                                 As String
     Dim s As String
     Dim delimiter As String: delimiter = settings.delimiter
     If StrPtr(delimiter) = 0 Then delimiter = ", "
@@ -3729,8 +3730,8 @@ End Function
 'Utility function for 'BToString'
 'Note: Will only be called in non-recursive calls of 'BToString'
 Private Function ToString2dimArray(ByRef arr As Variant, _
-                                    ByRef settings As StringificationSettings) _
-                                    As String
+                                   ByRef settings As StringificationSettings) _
+                                   As String
     Dim delimiter As String: delimiter = settings.delimiter
     If StrPtr(settings.delimiter) = 0 Then delimiter = "  "
     
@@ -4101,7 +4102,9 @@ End Sub
 'Works like the inbuilt trim but instead of just spaces, it will trim any
 'characters occurring in 'charactersToTrim' from the edges of 'str'
 Public Function TrimX(ByRef str As String, _
-             Optional ByRef charactersToTrim As String = " " & vbCrLf) As String
+             Optional ByRef charactersToTrim As String = " " & vbCrLf & vbTab) _
+                      As String
+    If Len(str) = 0 Then Exit Function
     Dim strLen As Long:   strLen = Len(str)
     Dim startIdx As Long: startIdx = 1
     Dim endIdx As Long:   endIdx = strLen
@@ -4111,9 +4114,12 @@ Public Function TrimX(ByRef str As String, _
         startIdx = startIdx + 1
     Loop
 
-    Do While endIdx >= 1 _
-         And InStr(charactersToTrim, Mid(str, endIdx, 1)) > 0
-        endIdx = endIdx - 1
+    Do While endIdx >= 1
+        If InStr(charactersToTrim, Mid(str, endIdx, 1)) > 0 Then
+            endIdx = endIdx - 1
+        Else
+            Exit Do
+        End If
     Loop
 
     If startIdx <= endIdx Then
