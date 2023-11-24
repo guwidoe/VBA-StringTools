@@ -1,5 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
-*.bas linguist-language=VBA
-*.cls linguist-language=VBA
+*.bas linguist-language=VBA working-tree-encoding=CP1252
+*.cls linguist-language=VBA working-tree-encoding=CP1252
 *.bas eol=crlf
