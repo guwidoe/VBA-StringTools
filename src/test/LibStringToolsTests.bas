@@ -113,40 +113,40 @@ End Sub
 
 Private Sub TestEncodersAndDecoders()
     Const STR_LENGTH As Long = 1000001
-    
+
     Dim fullUnicode As String:    fullUnicode = RandomStringUnicode(STR_LENGTH)
     Dim bmpUnicode As String:     bmpUnicode = RandomStringBMP(STR_LENGTH)
     Dim utf16AsciiOnly As String: utf16AsciiOnly = RandomStringASCII(STR_LENGTH)
     
     'VBA natively implemented Encoders/Decoders
     Debug.Print "Native UTF-8 Encoder/Decoder Test Basic Multilingual Plane: " & _
-        IIf(DecodeUTF8(EncodeUTF8(bmpUnicode)) = bmpUnicode, "passed", "failed")
+        iif(DecodeUTF8(EncodeUTF8(bmpUnicode)) = bmpUnicode, "passed", "failed")
         
      Debug.Print "ADODB.Stream UTF-8 Encoder/Decoder Test Basic Multilingual Plane: " & _
-         IIf(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(bmpUnicode)) = bmpUnicode, "passed", "failed")
+         iif(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(bmpUnicode)) = bmpUnicode, "passed", "failed")
          
      Debug.Print "API UTF-8 Encoder/Decoder Test Basic Multilingual Plane: " & _
-         IIf(Decode(Encode(bmpUnicode, cpUTF_8), cpUTF_8) = bmpUnicode, "passed", "failed")
+         iif(Decode(Encode(bmpUnicode, cpUTF_8), cpUTF_8) = bmpUnicode, "passed", "failed")
 
     Debug.Print "UTF-32 Encoder/Decoder Test Basic Multilingual Plane: " & _
-        IIf(DecodeUTF32LE(EncodeUTF32LE(bmpUnicode)) = bmpUnicode, "passed", "failed")
+        iif(DecodeUTF32LE(EncodeUTF32LE(bmpUnicode)) = bmpUnicode, "passed", "failed")
         
     Debug.Print "Native UTF-8 Encoder/Decoder Test full Unicode: " & _
-        IIf(DecodeUTF8(EncodeUTF8(fullUnicode)) = fullUnicode, "passed", "failed")
+        iif(DecodeUTF8(EncodeUTF8(fullUnicode)) = fullUnicode, "passed", "failed")
     
     #If Mac = 0 Then
         Debug.Print "ADODB.Stream UTF-8 Encoder/Decoder Test full Unicode: " & _
-            IIf(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(fullUnicode)) = fullUnicode, "passed", "failed")
+            iif(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(fullUnicode)) = fullUnicode, "passed", "failed")
     #End If
     
     Debug.Print "API UTF-8 Encoder/Decoder Test full Unicode: " & _
-        IIf(Decode(Encode(fullUnicode, cpUTF_8), cpUTF_8) = fullUnicode, "passed", "failed")
+        iif(Decode(Encode(fullUnicode, cpUTF_8), cpUTF_8) = fullUnicode, "passed", "failed")
     
     Debug.Print "UTF-32 Encoder/Decoder Test full Unicode: " & _
-        IIf(DecodeUTF32LE(EncodeUTF32LE(fullUnicode)) = fullUnicode, "passed", "failed")
+        iif(DecodeUTF32LE(EncodeUTF32LE(fullUnicode)) = fullUnicode, "passed", "failed")
         
     Debug.Print "ANSI Encoder/Decoder Test: " & _
-        IIf(DecodeANSI(EncodeANSI(utf16AsciiOnly)) = utf16AsciiOnly, "passed", "failed")
+        iif(DecodeANSI(EncodeANSI(utf16AsciiOnly)) = utf16AsciiOnly, "passed", "failed")
 End Sub
 
 Private Sub TestUTF8EncodersPerformance()
@@ -157,7 +157,7 @@ Private Sub TestUTF8EncodersPerformance()
     Dim numRepetitions As Variant: numRepetitions = VBA.Array(100000, 1000, 10)
     Dim strLengths As Variant:     strLengths = VBA.Array(100, 1000, 1000000)
     
-    Dim description As String
+    Dim Description As String
     Dim s As String
     Dim numReps As Long
     Dim strLength As Long
@@ -172,7 +172,7 @@ Private Sub TestUTF8EncodersPerformance()
         's = RandomStringBMP(strLength)
         's = RandomStringASCII(strLength)
         
-        description = " seconds to encode a string of length " & _
+        Description = " seconds to encode a string of length " & _
                       strLength & " " & numReps & " times."
                       
         'VBA Native UTF-8 Encoder:
@@ -180,7 +180,7 @@ Private Sub TestUTF8EncodersPerformance()
         For j = 1 To numReps
             EncodeUTF8 s
         Next j
-        Debug.Print "EncodeUTF8native took: " & AccurateTimer - t & description
+        Debug.Print "EncodeUTF8native took: " & AccurateTimer - t & Description
             
         #If Mac = 0 Then
             'ADODB.Stream UTF-8 Encoder:
@@ -188,7 +188,7 @@ Private Sub TestUTF8EncodersPerformance()
             For j = 1 To numReps
                 EncodeUTF8usingAdodbStream s
             Next j
-            Debug.Print "EncodeUTF8usingAdodbStream took: " & AccurateTimer - t & description
+            Debug.Print "EncodeUTF8usingAdodbStream took: " & AccurateTimer - t & Description
         #End If
         
         'Windows API UTF-8 Encoder:
@@ -196,7 +196,7 @@ Private Sub TestUTF8EncodersPerformance()
         For j = 1 To numReps
             Encode s, cpUTF_8
         Next j
-        Debug.Print "EncodeUTF8usingAPI took: " & AccurateTimer - t & description
+        Debug.Print "EncodeUTF8usingAPI took: " & AccurateTimer - t & Description
         
         DoEvents
     Next i
@@ -209,7 +209,7 @@ Private Sub TestUTF8DecodersPerformance()
     Dim numRepetitions As Variant: numRepetitions = VBA.Array(100000, 1000, 10)
     Dim strLengths As Variant:     strLengths = VBA.Array(100, 1000, 1000000)
     
-    Dim description As String
+    Dim Description As String
     Dim s As String
     Dim numReps As Long
     Dim strLength As Long
@@ -225,7 +225,7 @@ Private Sub TestUTF8DecodersPerformance()
         's = RandomStringASCII(strLength)
         
         s = EncodeUTF8(s)
-        description = " seconds to encode a string of length " & _
+        Description = " seconds to encode a string of length " & _
                       strLength & " " & numReps & " times."
                       
         'VBA Native UTF-8 Decoder:
@@ -233,7 +233,7 @@ Private Sub TestUTF8DecodersPerformance()
         For j = 1 To numReps
             DecodeUTF8 s
         Next j
-        Debug.Print "DecodeUTF8native took: " & AccurateTimer - t & description
+        Debug.Print "DecodeUTF8native took: " & AccurateTimer - t & Description
         
         #If Mac = 0 Then
             'ADODB.Stream UTF-8 Decoder:
@@ -241,7 +241,7 @@ Private Sub TestUTF8DecodersPerformance()
             For j = 1 To numReps
                 DecodeUTF8usingAdodbStream s
             Next j
-            Debug.Print "DecodeUTF8usingAdodbStream took: " & AccurateTimer - t & description
+            Debug.Print "DecodeUTF8usingAdodbStream took: " & AccurateTimer - t & Description
         #End If
         
         'Windows API UTF-8 Decoder:
@@ -249,7 +249,7 @@ Private Sub TestUTF8DecodersPerformance()
         For j = 1 To numReps
             Decode s, cpUTF_8
         Next j
-        Debug.Print "DecodeUTF8usingWinAPI took: " & AccurateTimer - t & description
+        Debug.Print "DecodeUTF8usingWinAPI took: " & AccurateTimer - t & Description
         
         DoEvents
     Next i
@@ -262,7 +262,7 @@ Private Sub TestUTF32EncodersAndDecodersPerformance()
     Dim numRepetitions As Variant: numRepetitions = VBA.Array(100000, 1000, 10)
     Dim strLengths As Variant:     strLengths = VBA.Array(100, 1000, 1000000)
     
-    Dim description As String
+    Dim Description As String
     Dim s As String
     Dim s2 As String
     Dim numReps As Long
@@ -279,7 +279,7 @@ Private Sub TestUTF32EncodersAndDecodersPerformance()
         's = RandomStringASCII(strLength)
         
         s2 = EncodeUTF32LE(s)
-        description = " seconds to encode a string of length " & _
+        Description = " seconds to encode a string of length " & _
                       strLength & " " & numReps & " times."
                       
         'VBA Native UTF-32 Encoder:
@@ -287,7 +287,7 @@ Private Sub TestUTF32EncodersAndDecodersPerformance()
         For j = 1 To numReps
             EncodeUTF32LE s
         Next j
-        Debug.Print "EncodeUTF32LE took: " & AccurateTimer - t & description
+        Debug.Print "EncodeUTF32LE took: " & AccurateTimer - t & Description
         
 
         'VBA Native UTF-32 Decoder:
@@ -295,7 +295,7 @@ Private Sub TestUTF32EncodersAndDecodersPerformance()
         For j = 1 To numReps
             DecodeUTF32LE s2
         Next j
-        Debug.Print "DecodeUTF32LE took: " & AccurateTimer - t & description
+        Debug.Print "DecodeUTF32LE took: " & AccurateTimer - t & Description
 
         DoEvents
     Next i
@@ -308,7 +308,7 @@ Private Sub TestANSIEncodersAndDecodersPerformance()
     Dim numRepetitions As Variant: numRepetitions = VBA.Array(100000, 1000, 10)
     Dim strLengths As Variant:     strLengths = VBA.Array(100, 1000, 1000000)
     
-    Dim description As String
+    Dim Description As String
     Dim s As String
     Dim s2 As String
     Dim numReps As Long
@@ -325,7 +325,7 @@ Private Sub TestANSIEncodersAndDecodersPerformance()
         's = RandomStringASCII(strLength)
         
         s2 = EncodeANSI(s)
-        description = " seconds to encode a string of length " & _
+        Description = " seconds to encode a string of length " & _
                       strLength & " " & numReps & " times."
                       
         'VBA Native UTF-32 Encoder:
@@ -333,7 +333,7 @@ Private Sub TestANSIEncodersAndDecodersPerformance()
         For j = 1 To numReps
             EncodeANSI s
         Next j
-        Debug.Print "EncodeANSI took: " & AccurateTimer - t & description
+        Debug.Print "EncodeANSI took: " & AccurateTimer - t & Description
         
 
         'VBA Native UTF-32 Decoder:
@@ -341,7 +341,7 @@ Private Sub TestANSIEncodersAndDecodersPerformance()
         For j = 1 To numReps
             DecodeANSI s2
         Next j
-        Debug.Print "DecodeANSI took: " & AccurateTimer - t & description
+        Debug.Print "DecodeANSI took: " & AccurateTimer - t & Description
 
         DoEvents
     Next i
@@ -424,7 +424,7 @@ Sub RunLimitConsecutiveSubstringRepetitionTests()
     TestLimitConsecutiveSubstringRepetition "bbbaaababbb", "ab", 1
     TestLimitConsecutiveSubstringRepetition _
         UnescapeUnicode("\u6100\u6100\u6100"), "a", 1
-    failedTests = failedTests + IIf(LimitConsecutiveSubstringRepetitionB( _
+    failedTests = failedTests + iif(LimitConsecutiveSubstringRepetitionB( _
                 UnescapeUnicode("\u6100\u6100\u6100"), "a", 1) <> _
             LimitConsecutiveSubstringRepetition( _
                 UnescapeUnicode("\u6100\u6100\u6100"), "a", 1), 0, 1)
@@ -439,9 +439,9 @@ Sub RunLimitConsecutiveSubstringRepetitionTests()
     End If
     Exit Sub
 errh:
-    If Err.number = vbObjectError + 43233 Then
+    If Err.Number = vbObjectError + 43233 Then
         failedTests = failedTests + 1
-        Debug.Print Err.description
+        Debug.Print Err.Description
         Resume Next
     Else
         Err.Raise Err
@@ -490,13 +490,13 @@ Private Sub TestSplitB()
     Stop
 End Sub
 
-Private Static Property Get AllCodePages() As Collection
-    Dim c As Collection
+Private Static Property Get AllCodePages() As collection
+    Dim c As collection
     If Not c Is Nothing Then
         Set AllCodePages = c
         Exit Function
     End If
-    Set c = New Collection
+    Set c = New collection
           'Item: Enum ID, Key:=.NET Name
     c.Add Item:=cpIBM037, Key:="IBM037"
     c.Add Item:=cpIBM437, Key:="IBM437"
@@ -664,8 +664,8 @@ Sub TestAPI()
     For Each cpID In AllCodePages
         Encode rndBytes, cpID, True
         i = i + 1
-        Debug.Print i, cpID, Err.number, Err.description
-        convNotSupported(i) = Err.number
+        Debug.Print i, cpID, Err.Number, Err.Description
+        convNotSupported(i) = Err.Number
         On Error GoTo -1
     Next cpID
 '    i = 0
@@ -922,7 +922,7 @@ Public Sub TestPrintVar()
     ReDim weirdArray(1 To 3, 1 To 3)
     weirdArray(1, 1) = Array(1, 2, 3, 4)
     weirdArray(1, 2) = Array(Array(1, 2, 3), 2, 3, 4)
-    Set weirdArray(2, 1) = New Collection
+    Set weirdArray(2, 1) = New collection
     weirdArray(2, 2) = CCur(1000)
     weirdArray(3, 2) = nested2DimArray
     Debug.Print "Test Case 9: Weird array"
@@ -1085,4 +1085,5 @@ Private Function ArraysAreEqual(arr1 As Variant, arr2 As Variant) As Boolean
     
     ArraysAreEqual = True
 End Function
+
 

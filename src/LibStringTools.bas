@@ -39,6 +39,9 @@ Option Compare Binary
 
         Private Declare PtrSafe Function CopyMemory Lib "/usr/lib/libc.dylib" Alias "memmove" (Destination As Any, Source As Any, ByVal Length As LongPtr) As LongPtr
         Private Declare PtrSafe Function errno_location Lib "/usr/lib/libSystem.B.dylib" Alias "__error" () As LongPtr
+        
+        Private Declare PtrSafe Function CFStringGetSystemEncoding Lib "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation" () As Long
+        Private Declare PtrSafe Function CFStringConvertEncodingToWindowsCodepage Lib "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation" (ByVal CFStringEncoding As Long) As Long
     #Else
         Private Declare Function iconv Lib "/usr/lib/libiconv.dylib" (ByVal cd As Long, ByRef inBuf As Long, ByRef inBytesLeft As Long, ByRef outBuf As Long, ByRef outBytesLeft As Long) As Long
         Private Declare Function iconv_open Lib "/usr/lib/libiconv.dylib" (ByVal toCode As Long, ByVal fromCode As Long) As Long
@@ -46,17 +49,22 @@ Option Compare Binary
 
         Private Declare Function CopyMemory Lib "/usr/lib/libc.dylib" Alias "memmove" (Destination As Any, Source As Any, ByVal Length As Long) As Long
         Private Declare Function errno_location Lib "/usr/lib/libSystem.B.dylib" Alias "__error" () As Long
+        
+        Private Declare Function CFStringGetSystemEncoding Lib "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation" () As Long
+        Private Declare Function CFStringConvertEncodingToWindowsCodepage Lib "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation" (ByVal CFStringEncoding As Long) As Long
     #End If
 #Else 'Windows
     #If VBA7 Then
-        Private Declare PtrSafe Function MultiByteToWideChar Lib "kernel32" (ByVal codePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long) As Long
-        Private Declare PtrSafe Function WideCharToMultiByte Lib "kernel32" (ByVal codePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpDefaultChar As LongPtr, ByVal lpUsedDefaultChar As LongPtr) As Long
+        Private Declare PtrSafe Function MultiByteToWideChar Lib "kernel32" (ByVal codepage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long) As Long
+        Private Declare PtrSafe Function WideCharToMultiByte Lib "kernel32" (ByVal codepage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpDefaultChar As LongPtr, ByVal lpUsedDefaultChar As LongPtr) As Long
 
         Private Declare PtrSafe Function GetLastError Lib "kernel32" () As Long
         Private Declare PtrSafe Sub SetLastError Lib "kernel32" (ByVal dwErrCode As Long)
 
         Private Declare PtrSafe Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (Destination As Any, Source As Any, ByVal Length As Long)
         Private Declare PtrSafe Function lstrlenW Lib "kernel32" (ByVal lpString As LongPtr) As Long
+        
+        Private Declare PtrSafe Function GetACP Lib "kernel32" () As Long
     #Else
         Private Declare Function MultiByteToWideChar Lib "kernel32" Alias "MultiByteToWideChar" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As Long, ByVal cchMultiByte As Long, ByVal lpWideCharStr As Long, ByVal cchWideChar As Long) As Long
         Private Declare Function WideCharToMultiByte Lib "kernel32" Alias "WideCharToMultiByte" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As Long, ByVal cchWideChar As Long, ByVal lpMultiByteStr As Long, ByVal cchMultiByte As Long, ByVal lpDefaultChar As Long, ByVal lpUsedDefaultChar As Long) As Long
@@ -66,6 +74,8 @@ Option Compare Binary
 
         Private Declare Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (Destination As Any, Source As Any, ByVal Length As Long)
         Private Declare Function lstrlenW Lib "kernel32" (ByVal lpString As Long) As Long
+        
+        Private Declare Function GetACP Lib "kernel32" () As Long
     #End If
 #End If
 
@@ -132,7 +142,7 @@ End Type
 Private Type StringificationSettings
     maxChars As Long
     escapeNonPrintable As Boolean
-    delimiter As String
+    Delimiter As String
     maxCharsPerElement As Long
     maxCharsPerLine As Long
     maxLines As Long
@@ -312,6 +322,11 @@ Public Enum CodePageIdentifier
     cpEUC_Traditional_Chinese = 51950 '                        EUC Traditional Chinese
     cpHz_gb_2312 = 52936              'hz-gb-2312              HZ-GB2312 Simplified Chinese; Chinese Simplified (HZ)
     cpGB18030 = 54936                 'GB18030                 Windows XP and later: GB18030 Simplified Chinese (4 byte); Chinese Simplified (GB18030)
+    cpSMS_GSM_7bit = 55000            '                        SMS GSM 7bit
+    cpSMS_GSM_7bit_Spanish = 55001    '                        SMS GSM 7bit Spanish
+    cpSMS_GSM_7bit_Portuguese = 55002 '                        SMS GSM 7bit Portuguese
+    cpSMS_GSM_7bit_Turkish = 55003    '                        SMS GSM 7bit Turkish
+    cpSMS_GSM_7bit_Greek = 55004      '                        SMS GSM 7bit Greek
     cpX_iscii_de = 57002              'x-iscii-de              ISCII Devanagari
     cpX_iscii_be = 57003              'x-iscii-be              ISCII Bangla
     cpX_iscii_ta = 57004              'x-iscii-ta              ISCII Tamil
@@ -414,17 +429,17 @@ Private Static Function CodePageAllowsQueryReversible(ByVal cpID As Long) As Boo
 End Function
 
 'Returns an array for converting CodePageIDs to ConversionDescriptorNames
-Private Static Function ConvDescriptorName(ByVal cpID As Long) As String
+Public Static Function ConvDescriptorName(ByVal cpID As Long) As String
     Dim arr(CodePageIdentifier.[_first] To CodePageIdentifier.[_last]) As String
 
-    If arr(CodePageIdentifier.[_first]) Then
+    If arr(CodePageIdentifier.[_first]) = "-" Then
         ConvDescriptorName = StrConv(arr(cpID), vbFromUnicode)
         Exit Function
     End If
 
     Dim i As Long
     For i = CodePageIdentifier.[_first] To CodePageIdentifier.[_last]
-        arr(i) = -1
+        arr(i) = "-"
     Next i
 
     'Source:
@@ -653,6 +668,15 @@ Private Function SetApiErrorNumber(ByVal errNumber As Long) As Long
     #End If
 End Function
 
+Public Function GetNonUnicodeSystemCodepage() As CodePageIdentifier
+    #If Mac Then
+        GetNonUnicodeSystemCodepage = _
+            CFStringConvertEncodingToWindowsCodepage(CFStringGetSystemEncoding())
+    #Else
+        GetNonUnicodeSystemCodepage = GetACP
+    #End If
+End Function
+
 #If Mac = 0 Then
 Public Function GetBstrFromWideStringPtr(ByVal lpwString As LongPtr) As String
     Dim Length As Long
@@ -694,7 +718,7 @@ Public Function Transcode(ByRef str As String, _
         Dim replacementChar As String
 
         Do While inBytesLeft > 0
-            SetApiErrorNumber = 0
+            SetApiErrorNumber 0
             irrevConvCount = iconv(cd, inBuf, inBytesLeft, outBuf, outBytesLeft)
 
             If irrevConvCount = -1 Then 'Error occurred
@@ -773,7 +797,7 @@ Private Function GetConversionDescriptor( _
     If LenB(fromCpCdName) = 0 Then Err.Raise 5, methodName, _
         "No conversion descriptor name assigned to CodePage " & fromCodePage
 
-    SetApiErrorNumber = 0 'Clear previous errors
+    SetApiErrorNumber 0  'Clear previous errors
     GetConversionDescriptor = iconv_open(StrPtr(toCpCdName), StrPtr(fromCodePage))
 
     If Not GetConversionDescriptor Then
@@ -795,12 +819,12 @@ End Function
 'On Mac, replacement character must be manually inserted when using iconv
 Private Function GetReplacementCharForCodePage( _
                                     ByVal cpID As CodePageIdentifier) As String
-    Static replacementChars As Collection
-    If replacementChars Is Nothing Then replacementChars = New Collection
+    Static replacementChars As collection
+    If replacementChars Is Nothing Then Set replacementChars = New collection
     On Error GoTo 0
     On Error Resume Next
     GetReplacementCharForCodePage = replacementChars(CStr(cpID))
-    If Err.number = 0 Then
+    If Err.Number = 0 Then
         On Error GoTo 0
         Exit Function
     End If
@@ -990,7 +1014,7 @@ Public Function HexToString(ByRef hexStr As String) As String
     If nibbleMap(0) = 0 Then
         For i = 0 To 255
             nibbleMap(i) = -256 'To force invalid character code
-            charMap(i) = ChrB$(i)
+            charMap(i) = chrb$(i)
         Next i
         For i = 0 To 9
             nibbleMap(Asc(CStr(i))) = i
@@ -1005,16 +1029,16 @@ Public Function HexToString(ByRef hexStr As String) As String
     Dim startPos As Long: startPos = -4 * CLng(prefix = "0x" Or prefix = "&H")
     Dim b() As Byte:      b = hexStr
     Dim j As Long
-    Dim charCode As Long
+    Dim CharCode As Long
 
     HexToString = MidB$(hexStr, 1, size / 2 - Sgn(startPos))
     For i = startPos To UBound(b) Step 4
         j = j + 1
-        charCode = nibbleMap(b(i)) * &H10& + nibbleMap(b(i + 2))
-        If charCode < 0 Or b(i + 1) > 0 Or b(i + 3) > 0 Then
+        CharCode = nibbleMap(b(i)) * &H10& + nibbleMap(b(i + 2))
+        If CharCode < 0 Or b(i + 1) > 0 Or b(i + 3) > 0 Then
             Err.Raise 5, methodName, errPrefix & "Expected a-f/A-F or 0-9"
         End If
-        MidB$(HexToString, j, 1) = charMap(charCode)
+        MidB$(HexToString, j, 1) = charMap(CharCode)
     Next i
 End Function
 
@@ -1194,7 +1218,7 @@ Public Function UnescapeUnicode(ByRef str As String, _
     Dim highSur As Long
     Dim lowSur As Long
     Dim remainingLen As Long: remainingLen = Len(str)
-    Dim posChar As String:    posChar = ChrB$(posByte)
+    Dim posChar As String:    posChar = chrb$(posByte)
     Dim outPos As Long:       outPos = 1
     Dim inPos As Long:        inPos = 1
 
@@ -1233,13 +1257,13 @@ Public Function UnescapeUnicode(ByRef str As String, _
                     End If
                     outPos = outPos + diff
                     If .unEscSize = 1 Then
-                        Mid$(UnescapeUnicode, outPos) = ChrW$(.codepoint)
+                        Mid$(UnescapeUnicode, outPos) = chrw$(.codepoint)
                     Else
                         .codepoint = .codepoint - &H10000
                         highSur = &HD800& Or (.codepoint \ &H400&)
                         lowSur = &HDC00& Or (.codepoint And &H3FF&)
-                        Mid$(UnescapeUnicode, outPos) = ChrW$(highSur)
-                        Mid$(UnescapeUnicode, outPos + 1) = ChrW$(lowSur)
+                        Mid$(UnescapeUnicode, outPos) = chrw$(highSur)
+                        Mid$(UnescapeUnicode, outPos + 1) = chrw$(lowSur)
                     End If
                     outPos = outPos + .unEscSize
                     inPos = .currPosition + .escSize
@@ -1285,9 +1309,9 @@ Private Sub InitEscape(ByRef escape As EscapeSequence, _
 End Sub
 
 Private Sub TryPythonEscape(ByRef escape As EscapeSequence, ByRef str As String)
-    Const H As String = "[0-9A-Fa-f]"
-    Const PYTHON_ESCAPE_PATTERN_NOT_BMP = "00[01]" & H & H & H & H & H
-    Const PYTHON_ESCAPE_PATTERN_BMP As String = H & H & H & H & "*"
+    Const h As String = "[0-9A-Fa-f]"
+    Const PYTHON_ESCAPE_PATTERN_NOT_BMP = "00[01]" & h & h & h & h & h
+    Const PYTHON_ESCAPE_PATTERN_BMP As String = h & h & h & h & "*"
     Dim potentialEscape As String
 
     With escape
@@ -1352,10 +1376,10 @@ End Sub
 
 Private Sub TryUPlusEscape(ByRef escape As EscapeSequence, _
                            ByRef str As String)
-    Const H As String = "[0-9A-Fa-f]"
-    Const UPLUS_ESCAPE_PATTERN_4_DIGITS = H & H & H & H & "*"
-    Const UPLUS_ESCAPE_PATTERN_5_DIGITS = H & H & H & H & H & "*"
-    Const UPLUS_ESCAPE_PATTERN_6_DIGITS = H & H & H & H & H & H
+    Const h As String = "[0-9A-Fa-f]"
+    Const UPLUS_ESCAPE_PATTERN_4_DIGITS = h & h & h & h & "*"
+    Const UPLUS_ESCAPE_PATTERN_5_DIGITS = h & h & h & h & h & "*"
+    Const UPLUS_ESCAPE_PATTERN_6_DIGITS = h & h & h & h & h & h
     Dim potentialEscape As String
     
     With escape
@@ -1438,11 +1462,11 @@ Public Function ChrU(ByVal codepoint As Long, _
     If codepoint < 0 Then codepoint = codepoint And &HFFFF& 'Incase of uInt input
 
     If codepoint < &HD800& Then
-        ChrU = ChrW$(codepoint)
+        ChrU = chrw$(codepoint)
     ElseIf codepoint < &HE000& And Not allowSingleSurrogates Then
         Err.Raise 5, methodName, "Range reserved for surrogate pairs"
     ElseIf codepoint < &H10000 Then
-        ChrU = ChrW$(codepoint)
+        ChrU = chrw$(codepoint)
     ElseIf codepoint < &H110000 Then
         lt.l = (&HD800& Or (codepoint \ &H400& - &H40&)) _
             Or (&HDC00 Or (codepoint And &H3FF&)) * &H10000 '&HDC00 with no &
@@ -1539,7 +1563,7 @@ End Function
 Public Function EncodeUTF8(ByRef utf16leStr As String, _
                   Optional ByVal raiseErrors As Boolean = False) _
                                   As String
-    Const methodName As String = "EncodeUTF8native"
+    Const methodName As String = "EncodeUTF8"
     Dim codepoint As Long
     Dim lowSurrogate As Long
     Dim i As Long:            i = 1
@@ -1604,7 +1628,7 @@ End Function
 Public Function DecodeUTF8(ByRef utf8Str As String, _
                   Optional ByVal raiseErrors As Boolean = False) As String
 
-    Const methodName As String = "DecodeUTF8native"
+    Const methodName As String = "DecodeUTF8"
     Dim i As Long
     Dim numBytesOfCodePoint As Byte
 
@@ -1664,8 +1688,8 @@ Public Function DecodeUTF8(ByRef utf8Str As String, _
                 If raiseErrors Then Err.Raise 5, methodName, "Overlong encoding"
                 GoTo insertErrChar
             ElseIf codepoint < &HD800& Then
-                utf16(j) = CByte(codepoint And &HFF&)
-                utf16(j + 1) = CByte(codepoint \ &H100&)
+                utf16(j) = codepoint And &HFF&
+                utf16(j + 1) = codepoint \ &H100&
                 j = j + 2
             ElseIf codepoint < &HE000& Then
                 If raiseErrors Then Err.Raise 5, methodName, _
@@ -1711,9 +1735,9 @@ Public Function EncodeUTF8usingAdodbStream(ByRef utf16leStr As String) _
         .Charset = "utf-8"
         .Open
         .WriteText utf16leStr
-        .position = 0
+        .Position = 0
         .Type = 1 ' adTypeBinary
-        .position = 3 ' Skip BOM (Byte Order Mark)
+        .Position = 3 ' Skip BOM (Byte Order Mark)
         EncodeUTF8usingAdodbStream = .Read
         .Close
     End With
@@ -1728,7 +1752,7 @@ Public Function DecodeUTF8usingAdodbStream(ByRef utf8Str As String) As String
         .Type = 1 ' adTypeBinary
         .Open
         .Write b
-        .position = 0
+        .Position = 0
         .Type = 2 ' adTypeText
         .Charset = "utf-8"
         DecodeUTF8usingAdodbStream = .ReadText
@@ -1844,7 +1868,7 @@ End Function
 Public Function RandomStringAlphanumeric(ByVal Length As Long) As String
     Const methodName As String = "RandomStringAlphanumeric"
     Const INKL_CHARS As String = _
-        "01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+        "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
     Static chars() As Byte
     Static numPossChars As Long
     Static isInitialized As Boolean
@@ -1945,7 +1969,7 @@ Public Function RandomStringUnicode(ByVal Length As Long) As String
             char = Int(MAX_UINT * Rnd) + 1
         Loop Until (char < &HD800& Or char > &HDFFF&) _
                And (char <> &HFEFF&)
-        Mid$(RandomStringUnicode, Len(RandomStringUnicode), 1) = ChrW(char)
+        Mid$(RandomStringUnicode, Len(RandomStringUnicode), 1) = chrw(char)
     End If
 End Function
 
@@ -2020,7 +2044,7 @@ Public Function RandomString(ByVal Length As Long, _
         Loop Until (char < &HD800& Or char > &HDFFF&) _
                And (char <> &HFEFF&) _
                And (char <= MAX_UINT)
-        Mid$(RandomString, Len(RandomString), 1) = ChrW(char)
+        Mid$(RandomString, Len(RandomString), 1) = chrw(char)
     End If
 End Function
 
@@ -2030,7 +2054,7 @@ End Function
 '     about twice as many "a"s as "b"s
 Public Function RandomStringFromChars(ByVal Length As Long, _
                              Optional ByRef inklChars As String = _
-    "01234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz") As String
+    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz") As String
     Const methodName As String = "RandomStringFromChars"
     If Length = 0 Then Exit Function
     If Len(inklChars) = 0 Then Err.Raise 5, methodName, _
@@ -2531,6 +2555,9 @@ End Function
 '      StrConv(RepeatString(MidB("a", 1, 1), 3), vbUnicode) -> "aaa"
 Public Function RepeatString(ByRef str As String, _
                     Optional ByVal repeatTimes As Long = 2) As String
+    Const methodName As String = "RepeatString"
+    If repeatTimes < 0 Then Err.Raise 5, methodName, _
+        "Argument 'repeatTimes' = " & repeatTimes & " < 0, invalid"
     If repeatTimes = 0 Then Exit Function
     If LenB(str) = 2 Then
         RepeatString = String$(repeatTimes, str)
@@ -3036,13 +3063,13 @@ Public Function ReplaceMultiple(ByRef str As String, _
     If m > n Then
         For i = 0 To UBound(finds)
             Dim numReplPerFind As Long
-            numReplPerFind = IIf(i < m Mod n, (m \ n) + 1, (m \ n))
+            numReplPerFind = iif(i < m Mod n, (m \ n) + 1, (m \ n))
             Dim numOcc As Long
             numOcc = CountSubstring(str, CStr(finds(i)), lStart, lCount, _
                                     lCompare)
             For j = i To m - 1 Step n
                 lenBBuffer = lenBBuffer + (LenB(replaces(j)) - LenB(finds(i))) _
-                             * IIf((j - i) \ n < numOcc Mod numReplPerFind _
+                             * iif((j - i) \ n < numOcc Mod numReplPerFind _
                          , numOcc \ numReplPerFind + 1, numOcc \ numReplPerFind)
             Next j
         Next i
@@ -3253,13 +3280,13 @@ Public Function ReplaceMultipleB(ByRef bytes As String, _
     If m > n Then
         For i = 0 To UBound(finds)
             Dim numReplPerFind As Long
-            numReplPerFind = IIf(i < m Mod n, (m \ n) + 1, (m \ n))
+            numReplPerFind = iif(i < m Mod n, (m \ n) + 1, (m \ n))
             Dim numOcc As Long
             numOcc = CountSubstringB(bytes, CStr(finds(i)), lStart, lCount, _
                                      lCompare)
             For j = i To m - 1 Step n
                 lenBBuffer = lenBBuffer + (LenB(replaces(j)) - LenB(finds(i))) _
-                             * IIf((j - i) \ n < numOcc Mod numReplPerFind _
+                             * iif((j - i) \ n < numOcc Mod numReplPerFind _
                          , numOcc \ numReplPerFind + 1, numOcc \ numReplPerFind)
             Next j
         Next i
@@ -3553,30 +3580,30 @@ Public Function ChunkifyString(ByRef str As String, _
     
     Dim currChunkLength As Long
     Dim chunkIndex As Long
-    Dim position As Long:           position = 1
+    Dim Position As Long:           Position = 1
     
     For chunkIndex = 0 To numberOfChunks - 1
-        If position > lenStr Then Exit For
+        If Position > lenStr Then Exit For
         
         currChunkLength = chunkLength
         If Not splitUTF16Surrogates _
-        And position + currChunkLength - 1 < lenStr Then
-            If AscU(Mid$(str, position + currChunkLength - 1, 2)) > &HFFFF& Then
+        And Position + currChunkLength - 1 < lenStr Then
+            If AscU(Mid$(str, Position + currChunkLength - 1, 2)) > &HFFFF& Then
                 currChunkLength = currChunkLength - 1
             End If
         End If
         
-        If position + currChunkLength - 1 > lenStr Then
+        If Position + currChunkLength - 1 > lenStr Then
             If discardIncompleteChunks Then Exit For
-            currChunkLength = lenStr - position + 1
+            currChunkLength = lenStr - Position + 1
         End If
         
-        chunks(chunkIndex) = Mid$(str, position, currChunkLength)
-        position = position + currChunkLength
+        chunks(chunkIndex) = Mid$(str, Position, currChunkLength)
+        Position = Position + currChunkLength
     Next chunkIndex
     
     'If the last chunk was not used, shrink the array
-    If position >= lenStr And discardIncompleteChunks Then
+    If Position >= lenStr And discardIncompleteChunks Then
         ReDim Preserve chunks(0 To chunkIndex - 1)
     End If
     
@@ -3597,10 +3624,10 @@ End Function
 'TODO: `ToString` doesn't comply to its settings with the desired rigour.
 'Problem Example:
 'Multiple recursion of nested 1d arrays will ignor the line length limit.
-Public Function ToString(ByVal value As Variant, _
+Public Function ToString(ByVal Value As Variant, _
                 Optional ByVal maxChars As Long = 0, _
                 Optional ByVal escapeNonPrintable As Boolean = True, _
-                Optional ByRef delimiter As String = vbNullString, _
+                Optional ByRef Delimiter As String = vbNullString, _
                 Optional ByVal maxCharsPerElement As Long = 25, _
                 Optional ByVal maxCharsPerLine As Long = 80, _
                 Optional ByVal maxLines As Long = 10, _
@@ -3626,18 +3653,18 @@ Public Function ToString(ByVal value As Variant, _
     With settings
         .maxChars = maxChars
         .escapeNonPrintable = escapeNonPrintable
-        .delimiter = delimiter
+        .Delimiter = Delimiter
         .maxCharsPerElement = maxCharsPerElement
         .maxCharsPerLine = maxCharsPerLine
         .maxLines = maxLines
         .inklColIndices = inklColIndices
         .inklRowIndices = inklRowIndices
     End With
-    ToString = BToString(value, settings)
+    ToString = BToString(Value, settings)
 End Function
 
 'Recursive "Backend" function for 'ToString'
-Private Function BToString(ByVal value As Variant, _
+Private Function BToString(ByVal Value As Variant, _
                            ByRef settings As StringificationSettings) As String
     'Don't use exit function in this Function! Instead use: GoTo CleanExit
     Static isRecursiveCall As Boolean
@@ -3646,34 +3673,34 @@ Private Function BToString(ByVal value As Variant, _
 
     Dim s As String
     Dim i As Long
-    If IsArray(value) Then
-        Select Case GetArrayDimsCount(value)
+    If IsArray(Value) Then
+        Select Case GetArrayDimsCount(Value)
             Case 0 'Array uninitialized
-                s = TypeName(value)
+                s = TypeName(Value)
             Case 1
                 If wasRecursiveCall Then settings.maxCharsPerLine = &H7FFFFFFF
-                s = ToString1dArray(value, settings)
+                s = ToString1dArray(Value, settings)
             Case 2
                 If wasRecursiveCall Then
-                    s = ToStringMultiDimArray(value) 'No settings required
+                    s = ToStringMultiDimArray(Value) 'No settings required
                 Else
-                    s = ToString2dimArray(value, settings)
+                    s = ToString2dimArray(Value, settings)
                 End If
             Case Else
-                s = ToStringMultiDimArray(value) 'No settings required
+                s = ToStringMultiDimArray(Value) 'No settings required
         End Select
-    ElseIf IsObject(value) Then
+    ElseIf IsObject(Value) Then
         Select Case True
             'Can add custom logic to ToString any object here
             'Case TypeOf value Is Collection
                 's = ToStringCollection(...
             Case Else
-                s = TypeName(value)
+                s = TypeName(Value)
         End Select
-    ElseIf IsEmpty(value) Then
+    ElseIf IsEmpty(Value) Then
         s = "Empty"
     Else
-        s = CStr(value)
+        s = CStr(Value)
     End If
     
     With settings
@@ -3685,7 +3712,7 @@ Private Function BToString(ByVal value As Variant, _
         
         If .escapeNonPrintable Then BToString = EscapeUnicode(BToString, 255)
     End With
-    If VarType(value) = vbString Then BToString = "'" & BToString & "'"
+    If VarType(Value) = vbString Then BToString = "'" & BToString & "'"
     
 CleanExit:
     If Not wasRecursiveCall Then isRecursiveCall = False
@@ -3698,8 +3725,8 @@ Private Function ToString1dArray(ByRef arr As Variant, _
                                  ByRef settings As StringificationSettings) _
                                  As String
     Dim s As String
-    Dim delimiter As String: delimiter = settings.delimiter
-    If StrPtr(delimiter) = 0 Then delimiter = ", "
+    Dim Delimiter As String: Delimiter = settings.Delimiter
+    If StrPtr(Delimiter) = 0 Then Delimiter = ", "
     
     If UBound(arr) - LBound(arr) = -1 Then
         ToString1dArray = "[]"
@@ -3712,11 +3739,11 @@ Private Function ToString1dArray(ByRef arr As Variant, _
     Dim line As String: line = "["
     Dim i As Long
     For i = LBound(arr) To UBound(arr) - 1
-        line = line & BToString(arr(i), settings) & delimiter
+        line = line & BToString(arr(i), settings) & Delimiter
 
        'Check if max characters per line would be exceeded with the next element
         If Len(line & BToString(arr(i + 1), settings) & _
-               delimiter) >= settings.maxCharsPerLine Then
+               Delimiter) >= settings.maxCharsPerLine Then
             s = s & line & vbNewLine
             line = ""
             Dim lineCount As Long: lineCount = lineCount + 1
@@ -3732,15 +3759,15 @@ End Function
 Private Function ToString2dimArray(ByRef arr As Variant, _
                                    ByRef settings As StringificationSettings) _
                                    As String
-    Dim delimiter As String: delimiter = settings.delimiter
-    If StrPtr(settings.delimiter) = 0 Then delimiter = "  "
+    Dim Delimiter As String: Delimiter = settings.Delimiter
+    If StrPtr(settings.Delimiter) = 0 Then Delimiter = "  "
     
     With settings
         Dim colWidths() As Long
         colWidths = CalculateColumnWidths(arr, settings)
         Dim numCols As Long
         numCols = CalculateNumColumnsToFit(colWidths, .maxCharsPerLine, _
-                                           Len(delimiter))
+                                           Len(Delimiter))
     
         Dim numRows As Long: numRows = UBound(arr, 1) - LBound(arr, 1) + 1
         Dim firstRows As Long: firstRows = Min(.maxLines \ 2, numRows)
@@ -3750,23 +3777,23 @@ Private Function ToString2dimArray(ByRef arr As Variant, _
     Dim s As String
 
     If settings.inklColIndices Then _
-        s = BuildColHeadersLine(arr, colWidths, numCols, delimiter, settings) _
+        s = BuildColHeadersLine(arr, colWidths, numCols, Delimiter, settings) _
             & vbNewLine
                           
     Dim i As Long
     For i = LBound(arr, 1) To LBound(arr, 1) + firstRows - 1
         If Len(s) > settings.maxChars Then Exit For
-        s = s & BuildLine(arr, colWidths, numCols, delimiter, i, settings) _
+        s = s & BuildLine(arr, colWidths, numCols, Delimiter, i, settings) _
             & vbNewLine
     Next i
     
     If numRows > settings.maxLines And Len(s) < settings.maxChars Then _
-        s = s & BuildDotsLine(arr, colWidths, numCols, delimiter, settings) _
+        s = s & BuildDotsLine(arr, colWidths, numCols, Delimiter, settings) _
             & vbNewLine
     
     For i = UBound(arr, 1) - lastRows + 1 To UBound(arr, 1)
         If Len(s) > settings.maxChars Then Exit For
-        s = s & BuildLine(arr, colWidths, numCols, delimiter, i, settings) _
+        s = s & BuildLine(arr, colWidths, numCols, Delimiter, i, settings) _
             & vbNewLine
     Next i
     ToString2dimArray = s & "(" & numRows & "*" & _
@@ -3789,19 +3816,19 @@ End Function
 Private Function BuildColHeadersLine(ByRef arr As Variant, _
                                      ByRef colWidths() As Long, _
                                      ByVal numCols As Long, _
-                                     ByVal delimiter As String, _
+                                     ByVal Delimiter As String, _
                                      ByRef settings As StringificationSettings) _
                                      As String
     Dim rowNumPadding As Long
     rowNumPadding = Max(Len(CStr(UBound(arr, 1))), Len(CStr(LBound(arr, 1)))) + 2
     
-    Dim lenDelim As Long: lenDelim = Len(delimiter)
+    Dim lenDelim As Long: lenDelim = Len(Delimiter)
     Dim j As Long
     If numCols = UBound(arr, 2) - LBound(arr, 2) + 1 Then
         For j = LBound(arr, 2) To UBound(arr, 2)
             BuildColHeadersLine = BuildColHeadersLine & _
                                   PadLeft(CStr(j), colWidths(j)) _
-                                  & delimiter
+                                  & Delimiter
         Next j
         If settings.inklRowIndices Then _
             BuildColHeadersLine = Space(rowNumPadding) & BuildColHeadersLine
@@ -3831,17 +3858,17 @@ End Function
 Private Function BuildDotsLine(ByRef arr As Variant, _
                                ByRef colWidths() As Long, _
                                ByVal numCols As Long, _
-                               ByVal delimiter As String, _
+                               ByVal Delimiter As String, _
                                ByRef settings As StringificationSettings) _
                                As String
     Dim rowNumPadding As Long
     rowNumPadding = Max(Len(CStr(UBound(arr, 1))), Len(CStr(LBound(arr, 1)))) + 2
-    Dim lenDelim As Long: lenDelim = Len(delimiter)
+    Dim lenDelim As Long: lenDelim = Len(Delimiter)
     Dim j As Long
     If numCols = UBound(arr, 2) - LBound(arr, 2) + 1 Then
         For j = LBound(arr, 2) To UBound(arr, 2)
             BuildDotsLine = BuildDotsLine & PadLeft("...", colWidths(j)) _
-                                          & delimiter
+                                          & Delimiter
         Next j
         If settings.inklRowIndices Then _
                 BuildDotsLine = PadRight("..", rowNumPadding) & BuildDotsLine
@@ -3869,22 +3896,22 @@ End Function
 Private Function BuildLine(ByRef arr As Variant, _
                            ByRef colWidths() As Long, _
                            ByVal numCols As Long, _
-                           ByVal delimiter As String, _
-                           ByVal rowIndex As Long, _
+                           ByVal Delimiter As String, _
+                           ByVal RowIndex As Long, _
                            ByRef settings As StringificationSettings) As String
     Dim rowNumPadding As Long
     rowNumPadding = Max(Len(CStr(UBound(arr, 1))), Len(CStr(LBound(arr, 1)))) + 2
     
-    Dim lenDelim As Long: lenDelim = Len(delimiter)
+    Dim lenDelim As Long: lenDelim = Len(Delimiter)
     Dim j As Long
     If numCols = UBound(arr, 2) - LBound(arr, 2) + 1 Then
         For j = LBound(arr, 2) To UBound(arr, 2)
             BuildLine = BuildLine & _
-                        PadLeft(BToString(arr(rowIndex, j), settings), _
-                                colWidths(j)) & delimiter
+                        PadLeft(BToString(arr(RowIndex, j), settings), _
+                                colWidths(j)) & Delimiter
         Next j
         If settings.inklRowIndices Then _
-            BuildLine = PadRight(CStr(rowIndex), rowNumPadding) & BuildLine
+            BuildLine = PadRight(CStr(RowIndex), rowNumPadding) & BuildLine
 
         BuildLine = Left(BuildLine, Len(BuildLine) - lenDelim)
         Exit Function
@@ -3892,16 +3919,16 @@ Private Function BuildLine(ByRef arr As Variant, _
     
     Dim leftPart As String, rightPart As String
     For j = 0 To numCols \ 2 - 1 'numCols is always even
-        leftPart = leftPart & PadLeft(BToString(arr(rowIndex, _
+        leftPart = leftPart & PadLeft(BToString(arr(RowIndex, _
                    LBound(arr, 2) + j), settings), _
-                   colWidths(LBound(arr, 2) + j)) & delimiter
-        rightPart = delimiter & PadLeft(BToString(arr(rowIndex, _
+                   colWidths(LBound(arr, 2) + j)) & Delimiter
+        rightPart = Delimiter & PadLeft(BToString(arr(RowIndex, _
                     UBound(arr, 2) - j), settings), _
                     colWidths(UBound(arr, 2) - j)) & rightPart
     Next j
 
     If settings.inklRowIndices Then _
-        BuildLine = PadRight(CStr(rowIndex), rowNumPadding)
+        BuildLine = PadRight(CStr(RowIndex), rowNumPadding)
 
     BuildLine = BuildLine & Left(leftPart, Len(leftPart) - lenDelim) & _
                 " ... " & Right(rightPart, Len(rightPart) - lenDelim)
@@ -4012,7 +4039,7 @@ End Function
 'Sets the formatting rules adhered to by 'Printf'
 Public Sub SetPrintfSettings(Optional ByVal maxChars As Long = 0, _
                           Optional ByVal escapeNonPrintable As Boolean = True, _
-                            Optional ByRef delimiter As String = vbNullString, _
+                            Optional ByRef Delimiter As String = vbNullString, _
                              Optional ByVal maxCharsPerElement As Long = 25, _
                              Optional ByVal maxCharsPerLine As Long = 80, _
                              Optional ByVal maxLines As Long = 10, _
@@ -4037,7 +4064,7 @@ Public Sub SetPrintfSettings(Optional ByVal maxChars As Long = 0, _
     With printfSettings
         .maxChars = maxChars
         .escapeNonPrintable = escapeNonPrintable
-        .delimiter = delimiter
+        .Delimiter = Delimiter
         .maxCharsPerElement = maxCharsPerElement
         .maxCharsPerLine = maxCharsPerLine
         .maxLines = maxLines
@@ -4087,35 +4114,37 @@ End Function
 
 'Prints an one or two dimensional array to the immediate window.
 Public Sub PrintVar(ByRef arr As Variant, _
-           Optional ByRef delimiter As String = vbNullString, _
+           Optional ByRef Delimiter As String = vbNullString, _
            Optional ByVal maxCharsPerElement As Long = 25, _
            Optional ByVal maxCharsPerLine As Long = 80, _
            Optional ByVal maxLines As Long = 10, _
            Optional ByVal escapeNonPrintable As Boolean = True, _
            Optional ByVal printColIndices As Boolean = True, _
            Optional ByVal printRowIndices As Boolean = True)
-    Debug.Print ToString(arr, , escapeNonPrintable, delimiter, _
+    Debug.Print ToString(arr, , escapeNonPrintable, Delimiter, _
                           maxCharsPerElement, maxCharsPerLine, maxLines, _
                           printColIndices, printRowIndices)
 End Sub
 
 'Works like the inbuilt trim but instead of just spaces, it will trim any
 'characters occurring in 'charactersToTrim' from the edges of 'str'
+'If 'charactersToTrim' is an empty string, nothing will be trimmed.
 Public Function TrimX(ByRef str As String, _
-             Optional ByRef charactersToTrim As String = " " & vbCrLf & vbTab) _
+             Optional ByRef charactersToTrim As String = " " & vbCrLf & vbTab, _
+             Optional ByVal compareMethod As VbCompareMethod = vbBinaryCompare) _
                       As String
-    If Len(str) = 0 Then Exit Function
+    If Len(str) = 0 Or Len(charactersToTrim) = 0 Then Exit Function
     Dim strLen As Long:   strLen = Len(str)
     Dim startIdx As Long: startIdx = 1
     Dim endIdx As Long:   endIdx = strLen
 
     Do While startIdx <= strLen _
-         And InStr(charactersToTrim, Mid(str, startIdx, 1)) > 0
+        And InStr(1, charactersToTrim, Mid(str, startIdx, 1), compareMethod) > 0
         startIdx = startIdx + 1
     Loop
 
     Do While endIdx >= 1
-        If InStr(charactersToTrim, Mid(str, endIdx, 1)) > 0 Then
+        If InStr(1, charactersToTrim, Mid(str, endIdx, 1), compareMethod) > 0 Then
             endIdx = endIdx - 1
         Else
             Exit Do
@@ -4125,7 +4154,7 @@ Public Function TrimX(ByRef str As String, _
     If startIdx <= endIdx Then
         TrimX = Mid(str, startIdx, endIdx - startIdx + 1)
     Else
-        TrimX = ""
+        TrimX = vbNullString
     End If
 End Function
 
