@@ -1727,7 +1727,7 @@ End Function
 
 #If Mac = 0 Then
 'Transcoding a VBA-native UTF-16LE encoded string to UTF-8 using ADODB.Stream
-'Much faster than EncodeUTF8native, but only available on Windows
+'Much faster than EncodeUTF8, but only available on Windows
 Public Function EncodeUTF8usingAdodbStream(ByRef utf16leStr As String) _
                                             As String
     With CreateObject("ADODB.Stream")
@@ -1744,7 +1744,7 @@ Public Function EncodeUTF8usingAdodbStream(ByRef utf16leStr As String) _
 End Function
 
 'Transcoding an UTF-8 encoded string to VBA-native UTF-16LE using ADODB.Stream
-'Faster than DeocdeUTF8native for some strings but only available on Windows
+'Faster than DeocdeUTF8 for some strings but only available on Windows
 'Warning: This function performs extremely slow for strings bigger than ~5MB
 Public Function DecodeUTF8usingAdodbStream(ByRef utf8Str As String) As String
     Dim b() As Byte: b = utf8Str
