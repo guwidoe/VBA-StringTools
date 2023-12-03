@@ -6,7 +6,7 @@ Attribute VB_Name = "LibStringToolsTests"
 ' ------------------------------------------------------------------------------------
 ' MIT License
 '
-' Copyright (c) 2023 Guido Witt-Döring
+' Copyright (c) 2023 Guido Witt-DÃ¶ring
 '
 ' Permission is hereby granted, free of charge, to any person obtaining a copy
 ' of this software and associated documentation files (the "Software"), to
@@ -79,12 +79,12 @@ Private Function GetFrequency() As Currency
     #End If
 End Function
 
-'Returns time since system startup in seconds with 0.1ms (=100µs) precision
+'Returns time since system startup in seconds with 0.1ms (=100Âµs) precision
 Private Function AccurateTimer() As Currency
     AccurateTimer = GetTickCount / GetFrequency
 End Function
 
-'Returns time since system startup in milliseconds with 0.1µs (=100ns) precision
+'Returns time since system startup in milliseconds with 0.1Âµs (=100ns) precision
 Private Function AccurateTimerMs() As Currency
     'Note that this calculation will work even if 1000@ / GetFrequency < 0.0001
     AccurateTimerMs = (1000@ / GetFrequency) * GetTickCount
