@@ -6,7 +6,7 @@ Attribute VB_Name = "LibStringTools"
 ' ------------------------------------------
 ' MIT License
 '
-' Copyright (c) 2023 Guido Witt-Döring
+' Copyright (c) 2023 Guido Witt-DÃ¶ring
 '
 ' Permission is hereby granted, free of charge, to any person obtaining a copy
 ' of this software and associated documentation files (the "Software"), to
@@ -695,12 +695,12 @@ End Function
 '     string of codepage 'fromCodePage', or
 '   - the string contains codepoints that can not be represented in 'toCodePage'
 '     and will lead to the insertion of a "default character".
-'E.g.: Transcode("°", cpUTF_16, cpUs_ascii, True) will raise an error, because
-'      "°" is not an ASCII character.
+'E.g.: Transcode("Â°", cpUTF_16, cpUs_ascii, True) will raise an error, because
+'      "Â°" is not an ASCII character.
 'Note that even calling the function with 'raiseErrors = True' doesn't guarantee
 'that the conversion is reversible, because sometimes codepoints are replaced
 'with more generic characters that aren't the default character (raise no error)
-'E.g.:Decode(Transcode("³", cpUTF_16, cpUs_ascii, True), cpUs_ascii) returns "3"
+'E.g.:Decode(Transcode("Â³", cpUTF_16, cpUs_ascii, True), cpUs_ascii) returns "3"
 Public Function Transcode(ByRef str As String, _
                           ByVal fromCodePage As CodePageIdentifier, _
                           ByVal toCodePage As CodePageIdentifier, _
@@ -849,12 +849,12 @@ End Function
 '     valid UTF-16LE string, or
 '   - the string contains codepoints that can not be represented in 'toCodePage'
 '     and will lead to the insertion of a "default character".
-'E.g.: Encode("°", cpUs_ascii, True) will raise an error, because
-'      "°" is not an ASCII character.
+'E.g.: Encode("Â°", cpUs_ascii, True) will raise an error, because
+'      "Â°" is not an ASCII character.
 'Note that even calling the function with 'raiseErrors = True' doesn't guarantee
 'that the conversion is reversible, because sometimes codepoints are replaced
 'with more generic characters that aren't the default character (raise no error)
-'E.g.: Decode(Encode("³", cpUTF_16, cpUs_ascii, True), cpUs_ascii) returns "3"
+'E.g.: Decode(Encode("Â³", cpUTF_16, cpUs_ascii, True), cpUs_ascii) returns "3"
 Public Function Encode(ByRef utf16leStr As String, _
                        ByVal toCodePage As CodePageIdentifier, _
               Optional ByVal raiseErrors As Boolean = False) As String
@@ -1727,7 +1727,7 @@ End Function
 
 #If Mac = 0 Then
 'Transcoding a VBA-native UTF-16LE encoded string to UTF-8 using ADODB.Stream
-'Much faster than EncodeUTF8native, but only available on Windows
+'Much faster than EncodeUTF8, but only available on Windows
 Public Function EncodeUTF8usingAdodbStream(ByRef utf16leStr As String) _
                                             As String
     With CreateObject("ADODB.Stream")
@@ -1744,7 +1744,7 @@ Public Function EncodeUTF8usingAdodbStream(ByRef utf16leStr As String) _
 End Function
 
 'Transcoding an UTF-8 encoded string to VBA-native UTF-16LE using ADODB.Stream
-'Faster than DeocdeUTF8native for some strings but only available on Windows
+'Faster than DeocdeUTF8 for some strings but only available on Windows
 'Warning: This function performs extremely slow for strings bigger than ~5MB
 Public Function DecodeUTF8usingAdodbStream(ByRef utf8Str As String) As String
     Dim b() As Byte: b = utf8Str
@@ -3039,7 +3039,7 @@ Public Function ReplaceMultiple(ByRef str As String, _
     'n^2 runtime complexity: https://en.wikipedia.org/wiki/Trie
     'A simple implementation of the trie algorithm has been tested, the
     'procedure is available in the test module ('ProcessFindsUsingTrie')
-    'Unfortunately it performs at least 20 times slower than the naïve approach
+    'Unfortunately it performs at least 20 times slower than the naÃ¯ve approach
     'implemented here:
     Dim i As Long, j As Long
     For i = 0 To UBound(finds)
