@@ -6,7 +6,7 @@ Attribute VB_Name = "LibStringTools"
 ' ------------------------------------------
 ' MIT License
 '
-' Copyright (c) 2023 Guido Witt-Döring
+' Copyright (c) 2023 Guido Witt-Dörring
 '
 ' Permission is hereby granted, free of charge, to any person obtaining a copy
 ' of this software and associated documentation files (the "Software"), to
@@ -40,6 +40,7 @@ Option Compare Binary
         Private Declare PtrSafe Function CopyMemory Lib "/usr/lib/libc.dylib" Alias "memmove" (Destination As Any, Source As Any, ByVal Length As LongPtr) As LongPtr
         Private Declare PtrSafe Function errno_location Lib "/usr/lib/libSystem.B.dylib" Alias "__error" () As LongPtr
         
+        'https://developer.apple.com/documentation/corefoundation/1541720-cfstringgetsystemencoding
         Private Declare PtrSafe Function CFStringGetSystemEncoding Lib "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation" () As Long
         Private Declare PtrSafe Function CFStringConvertEncodingToWindowsCodepage Lib "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation" (ByVal CFStringEncoding As Long) As Long
     #Else
@@ -55,8 +56,8 @@ Option Compare Binary
     #End If
 #Else 'Windows
     #If VBA7 Then
-        Private Declare PtrSafe Function MultiByteToWideChar Lib "kernel32" (ByVal codepage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long) As Long
-        Private Declare PtrSafe Function WideCharToMultiByte Lib "kernel32" (ByVal codepage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpDefaultChar As LongPtr, ByVal lpUsedDefaultChar As LongPtr) As Long
+        Private Declare PtrSafe Function MultiByteToWideChar Lib "kernel32" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long) As Long
+        Private Declare PtrSafe Function WideCharToMultiByte Lib "kernel32" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpDefaultChar As LongPtr, ByVal lpUsedDefaultChar As LongPtr) As Long
 
         Private Declare PtrSafe Function GetLastError Lib "kernel32" () As Long
         Private Declare PtrSafe Sub SetLastError Lib "kernel32" (ByVal dwErrCode As Long)
@@ -65,6 +66,8 @@ Option Compare Binary
         Private Declare PtrSafe Function lstrlenW Lib "kernel32" (ByVal lpString As LongPtr) As Long
         
         Private Declare PtrSafe Function GetACP Lib "kernel32" () As Long
+        
+        Private Declare PtrSafe Function GetCPInfoExW Lib "kernel32" (ByVal CodePage As Long, ByVal dwFlags As Long, lpCPInfoExW As CPINFOEXW) As Long
     #Else
         Private Declare Function MultiByteToWideChar Lib "kernel32" Alias "MultiByteToWideChar" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As Long, ByVal cchMultiByte As Long, ByVal lpWideCharStr As Long, ByVal cchWideChar As Long) As Long
         Private Declare Function WideCharToMultiByte Lib "kernel32" Alias "WideCharToMultiByte" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As Long, ByVal cchWideChar As Long, ByVal lpMultiByteStr As Long, ByVal cchMultiByte As Long, ByVal lpDefaultChar As Long, ByVal lpUsedDefaultChar As Long) As Long
@@ -76,6 +79,8 @@ Option Compare Binary
         Private Declare Function lstrlenW Lib "kernel32" (ByVal lpString As Long) As Long
         
         Private Declare Function GetACP Lib "kernel32" () As Long
+        
+        Private Declare Function GetCPInfoExW Lib "kernel32" (ByVal CodePage As Long, ByVal dwFlags As Long, lpCPInfoExW As CPINFOEXW) As Long
     #End If
 #End If
 
@@ -109,6 +114,34 @@ Private Const FADF_HAVEVARTYPE As Long = &H80
 
 Private Const BYTE_SIZE As Long = 1
 Private Const INT_SIZE As Long = 2
+
+Private Const MAX_DEFAULTCHAR = 2
+Private Const MAX_LEADBYTES = 12  '  5 ranges, 2 bytes ea., 0 term.
+Private Const MAX_PATH = 260
+
+Private Type CPINFOEXW
+    MaxCharSize As Long                    'max length (in bytes) of a character
+    defaultChar(MAX_DEFAULTCHAR - 1) As Byte ' default character (MB)
+    LeadByte(MAX_LEADBYTES - 1) As Byte      ' lead byte ranges
+    UnicodeDefaultChar(0 To 1) As Byte       ' default character (Unicode)
+    CodePage As Long                         ' code page id
+    CodePageName(MAX_PATH - 1) As Byte       ' code page name (Unicode)
+End Type
+
+Private Type CpInfo 'Custom extended CpInfo type for use in this library
+    'From CpInfoExW:
+    CodePage As Long              ' code page id
+    MaxCharSize As Long           ' max length (in bytes) of a character
+    defaultChar As String         ' default character (MB)
+    LeadByte As String            ' lead byte ranges
+    UnicodeDefaultChar As String  ' default character (Unicode)
+    CodePageName As String        ' code page name (Unicode)
+    'Extra:
+    AllowsFlags As Boolean
+    AllowsQueryReversible As Boolean
+    MacConvDescriptorName As String
+    IsInitialized As Boolean
+End Type
 
 Private Type EscapeSequence
     ueFormat As UnicodeEscapeFormat
@@ -153,6 +186,7 @@ End Type
 Dim printfSettings As StringificationSettings
 Dim printfSettingsAreInitialized As Boolean
 
+'API error codes
 Private Const WC_ERR_INVALID_CHARS As Long = &H80&
 Private Const MB_ERR_INVALID_CHARS As Long = &H8&
 
@@ -166,6 +200,9 @@ Private Const MAC_API_ERR_EINVAL As Long = 22 'Invalid argument
 Private Const MAC_API_ERR_E2BIG  As Long = 7  'Argument list too long
 
 Private Const vbErrInternalError As Long = 51
+
+'Custom error codes:
+Public Const STERROR_CPINFO_NOT_SET As Long = vbObjectError + 52
 
 Public Enum UnicodeEscapeFormat
     [_efNone] = 0
@@ -348,11 +385,17 @@ End Enum
 'Note: The documentation doesn't seem to list all codepages for which certain
 '      flags are disallowed. This can lead to 'Library implementation erroneous'
 '      errors when calling Encode, Decode or Transcode with 'raiseErrors = True'
-Private Static Function CodePageAllowsFlags(ByVal cpID As Long) As Boolean
+Private Static Function CodePageAllowsFlags(ByVal cpId As Long) As Boolean
     Dim arr(CodePageIdentifier.[_first] To CodePageIdentifier.[_last]) As Boolean
 
+    If cpId < CodePageIdentifier.[_first] _
+    Or cpId > CodePageIdentifier.[_last] Then
+        CodePageAllowsFlags = False
+        Exit Function
+    End If
+    
     If arr(CodePageIdentifier.[_first]) Then
-        CodePageAllowsFlags = arr(cpID)
+        CodePageAllowsFlags = arr(cpId)
         Exit Function
     End If
 
@@ -382,17 +425,23 @@ Private Static Function CodePageAllowsFlags(ByVal cpID As Long) As Boolean
     arr(cpGB18030) = True  'This one is definitely allowed
     arr(cpUTF_8) = True    'This one is definitely allowed
 
-    CodePageAllowsFlags = arr(cpID)
+    CodePageAllowsFlags = arr(cpId)
 End Function
 
 'According to documentation:
 'https://learn.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-widechartomultibyte
 'https://learn.microsoft.com/en-us/windows/win32/api/stringapiset/nf-stringapiset-multibytetowidechar
-Private Static Function CodePageAllowsQueryReversible(ByVal cpID As Long) As Boolean
+Private Static Function CodePageAllowsQueryReversible(ByVal cpId As Long) As Boolean
     Dim arr(CodePageIdentifier.[_first] To CodePageIdentifier.[_last]) As Boolean
 
+    If cpId < CodePageIdentifier.[_first] _
+    Or cpId > CodePageIdentifier.[_last] Then
+        CodePageAllowsQueryReversible = False
+        Exit Function
+    End If
+    
     If arr(CodePageIdentifier.[_first]) Then
-        CodePageAllowsQueryReversible = arr(cpID)
+        CodePageAllowsQueryReversible = arr(cpId)
         Exit Function
     End If
 
@@ -425,15 +474,21 @@ Private Static Function CodePageAllowsQueryReversible(ByVal cpID As Long) As Boo
     arr(cpX_iscii_gu) = False
     arr(cpX_iscii_pa) = False
 
-    CodePageAllowsQueryReversible = arr(cpID)
+    CodePageAllowsQueryReversible = arr(cpId)
 End Function
 
 'Returns an array for converting CodePageIDs to ConversionDescriptorNames
-Public Static Function ConvDescriptorName(ByVal cpID As Long) As String
+Private Static Function ConvDescriptorName(ByVal cpId As Long) As String
     Dim arr(CodePageIdentifier.[_first] To CodePageIdentifier.[_last]) As String
-
+    
+    If cpId < CodePageIdentifier.[_first] _
+    Or cpId > CodePageIdentifier.[_last] Then
+        ConvDescriptorName = StrConv("-", vbFromUnicode)
+        Exit Function
+    End If
+    
     If arr(CodePageIdentifier.[_first]) = "-" Then
-        ConvDescriptorName = StrConv(arr(cpID), vbFromUnicode)
+        ConvDescriptorName = StrConv(arr(cpId), vbFromUnicode)
         Exit Function
     End If
 
@@ -616,41 +671,1444 @@ Public Static Function ConvDescriptorName(ByVal cpID As Long) As String
 
     'The empty encoding name is equivalent to "char":
     'it denotes the locale dependent character encoding.
-    ConvDescriptorName = ConvDescriptorName(cpID)
+    ConvDescriptorName = ConvDescriptorName(cpId)
 End Function
 
-''Returns a Collection for converting ConversionDescriptorNames to CodePageIDs
-'Private Function ConvDescriptorNameToCodePage() As Collection
-'    Static c As Collection
-'
-'    If Not c Is Nothing Then
-'        Set ConvDescriptorNameToCodePage = c
-'        Exit Function
-'    End If
-'
-'    Dim cpID As Long
-'    Dim conversionDescriptor As Variant
-'    Set c = New Collection
-'
-'    On Error Resume Next
-'    For cpID = CodePageIdentifier.[_first_] To CodePageIdentifier.[_last_]
-'        conversionDescriptor = CodePageToConvDescriptorName(CStr(cpID))
-'        If conversionDescriptor <> "" Then
-'            c.Add Item:=cpID, Key:=conversionDescriptor
-'        End If
-'        conversionDescriptor = ""
-'    Next cpID
-'
-'    cpID = -1
-'    For Each conversionDescriptor In CodePageToConvDescriptorName
-'        cpID = c(conversionDescriptor)
-'        If cpID = -1 Then c.Add Item:=-1, Key:=conversionDescriptor
-'        cpID = -1
-'    Next conversionDescriptor
-'    On Error GoTo 0
-'
-'    Set ConvDescriptorNameToCodePage = c
-'End Function
+Private Function GetCpInfo(ByVal cpId As CodePageIdentifier) As CpInfo
+    Const methodName As String = "GetCpInfo"
+    Static cpInfos(CodePageIdentifier.[_first] To _
+                   CodePageIdentifier.[_last]) As CpInfo
+    
+    If cpId < CodePageIdentifier.[_first] _
+    Or cpId > CodePageIdentifier.[_last] Then
+        Exit Function
+    End If
+    
+    #If Mac Then
+        If Not cpInfos(cpId).IsInitialized Then GoSub InitializeCpInfosMac
+    #Else 'Windows
+        Dim cpi As CPINFOEXW
+        With cpInfos(cpId)
+            If Not .IsInitialized Then
+                .CodePage = cpId
+                .AllowsFlags = CodePageAllowsFlags(cpId)
+                .AllowsQueryReversible = CodePageAllowsQueryReversible(cpId)
+                .MacConvDescriptorName = ConvDescriptorName(cpId)
+                If GetCPInfoExW(cpId, 0, cpi) Then 'This is not really needed:
+                    .MaxCharSize = cpi.MaxCharSize
+                    .defaultChar = cpi.defaultChar
+                    .LeadByte = TrimX(CStr(cpi.LeadByte), vbNullChar)
+                    .UnicodeDefaultChar = cpi.UnicodeDefaultChar
+                    .CodePageName = TrimX(CStr(cpi.CodePageName), vbNullChar)
+                End If
+                .IsInitialized = True
+            End If
+        End With
+    #End If
+    GetCpInfo = cpInfos(cpId)
+    Exit Function
+    
+InitializeCpInfosMac:
+    Const errMsg As String = "CpInfoData for codepage %CP% not available. " & _
+        "You can fix this error by manually supplying the data in the Select" _
+        & " Case stement in the function " & methodName & "."
+        
+    'The following code was generated on a Windows machine by running the
+    ''GenerateGetCpInfoCode' procedure from the module 'LibStringToolsCodeGen'
+    'with manual adjustments for 1200 (UTF-16LE), 1201 (UTF-16BE),
+    '12000 (UTF-32LE), 12001 (UTF-32BE)
+    With cpInfos(cpId)
+        .CodePage = cpId
+        .AllowsFlags = CodePageAllowsFlags(cpId)
+        .AllowsQueryReversible = CodePageAllowsQueryReversible(cpId)
+        .MacConvDescriptorName = ConvDescriptorName(cpId)
+        
+        Select Case cpId
+            'cpIBM037 (37    (IBM EBCDIC - U.S./Canada))
+            Case cpIBM037
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "37    (IBM EBCDIC - U.S./Canada)"
+
+            'cpIBM437 (437   (OEM - United States))
+            Case cpIBM437
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "437   (OEM - United States)"
+
+            'cpIBM500 (500   (IBM EBCDIC - International))
+            Case cpIBM500
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "500   (IBM EBCDIC - International)"
+
+            'cpASMO_708 (708   (Arabic - ASMO))
+            Case cpASMO_708
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "708   (Arabic - ASMO)"
+
+            'cpASMO_449 ()
+            Case cpASMO_449
+                'TODO:
+                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+                          Replace(errMsg, "%CP%", cpASMO_449)
+                '.MaxCharSize =
+                '.DefaultChar = ""
+                '.LeadByte = ""
+                '.UnicodeDefaultChar = ""
+                '.CodePageName = ""
+
+            'cpTransparent_Arabic ()
+            Case cpTransparent_Arabic
+                'TODO:
+                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+                          Replace(errMsg, "%CP%", cpTransparent_Arabic)
+                '.MaxCharSize =
+                '.DefaultChar = ""
+                '.LeadByte = ""
+                '.UnicodeDefaultChar = ""
+                '.CodePageName = ""
+
+            'cpDOS_720 (720   (Arabic - Transparent ASMO))
+            Case cpDOS_720
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "720   (Arabic - Transparent ASMO)"
+
+            'cpIbm737 (737   (OEM - Greek 437G))
+            Case cpIbm737
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "737   (OEM - Greek 437G)"
+
+            'cpIbm775 (775   (OEM - Baltic))
+            Case cpIbm775
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "775   (OEM - Baltic)"
+
+            'cpIbm850 (850   (OEM - Multilingual Latin I))
+            Case cpIbm850
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "850   (OEM - Multilingual Latin I)"
+
+            'cpIbm852 (852   (OEM - Latin II))
+            Case cpIbm852
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "852   (OEM - Latin II)"
+
+            '853 ()
+            Case 853
+                'TODO:
+                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+                          Replace(errMsg, "%CP%", 853)
+                '.MaxCharSize =
+                '.DefaultChar = ""
+                '.LeadByte = ""
+                '.UnicodeDefaultChar = ""
+                '.CodePageName = ""
+
+            'cpIBM855 (855   (OEM - Cyrillic))
+            Case cpIBM855
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "855   (OEM - Cyrillic)"
+
+            'cpIbm857 (857   (OEM - Turkish))
+            Case cpIbm857
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "857   (OEM - Turkish)"
+
+            'cpIBM00858 (858   (OEM - Multilingual Latin I + Euro))
+            Case cpIBM00858
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "858   (OEM - Multilingual Latin I + Euro)"
+
+            'cpIBM860 (860   (OEM - Portuguese))
+            Case cpIBM860
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "860   (OEM - Portuguese)"
+
+            'cpIbm861 (861   (OEM - Icelandic))
+            Case cpIbm861
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "861   (OEM - Icelandic)"
+
+            'cpDOS_862 (862   (OEM - Hebrew))
+            Case cpDOS_862
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "862   (OEM - Hebrew)"
+
+            'cpIBM863 (863   (OEM - Canadian French))
+            Case cpIBM863
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "863   (OEM - Canadian French)"
+
+            'cpIBM864 (864   (OEM - Arabic))
+            Case cpIBM864
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "864   (OEM - Arabic)"
+
+            'cpIBM865 (865   (OEM - Nordic))
+            Case cpIBM865
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "865   (OEM - Nordic)"
+
+            'cpCp866 (866   (OEM - Russian))
+            Case cpCp866
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "866   (OEM - Russian)"
+
+            'cpIbm869 (869   (OEM - Modern Greek))
+            Case cpIbm869
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "869   (OEM - Modern Greek)"
+
+            'cpIBM870 (870   (IBM EBCDIC - Multilingual/ROECE (Latin-2)))
+            Case cpIBM870
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "870   (IBM EBCDIC - Multilingual/ROECE (Latin-2))"
+
+            'cpWindows_874 (874   (ANSI/OEM - Thai))
+            Case cpWindows_874
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "874   (ANSI/OEM - Thai)"
+
+            'cpCp875 (875   (IBM EBCDIC - Modern Greek))
+            Case cpCp875
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "875   (IBM EBCDIC - Modern Greek)"
+
+            'cpShift_jis (932   (ANSI/OEM - Japanese Shift-JIS))
+            Case cpShift_jis
+                .MaxCharSize = 2
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x819FE0FC")
+                .UnicodeDefaultChar = HexToString("0xFB30")
+                .CodePageName = "932   (ANSI/OEM - Japanese Shift-JIS)"
+
+            'cpGb2312 (936   (ANSI/OEM - Simplified Chinese GBK))
+            Case cpGb2312
+                .MaxCharSize = 2
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x81FE")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "936   (ANSI/OEM - Simplified Chinese GBK)"
+
+            'cpKs_c_5601_1987 (949   (ANSI/OEM - Korean))
+            Case cpKs_c_5601_1987
+                .MaxCharSize = 2
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x81FE")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "949   (ANSI/OEM - Korean)"
+
+            'cpBig5 (950   (ANSI/OEM - Traditional Chinese Big5))
+            Case cpBig5
+                .MaxCharSize = 2
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x81FE")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "950   (ANSI/OEM - Traditional Chinese Big5)"
+
+            '951 ()
+            Case 951
+                'TODO:
+                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+                          Replace(errMsg, "%CP%", 951)
+                '.MaxCharSize =
+                '.DefaultChar = ""
+                '.LeadByte = ""
+                '.UnicodeDefaultChar = ""
+                '.CodePageName = ""
+
+            'cpIBM1026 (1026  (IBM EBCDIC - Turkish (Latin-5)))
+            Case cpIBM1026
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "1026  (IBM EBCDIC - Turkish (Latin-5))"
+
+            'cpIBM01047 (1047  (IBM EBCDIC - Latin-1/Open System))
+            Case cpIBM01047
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "1047  (IBM EBCDIC - Latin-1/Open System)"
+
+            '1125 ()
+            Case 1125
+                'TODO:
+                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+                          Replace(errMsg, "%CP%", 1125)
+                '.MaxCharSize =
+                '.DefaultChar = ""
+                '.LeadByte = ""
+                '.UnicodeDefaultChar = ""
+                '.CodePageName = ""
+
+            '1133 ()
+            Case 1133
+                'TODO:
+                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+                          Replace(errMsg, "%CP%", 1133)
+                '.MaxCharSize =
+                '.DefaultChar = ""
+                '.LeadByte = ""
+                '.UnicodeDefaultChar = ""
+                '.CodePageName = ""
+
+            'cpIBM01140 (1140  (IBM EBCDIC - U.S./Canada (37 + Euro)))
+            Case cpIBM01140
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "1140  (IBM EBCDIC - U.S./Canada (37 + Euro))"
+
+            'cpIBM01141 (1141  (IBM EBCDIC - Germany (20273 + Euro)))
+            Case cpIBM01141
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "1141  (IBM EBCDIC - Germany (20273 + Euro))"
+
+            'cpIBM01142 (1142  (IBM EBCDIC - Denmark/Norway (20277 + Euro)))
+            Case cpIBM01142
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "1142  (IBM EBCDIC - Denmark/Norway (20277 + Euro))"
+
+            'cpIBM01143 (1143  (IBM EBCDIC - Finland/Sweden (20278 + Euro)))
+            Case cpIBM01143
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "1143  (IBM EBCDIC - Finland/Sweden (20278 + Euro))"
+
+            'cpIBM01144 (1144  (IBM EBCDIC - Italy (20280 + Euro)))
+            Case cpIBM01144
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "1144  (IBM EBCDIC - Italy (20280 + Euro))"
+
+            'cpIBM01145 (1145  (IBM EBCDIC - Latin America/Spain (20284 + Euro)))
+            Case cpIBM01145
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "1145  (IBM EBCDIC - Latin America/Spain (20284 + Euro))"
+
+            'cpIBM01146 (1146  (IBM EBCDIC - United Kingdom (20285 + Euro)))
+            Case cpIBM01146
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "1146  (IBM EBCDIC - United Kingdom (20285 + Euro))"
+
+            'cpIBM01147 ()
+            Case cpIBM01147
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = ""
+
+            'cpIBM01148 (1148  (IBM EBCDIC - International (500 + Euro)))
+            Case cpIBM01148
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "1148  (IBM EBCDIC - International (500 + Euro))"
+
+            'cpIBM01149 (1149  (IBM EBCDIC - Icelandic (20871 + Euro)))
+            Case cpIBM01149
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "1149  (IBM EBCDIC - Icelandic (20871 + Euro))"
+
+            'cpUTF_16 ()
+            Case cpUTF_16
+'                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+'                          Replace(errMsg, "%CP%", cpUTF_16)
+                .MaxCharSize = 4
+                .defaultChar = "?"
+                .LeadByte = ""
+                .UnicodeDefaultChar = HexToString("0xFDFF")
+                .CodePageName = "1200 (UTF-16LE)"
+
+            'cpUnicodeFFFE ()
+            Case cpUnicodeFFFE
+'                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+'                          Replace(errMsg, "%CP%", cpUnicodeFFFE)
+                .MaxCharSize = 4
+                .defaultChar = "?"
+                .LeadByte = ""
+                .UnicodeDefaultChar = HexToString("0xFDFF")
+                .CodePageName = "1201 (UTF-16BE)"
+
+            'cpWindows_1250 (1250  (ANSI - Central Europe))
+            Case cpWindows_1250
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "1250  (ANSI - Central Europe)"
+
+            'cpWindows_1251 (1251  (ANSI - Cyrillic))
+            Case cpWindows_1251
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "1251  (ANSI - Cyrillic)"
+
+            'cpWindows_1252 (1252  (ANSI - Latin I))
+            Case cpWindows_1252
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "1252  (ANSI - Latin I)"
+
+            'cpWindows_1253 (1253  (ANSI - Greek))
+            Case cpWindows_1253
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "1253  (ANSI - Greek)"
+
+            'cpWindows_1254 (1254  (ANSI - Turkish))
+            Case cpWindows_1254
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "1254  (ANSI - Turkish)"
+
+            'cpWindows_1255 (1255  (ANSI - Hebrew))
+            Case cpWindows_1255
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "1255  (ANSI - Hebrew)"
+
+            'cpWindows_1256 (1256  (ANSI - Arabic))
+            Case cpWindows_1256
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "1256  (ANSI - Arabic)"
+
+            'cpWindows_1257 (1257  (ANSI - Baltic))
+            Case cpWindows_1257
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "1257  (ANSI - Baltic)"
+
+            'cpWindows_1258 (1258  (ANSI/OEM - Viet Nam))
+            Case cpWindows_1258
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "1258  (ANSI/OEM - Viet Nam)"
+
+            'cpJohab (1361  (Korean - Johab))
+            Case cpJohab
+                .MaxCharSize = 2
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x84D3D8DEE0F9")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "1361  (Korean - Johab)"
+
+            'cpMacintosh (10000 (MAC - Roman))
+            Case cpMacintosh
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "10000 (MAC - Roman)"
+
+            'cpX_mac_japanese (10001 (MAC - Japanese))
+            Case cpX_mac_japanese
+                .MaxCharSize = 2
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x819FE0FC")
+                .UnicodeDefaultChar = HexToString("0xFB30")
+                .CodePageName = "10001 (MAC - Japanese)"
+
+            'cpX_mac_chinesetrad (10002 (MAC - Traditional Chinese Big5))
+            Case cpX_mac_chinesetrad
+                .MaxCharSize = 2
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x81FC")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "10002 (MAC - Traditional Chinese Big5)"
+
+            'cpX_mac_korean (10003 (MAC - Korean))
+            Case cpX_mac_korean
+                .MaxCharSize = 2
+                .defaultChar = "?"
+                .LeadByte = HexToString("0xA1ACB0C8CAFD")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "10003 (MAC - Korean)"
+
+            'cpX_mac_arabic (10004 (MAC - Arabic))
+            Case cpX_mac_arabic
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "10004 (MAC - Arabic)"
+
+            'cpX_mac_hebrew (10005 (MAC - Hebrew))
+            Case cpX_mac_hebrew
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "10005 (MAC - Hebrew)"
+
+            'cpX_mac_greek (10006 (MAC - Greek I))
+            Case cpX_mac_greek
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "10006 (MAC - Greek I)"
+
+            'cpX_mac_cyrillic (10007 (MAC - Cyrillic))
+            Case cpX_mac_cyrillic
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "10007 (MAC - Cyrillic)"
+
+            'cpX_mac_chinesesimp (10008 (MAC - Simplified Chinese GB 2312))
+            Case cpX_mac_chinesesimp
+                .MaxCharSize = 2
+                .defaultChar = "?"
+                .LeadByte = HexToString("0xA1A9B0F7")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "10008 (MAC - Simplified Chinese GB 2312)"
+
+            'cpX_mac_romanian (10010 (MAC - Romania))
+            Case cpX_mac_romanian
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "10010 (MAC - Romania)"
+
+            'cpX_mac_ukrainian (10017 (MAC - Ukraine))
+            Case cpX_mac_ukrainian
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "10017 (MAC - Ukraine)"
+
+            'cpX_mac_thai (10021 (MAC - Thai))
+            Case cpX_mac_thai
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "10021 (MAC - Thai)"
+
+            'cpX_mac_ce (10029 (MAC - Latin II))
+            Case cpX_mac_ce
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "10029 (MAC - Latin II)"
+
+            'cpX_mac_icelandic (10079 (MAC - Icelandic))
+            Case cpX_mac_icelandic
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "10079 (MAC - Icelandic)"
+
+            'cpX_mac_turkish (10081 (MAC - Turkish))
+            Case cpX_mac_turkish
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "10081 (MAC - Turkish)"
+
+            'cpX_mac_croatian (10082 (MAC - Croatia))
+            Case cpX_mac_croatian
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "10082 (MAC - Croatia)"
+
+            'cpUTF_32 ()
+            Case cpUTF_32
+                'Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+                          Replace(errMsg, "%CP%", cpUTF_32)
+                .MaxCharSize = 4
+                .defaultChar = "?"
+                .LeadByte = ""
+                .UnicodeDefaultChar = HexToString("0xFDFF")
+                .CodePageName = "12000 (UTF-32LE)"
+
+            'cpUTF_32BE ()
+            Case cpUTF_32BE
+'                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+'                          Replace(errMsg, "%CP%", cpUTF_32BE)
+                .MaxCharSize = 4
+                .defaultChar = "?"
+                .LeadByte = ""
+                .UnicodeDefaultChar = HexToString("0xFDFF")
+                .CodePageName = "12001 (UTF-32BE)"
+
+            'cpX_Chinese_CNS (20000 (CNS - Taiwan))
+            Case cpX_Chinese_CNS
+                .MaxCharSize = 2
+                .defaultChar = "?"
+                .LeadByte = HexToString("0xA1FE")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20000 (CNS - Taiwan)"
+
+            'cpX_cp20001 (20001 (TCA - Taiwan))
+            Case cpX_cp20001
+                .MaxCharSize = 2
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x818491D8DFFC")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20001 (TCA - Taiwan)"
+
+            'cpX_Chinese_Eten (20002 (Eten - Taiwan))
+            Case cpX_Chinese_Eten
+                .MaxCharSize = 2
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x81AFDDFE")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20002 (Eten - Taiwan)"
+
+            'cpX_cp20003 (20003 (IBM5550 - Taiwan))
+            Case cpX_cp20003
+                .MaxCharSize = 2
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x8184878789E8F9FB")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20003 (IBM5550 - Taiwan)"
+
+            'cpX_cp20004 (20004 (TeleText - Taiwan))
+            Case cpX_cp20004
+                .MaxCharSize = 2
+                .defaultChar = "?"
+                .LeadByte = HexToString("0xA1FE")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20004 (TeleText - Taiwan)"
+
+            'cpX_cp20005 (20005 (Wang - Taiwan))
+            Case cpX_cp20005
+                .MaxCharSize = 2
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x8DF5F9FC")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20005 (Wang - Taiwan)"
+
+            'cpX_IA5 (20105 (IA5 IRV International Alphabet No.5))
+            Case cpX_IA5
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20105 (IA5 IRV International Alphabet No.5)"
+
+            'cpX_IA5_German (20106 (IA5 German))
+            Case cpX_IA5_German
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20106 (IA5 German)"
+
+            'cpX_IA5_Swedish (20107 (IA5 Swedish))
+            Case cpX_IA5_Swedish
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20107 (IA5 Swedish)"
+
+            'cpX_IA5_Norwegian (20108 (IA5 Norwegian))
+            Case cpX_IA5_Norwegian
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20108 (IA5 Norwegian)"
+
+            'cpUs_ascii (20127 (US-ASCII))
+            Case cpUs_ascii
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20127 (US-ASCII)"
+
+            'cpX_cp20261 (20261 (T.61))
+            Case cpX_cp20261
+                .MaxCharSize = 2
+                .defaultChar = "?"
+                .LeadByte = HexToString("0xC1CF")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20261 (T.61)"
+
+            'cpX_cp20269 (20269 (ISO 6937 Non-Spacing Accent))
+            Case cpX_cp20269
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20269 (ISO 6937 Non-Spacing Accent)"
+
+            'cpIBM273 (20273 (IBM EBCDIC - Germany))
+            Case cpIBM273
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20273 (IBM EBCDIC - Germany)"
+
+            'cpIBM277 (20277 (IBM EBCDIC - Denmark/Norway))
+            Case cpIBM277
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20277 (IBM EBCDIC - Denmark/Norway)"
+
+            'cpIBM278 (20278 (IBM EBCDIC - Finland/Sweden))
+            Case cpIBM278
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20278 (IBM EBCDIC - Finland/Sweden)"
+
+            'cpIBM280 (20280 (IBM EBCDIC - Italy))
+            Case cpIBM280
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20280 (IBM EBCDIC - Italy)"
+
+            'cpIBM284 (20284 (IBM EBCDIC - Latin America/Spain))
+            Case cpIBM284
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20284 (IBM EBCDIC - Latin America/Spain)"
+
+            'cpIBM285 (20285 (IBM EBCDIC - United Kingdom))
+            Case cpIBM285
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20285 (IBM EBCDIC - United Kingdom)"
+
+            'cpIBM290 (20290 (IBM EBCDIC - Japanese Katakana Extended))
+            Case cpIBM290
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20290 (IBM EBCDIC - Japanese Katakana Extended)"
+
+            'cpIBM297 (20297 (IBM EBCDIC - France))
+            Case cpIBM297
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20297 (IBM EBCDIC - France)"
+
+            'cpIBM420 (20420 (IBM EBCDIC - Arabic))
+            Case cpIBM420
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20420 (IBM EBCDIC - Arabic)"
+
+            'cpIBM423 (20423 (IBM EBCDIC - Greek))
+            Case cpIBM423
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20423 (IBM EBCDIC - Greek)"
+
+            'cpIBM424 (20424 (IBM EBCDIC - Hebrew))
+            Case cpIBM424
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20424 (IBM EBCDIC - Hebrew)"
+
+            'cpX_EBCDIC_KoreanExtended (20833 (IBM EBCDIC - Korean Extended))
+            Case cpX_EBCDIC_KoreanExtended
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20833 (IBM EBCDIC - Korean Extended)"
+
+            'cpIBM_Thai (20838 (IBM EBCDIC - Thai))
+            Case cpIBM_Thai
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20838 (IBM EBCDIC - Thai)"
+
+            'cpKoi8_r (20866 (Russian - KOI8))
+            Case cpKoi8_r
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20866 (Russian - KOI8)"
+
+            'cpIBM871 (20871 (IBM EBCDIC - Icelandic))
+            Case cpIBM871
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20871 (IBM EBCDIC - Icelandic)"
+
+            'cpIBM880 (20880 (IBM EBCDIC - Cyrillic (Russian)))
+            Case cpIBM880
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20880 (IBM EBCDIC - Cyrillic (Russian))"
+
+            'cpIBM905 (20905 (IBM EBCDIC - Turkish))
+            Case cpIBM905
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20905 (IBM EBCDIC - Turkish)"
+
+            'cpIBM00924 (20924 (IBM EBCDIC - Latin-1/Open System (1047 + Euro)))
+            Case cpIBM00924
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20924 (IBM EBCDIC - Latin-1/Open System (1047 + Euro))"
+
+            'cpEuc_jp (20932 (JIS X 0208-1990 & 0212-1990))
+            Case cpEuc_jp
+                .MaxCharSize = 2
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x8E8EA1FE")
+                .UnicodeDefaultChar = HexToString("0xFB30")
+                .CodePageName = "20932 (JIS X 0208-1990 & 0212-1990)"
+
+            'cpX_cp20936 (20936 (Simplified Chinese GB2312))
+            Case cpX_cp20936
+                .MaxCharSize = 2
+                .defaultChar = "?"
+                .LeadByte = HexToString("0xA1A9B0F7")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "20936 (Simplified Chinese GB2312)"
+
+            'cpX_cp20949 ()
+            Case cpX_cp20949
+                .MaxCharSize = 2
+                .defaultChar = "?"
+                .LeadByte = HexToString("0xA1ACB0C8CAFD")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = ""
+
+            'cpCp1025 (21025 (IBM EBCDIC - Cyrillic (Serbian, Bulgarian)))
+            Case cpCp1025
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "21025 (IBM EBCDIC - Cyrillic (Serbian, Bulgarian))"
+
+            'cpDeprecated (21027 (Ext Alpha Lowercase))
+            Case cpDeprecated
+                .MaxCharSize = 1
+                .defaultChar = "o"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "21027 (Ext Alpha Lowercase)"
+
+            'cpKoi8_u (21866 (Ukrainian - KOI8-U))
+            Case cpKoi8_u
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "21866 (Ukrainian - KOI8-U)"
+
+            'cpIso_8859_1 (28591 (ISO 8859-1 Latin I))
+            Case cpIso_8859_1
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "28591 (ISO 8859-1 Latin I)"
+
+            'cpIso_8859_2 (28592 (ISO 8859-2 Central Europe))
+            Case cpIso_8859_2
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "28592 (ISO 8859-2 Central Europe)"
+
+            'cpIso_8859_3 (28593 (ISO 8859-3 Latin 3))
+            Case cpIso_8859_3
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "28593 (ISO 8859-3 Latin 3)"
+
+            'cpIso_8859_4 (28594 (ISO 8859-4 Baltic))
+            Case cpIso_8859_4
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "28594 (ISO 8859-4 Baltic)"
+
+            'cpIso_8859_5 (28595 (ISO 8859-5 Cyrillic))
+            Case cpIso_8859_5
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "28595 (ISO 8859-5 Cyrillic)"
+
+            'cpIso_8859_6 (28596 (ISO 8859-6 Arabic))
+            Case cpIso_8859_6
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "28596 (ISO 8859-6 Arabic)"
+
+            'cpIso_8859_7 (28597 (ISO 8859-7 Greek))
+            Case cpIso_8859_7
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "28597 (ISO 8859-7 Greek)"
+
+            'cpIso_8859_8 (28598 (ISO 8859-8 Hebrew: Visual Ordering))
+            Case cpIso_8859_8
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "28598 (ISO 8859-8 Hebrew: Visual Ordering)"
+
+            'cpIso_8859_9 (28599 (ISO 8859-9 Latin 5))
+            Case cpIso_8859_9
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "28599 (ISO 8859-9 Latin 5)"
+
+            '28600 ()
+            Case 28600
+                'TODO:
+                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+                          Replace(errMsg, "%CP%", 28600)
+                '.MaxCharSize =
+                '.DefaultChar = ""
+                '.LeadByte = ""
+                '.UnicodeDefaultChar = ""
+                '.CodePageName = ""
+
+            'cpIso_8859_13 (28603 (ISO 8859-13 Latin 7))
+            Case cpIso_8859_13
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "28603 (ISO 8859-13 Latin 7)"
+
+            '28604 ()
+            Case 28604
+                'TODO:
+                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+                          Replace(errMsg, "%CP%", 28604)
+                '.MaxCharSize =
+                '.DefaultChar = ""
+                '.LeadByte = ""
+                '.UnicodeDefaultChar = ""
+                '.CodePageName = ""
+
+            'cpIso_8859_15 (28605 (ISO 8859-15 Latin 9))
+            Case cpIso_8859_15
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "28605 (ISO 8859-15 Latin 9)"
+
+            '28606 ()
+            Case 28606
+                'TODO:
+                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+                          Replace(errMsg, "%CP%", 28606)
+                '.MaxCharSize =
+                '.DefaultChar = ""
+                '.LeadByte = ""
+                '.UnicodeDefaultChar = ""
+                '.CodePageName = ""
+
+            'cpX_Europa ()
+            Case cpX_Europa
+                'TODO:
+                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+                          Replace(errMsg, "%CP%", cpX_Europa)
+                '.MaxCharSize =
+                '.DefaultChar = ""
+                '.LeadByte = ""
+                '.UnicodeDefaultChar = ""
+                '.CodePageName = ""
+
+            'cpIso_8859_8_i (38598 (ISO 8859-8 Hebrew: Logical Ordering))
+            Case cpIso_8859_8_i
+                .MaxCharSize = 1
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "38598 (ISO 8859-8 Hebrew: Logical Ordering)"
+
+            'cpIso_2022_jp (50220 (ISO-2022 Japanese with no halfwidth Katakana))
+            Case cpIso_2022_jp
+                .MaxCharSize = 5
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "50220 (ISO-2022 Japanese with no halfwidth Katakana)"
+
+            'cpCsISO2022JP (50221 (ISO-2022 Japanese with halfwidth Katakana))
+            Case cpCsISO2022JP
+                .MaxCharSize = 5
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "50221 (ISO-2022 Japanese with halfwidth Katakana)"
+
+            'cpIso_2022_jp_w_1b_Kana (50222 (ISO-2022 Japanese JIS X 0201-1989))
+            Case cpIso_2022_jp_w_1b_Kana
+                .MaxCharSize = 5
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "50222 (ISO-2022 Japanese JIS X 0201-1989)"
+
+            'cpIso_2022_kr (50225 (ISO-2022 Korean))
+            Case cpIso_2022_kr
+                .MaxCharSize = 5
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "50225 (ISO-2022 Korean)"
+
+            'cpX_cp50227 (50227 (ISO-2022 Simplified Chinese))
+            Case cpX_cp50227
+                .MaxCharSize = 5
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "50227 (ISO-2022 Simplified Chinese)"
+
+            'cpISO_2022_Trad_Chinese (50229 (ISO-2022 Traditional Chinese))
+            Case cpISO_2022_Trad_Chinese
+                .MaxCharSize = 5
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "50229 (ISO-2022 Traditional Chinese)"
+
+            'cpEBCDIC_Jap_Katakana_Ext ()
+            Case cpEBCDIC_Jap_Katakana_Ext
+                'TODO:
+                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+                          Replace(errMsg, "%CP%", cpEBCDIC_Jap_Katakana_Ext)
+                '.MaxCharSize =
+                '.DefaultChar = ""
+                '.LeadByte = ""
+                '.UnicodeDefaultChar = ""
+                '.CodePageName = ""
+
+            'cpEBCDIC_US_Can_and_Jap ()
+            Case cpEBCDIC_US_Can_and_Jap
+                'TODO:
+                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+                          Replace(errMsg, "%CP%", cpEBCDIC_US_Can_and_Jap)
+                '.MaxCharSize =
+                '.DefaultChar = ""
+                '.LeadByte = ""
+                '.UnicodeDefaultChar = ""
+                '.CodePageName = ""
+
+            'cpEBCDIC_Kor_Ext_and_Kor ()
+            Case cpEBCDIC_Kor_Ext_and_Kor
+                'TODO:
+                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+                          Replace(errMsg, "%CP%", cpEBCDIC_Kor_Ext_and_Kor)
+                '.MaxCharSize =
+                '.DefaultChar = ""
+                '.LeadByte = ""
+                '.UnicodeDefaultChar = ""
+                '.CodePageName = ""
+
+            'cpEBCDIC_Simp_Chin_Ext ()
+            Case cpEBCDIC_Simp_Chin_Ext
+                'TODO:
+                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+                          Replace(errMsg, "%CP%", cpEBCDIC_Simp_Chin_Ext)
+                '.MaxCharSize =
+                '.DefaultChar = ""
+                '.LeadByte = ""
+                '.UnicodeDefaultChar = ""
+                '.CodePageName = ""
+
+            'cpEBCDIC_Simp_Chin ()
+            Case cpEBCDIC_Simp_Chin
+                'TODO:
+                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+                          Replace(errMsg, "%CP%", cpEBCDIC_Simp_Chin)
+                '.MaxCharSize =
+                '.DefaultChar = ""
+                '.LeadByte = ""
+                '.UnicodeDefaultChar = ""
+                '.CodePageName = ""
+
+            'cpEBCDIC_US_Can_Trad_Chin ()
+            Case cpEBCDIC_US_Can_Trad_Chin
+                'TODO:
+                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+                          Replace(errMsg, "%CP%", cpEBCDIC_US_Can_Trad_Chin)
+                '.MaxCharSize =
+                '.DefaultChar = ""
+                '.LeadByte = ""
+                '.UnicodeDefaultChar = ""
+                '.CodePageName = ""
+
+            'cpEBCDIC_Jap_Latin_Ext ()
+            Case cpEBCDIC_Jap_Latin_Ext
+                'TODO:
+                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+                          Replace(errMsg, "%CP%", cpEBCDIC_Jap_Latin_Ext)
+                '.MaxCharSize =
+                '.DefaultChar = ""
+                '.LeadByte = ""
+                '.UnicodeDefaultChar = ""
+                '.CodePageName = ""
+
+            'euc_jp ()
+            Case euc_jp
+                'TODO:
+                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+                          Replace(errMsg, "%CP%", euc_jp)
+                '.MaxCharSize =
+                '.DefaultChar = ""
+                '.LeadByte = ""
+                '.UnicodeDefaultChar = ""
+                '.CodePageName = ""
+
+            'cpEUC_CN ()
+            Case cpEUC_CN
+                'TODO:
+                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+                          Replace(errMsg, "%CP%", cpEUC_CN)
+                '.MaxCharSize =
+                '.DefaultChar = ""
+                '.LeadByte = ""
+                '.UnicodeDefaultChar = ""
+                '.CodePageName = ""
+
+            'cpEuc_kr (51949 (EUC-Korean))
+            Case cpEuc_kr
+                .MaxCharSize = 2
+                .defaultChar = "?"
+                .LeadByte = HexToString("0xA1ACB0C8CAFD")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "51949 (EUC-Korean)"
+
+            'cpEUC_Traditional_Chinese ()
+            Case cpEUC_Traditional_Chinese
+                'TODO:
+                Err.Raise STERROR_CPINFO_NOT_SET, methodName, _
+                          Replace(errMsg, "%CP%", cpEUC_Traditional_Chinese)
+                '.MaxCharSize =
+                '.DefaultChar = ""
+                '.LeadByte = ""
+                '.UnicodeDefaultChar = ""
+                '.CodePageName = ""
+
+            'cpHz_gb_2312 (52936 (HZ-GB2312 Simplified Chinese))
+            Case cpHz_gb_2312
+                .MaxCharSize = 5
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "52936 (HZ-GB2312 Simplified Chinese)"
+
+            'cpGB18030 (54936 (GB18030 Simplified Chinese))
+            Case cpGB18030
+                .MaxCharSize = 4
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "54936 (GB18030 Simplified Chinese)"
+
+            'cpSMS_GSM_7bit (55000 (SMS GSM 7bit))
+            Case cpSMS_GSM_7bit
+                .MaxCharSize = 2
+                .defaultChar = " "
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "55000 (SMS GSM 7bit)"
+
+            'cpSMS_GSM_7bit_Spanish (55001 (SMS GSM 7bit Spanish))
+            Case cpSMS_GSM_7bit_Spanish
+                .MaxCharSize = 2
+                .defaultChar = " "
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "55001 (SMS GSM 7bit Spanish)"
+
+            'cpSMS_GSM_7bit_Portuguese (55002 (SMS GSM 7bit Portuguese))
+            Case cpSMS_GSM_7bit_Portuguese
+                .MaxCharSize = 2
+                .defaultChar = " "
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "55002 (SMS GSM 7bit Portuguese)"
+
+            'cpSMS_GSM_7bit_Turkish (55003 (SMS GSM 7bit Turkish))
+            Case cpSMS_GSM_7bit_Turkish
+                .MaxCharSize = 2
+                .defaultChar = " "
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "55003 (SMS GSM 7bit Turkish)"
+
+            'cpSMS_GSM_7bit_Greek (55004 (SMS GSM 7bit Greek))
+            Case cpSMS_GSM_7bit_Greek
+                .MaxCharSize = 2
+                .defaultChar = " "
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "55004 (SMS GSM 7bit Greek)"
+
+            'cpX_iscii_de (57002 (ISCII - Devanagari))
+            Case cpX_iscii_de
+                .MaxCharSize = 4
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "57002 (ISCII - Devanagari)"
+
+            'cpX_iscii_be (57003 (ISCII - Bangla))
+            Case cpX_iscii_be
+                .MaxCharSize = 4
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "57003 (ISCII - Bangla)"
+
+            'cpX_iscii_ta (57004 (ISCII - Tamil))
+            Case cpX_iscii_ta
+                .MaxCharSize = 4
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "57004 (ISCII - Tamil)"
+
+            'cpX_iscii_te (57005 (ISCII - Telugu))
+            Case cpX_iscii_te
+                .MaxCharSize = 4
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "57005 (ISCII - Telugu)"
+
+            'cpX_iscii_as (57006 (ISCII - Assamese))
+            Case cpX_iscii_as
+                .MaxCharSize = 4
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "57006 (ISCII - Assamese)"
+
+            'cpX_iscii_or (57007 (ISCII - Odia (Oriya)))
+            Case cpX_iscii_or
+                .MaxCharSize = 4
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "57007 (ISCII - Odia (Oriya))"
+
+            'cpX_iscii_ka (57008 (ISCII - Kannada))
+            Case cpX_iscii_ka
+                .MaxCharSize = 4
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "57008 (ISCII - Kannada)"
+
+            'cpX_iscii_ma (57009 (ISCII - Malayalam))
+            Case cpX_iscii_ma
+                .MaxCharSize = 4
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "57009 (ISCII - Malayalam)"
+
+            'cpX_iscii_gu (57010 (ISCII - Gujarati))
+            Case cpX_iscii_gu
+                .MaxCharSize = 4
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "57010 (ISCII - Gujarati)"
+
+            'cpX_iscii_pa (57011 (ISCII - Punjabi (Gurmukhi)))
+            Case cpX_iscii_pa
+                .MaxCharSize = 4
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0x3F00")
+                .CodePageName = "57011 (ISCII - Punjabi (Gurmukhi))"
+
+            'cpUTF_7 (65000 (UTF-7))
+            Case cpUTF_7
+                .MaxCharSize = 5
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0xFDFF")
+                .CodePageName = "65000 (UTF-7)"
+
+            'cpUTF_8 (65001 (UTF-8))
+            Case cpUTF_8
+                .MaxCharSize = 4
+                .defaultChar = "?"
+                .LeadByte = HexToString("0x")
+                .UnicodeDefaultChar = HexToString("0xFDFF")
+                .CodePageName = "65001 (UTF-8)"
+        End Select
+        
+        .IsInitialized = True
+    End With
+    Return
+End Function
 
 Private Function GetApiErrorNumber() As Long
     #If Mac Then
@@ -690,6 +2148,19 @@ End Function
 
 'This function attempts to transcode 'str' from codepage 'fromCodePage' to
 'codepage 'toCodePage' using the appropriate API functions on the platform.
+'Calling this function with 'raiseErrors = False' will:
+'   - If 'customDefaultChar = ""':
+'         Replace all occurrences of invalid bytes in the input string with the
+'         so-called standard-default-character of the target codepage in the
+'         output. This character is usually a "?" but could also be something
+'         else.
+'   - If 'customDefaultChar' is any other character:
+'         Replace all occurrences of invalid bytes in the input string with the
+'         character specified in 'customDefaultChar' in the target codepage in
+'         the output.
+'   Note: This override of the standard-default-character does NOT work for the
+'         target codepages UTF-8 and UTF-16, here U+FFFD will always be used,
+'         regardless of the value of 'customDefaultChar'
 'Calling it with 'raiseErrors = True' will raise an error if either:
 '   - the string 'str' contains byte sequences that do not represent a valid
 '     string of codepage 'fromCodePage', or
@@ -704,37 +2175,59 @@ End Function
 Public Function Transcode(ByRef str As String, _
                           ByVal fromCodePage As CodePageIdentifier, _
                           ByVal toCodePage As CodePageIdentifier, _
-                 Optional ByVal raiseErrors As Boolean = False) As String
+                 Optional ByVal raiseErrors As Boolean = False, _
+                 Optional ByVal customDefaultChar As String = vbNullString) _
+                          As String
     Const methodName As String = "Transcode"
     'https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/iconv.3.html
+    If Not (LenB(customDefaultChar) = 2 Or LenB(customDefaultChar) = 0) Then _
+        Err.Raise 5, methodName, "'customDefaultChar' must of length 1."
+        
     #If Mac Then
+        Dim cpi As CpInfo:           cpi = GetCpInfo(toCodePage)
         Dim inBytesLeft As LongPtr:  inBytesLeft = LenB(str)
-        Dim outBytesLeft As LongPtr: outBytesLeft = inBytesLeft * 4
-        Dim buffer As String:        buffer = Space$(CLng(inBytesLeft) * 2)
+        Dim outBytesLeft As LongPtr: outBytesLeft = inBytesLeft * cpi.MaxCharSize
+        Dim cd As LongPtr: cd = GetConversionDescriptor(fromCodePage, toCodePage)
+        Dim buffer As String
+        buffer = Space$((CLng(inBytesLeft) * cpi.MaxCharSize + 1) \ 2)
         Dim inBuf As LongPtr:        inBuf = StrPtr(str)
         Dim outBuf As LongPtr:       outBuf = StrPtr(buffer)
-        Dim cd As LongPtr: cd = GetConversionDescriptor(fromCodePage, toCodePage)
-        Dim irrevConvCount As Long
-        Dim replacementChar As String
+        Dim irrevConvCount As LongPtr
+        Dim defaultChar As String
 
         Do While inBytesLeft > 0
             SetApiErrorNumber 0
             irrevConvCount = iconv(cd, inBuf, inBytesLeft, outBuf, outBytesLeft)
 
             If irrevConvCount = -1 Then 'Error occurred
-                If StrPtr(replacementChar) = 0 Then _
-                    replacementChar = GetReplacementCharForCodePage(toCodePage)
-
+                If defaultChar <> vbNullString Then
+                    If toCodePage = cpUTF_16 Then
+                        defaultChar = HexToString("0xFDFF")
+                    ElseIf toCodePage = cpUTF_8 Then
+                        defaultChar = Encode(HexToString("0xFDFF"), cpUTF_8, _
+                                             False, vbNullString)
+                    ElseIf customDefaultChar <> vbNullString Then
+                        defaultChar = Encode(customDefaultChar, toCodePage, _
+                                             False, vbNullString)
+                    Else
+                        defaultChar = Encode(cpi.UnicodeDefaultChar, toCodePage, _
+                                             False, vbNullString)
+                    End If
+                    If defaultChar = vbNullString Then _
+                        Err.Raise vbErrInternalError, methodName, _
+                            "Invalid default character specified by library! " _
+                             & "Library implementation erroneous!"
+                End If
                 Select Case GetApiErrorNumber
                     Case MAC_API_ERR_EILSEQ
                         If raiseErrors Then Err.Raise 5, methodName, _
                             "Input is invalid byte sequence of " & _
                             "CodePage " & fromCodePage
 
-                        CopyMemory ByVal outBuf, replacementChar(0), _
-                                   LenB(replacementChar)
-                        outBuf = outBuf + LenB(replacementChar)
-                        outBytesLeft = outBytesLeft - LenB(replacementChar)
+                        CopyMemory ByVal outBuf, StrPtr(defaultChar), _
+                                   LenB(defaultChar)
+                        outBuf = outBuf + LenB(defaultChar)
+                        outBytesLeft = outBytesLeft - LenB(defaultChar)
                         inBuf = inBuf + 1
                         inBytesLeft = inBytesLeft - 1
                     Case MAC_API_ERR_EINVAL
@@ -742,8 +2235,8 @@ Public Function Transcode(ByRef str As String, _
                             "Input is incomplete byte sequence of" & _
                             "CodePage " & fromCodePage
 
-                        CopyMemory ByVal outBuf, replacementChar(0), _
-                                   LenB(replacementChar)
+                        CopyMemory ByVal outBuf, StrPtr(defaultChar), _
+                                   LenB(defaultChar)
                         outBuf = outBuf + outBytesLeft
                         inBuf = inBuf + inBytesLeft
                         outBytesLeft = 0
@@ -758,16 +2251,18 @@ Public Function Transcode(ByRef str As String, _
         Transcode = LeftB$(buffer, LenB(buffer) - CLng(outBytesLeft))
 
         'These errors are bugs and should be raised even if raiseErrors = False:
-        Select Case GetApiErrorNumber
-            Case MAC_API_ERR_E2BIG
-                Err.Raise vbErrInternalError, methodName, _
-                    "Output buffer overrun while transcoding from CodePage " _
-                    & fromCodePage & " to CodePage " & toCodePage
-            Case Is <> 0
-                Err.Raise vbErrInternalError, methodName, "Unknown error " & _
-                    "occurred during transcoding with 'iconv'. API Error" & _
-                    "Code: " & GetApiErrorNumber
-        End Select
+        'For some reason GetApiErrorNumber sometimes seems to return something
+        'that has nothing to do with this library, therefore skip this for now
+'        Select Case GetApiErrorNumber
+'            Case MAC_API_ERR_E2BIG
+'                Err.Raise vbErrInternalError, methodName, _
+'                    "Output buffer overrun while transcoding from CodePage " _
+'                    & fromCodePage & " to CodePage " & toCodePage
+'            Case Is <> 0
+'                Err.Raise vbErrInternalError, methodName, "Unknown error " & _
+'                    "occurred during transcoding with 'iconv'. API Error" & _
+'                    "Code: " & GetApiErrorNumber
+'        End Select
         If iconv_close(cd) <> 0 Then
             Err.Raise vbErrInternalError, methodName, "Unknown error occurred" _
                 & " when calling 'iconv_close'. API ErrorCode: " & _
@@ -777,10 +2272,10 @@ Public Function Transcode(ByRef str As String, _
         If toCodePage = cpUTF_16 Then
             Transcode = Decode(str, fromCodePage, raiseErrors)
         ElseIf fromCodePage = cpUTF_16 Then
-            Transcode = Encode(str, toCodePage, raiseErrors)
+            Transcode = Encode(str, toCodePage, raiseErrors, customDefaultChar)
         Else
             Transcode = Encode(Decode(str, fromCodePage, raiseErrors), _
-                               toCodePage, raiseErrors)
+                               toCodePage, raiseErrors, customDefaultChar)
         End If
     #End If
 End Function
@@ -789,6 +2284,7 @@ End Function
 Private Function GetConversionDescriptor( _
                             ByVal fromCodePage As CodePageIdentifier, _
                             ByVal toCodePage As CodePageIdentifier) As LongPtr
+    Const methodName As String = "GetConversionDescriptor"
     Dim toCpCdName As String:   toCpCdName = ConvDescriptorName(toCodePage)
     Dim fromCpCdName As String: fromCpCdName = ConvDescriptorName(fromCodePage)
     'Todo: potentially implement custom error numbers
@@ -798,9 +2294,9 @@ Private Function GetConversionDescriptor( _
         "No conversion descriptor name assigned to CodePage " & fromCodePage
 
     SetApiErrorNumber 0  'Clear previous errors
-    GetConversionDescriptor = iconv_open(StrPtr(toCpCdName), StrPtr(fromCodePage))
+    GetConversionDescriptor = iconv_open(StrPtr(toCpCdName), StrPtr(fromCpCdName))
 
-    If Not GetConversionDescriptor Then
+    If GetConversionDescriptor = -1 Then
         Select Case GetApiErrorNumber
             Case MAC_API_ERR_EINVAL
                 Err.Raise 5, methodName, "The conversion from CodePage " & _
@@ -815,36 +2311,22 @@ Private Function GetConversionDescriptor( _
 End Function
 #End If
 
-#If Mac Then
-'On Mac, replacement character must be manually inserted when using iconv
-Private Function GetReplacementCharForCodePage( _
-                                    ByVal cpID As CodePageIdentifier) As String
-    Static replacementChars As collection
-    If replacementChars Is Nothing Then Set replacementChars = New collection
-    On Error GoTo 0
-    On Error Resume Next
-    GetReplacementCharForCodePage = replacementChars(CStr(cpID))
-    If Err.Number = 0 Then
-        On Error GoTo 0
-        Exit Function
-    End If
-    On Error GoTo 0
-
-    ' U+FFFD (0xEF 0xBF 0xBD) in UTF-8
-    Dim ReplacementCharUtf8() As Byte: ReDim ReplacementCharUtf8(0 To 2)
-    ReplacementCharUtf8(0) = &HEF
-    ReplacementCharUtf8(1) = &HBF
-    ReplacementCharUtf8(2) = &HBD
-
-    replacementChars.Add Transcode(CStr(ReplacementCharUtf8), cpUTF_8, cpID), _
-                         CStr(cpID)
-    GetReplacementCharForCodePage = replacementChars(CStr(cpID))
-End Function
-#End If
-
 'This function tries to encode utf16leStr from vba-internal codepage UTF-16LE to
 'codepage 'toCodePage' using the appropriate API functions on the platform.
-'Calling it with 'raiseErrors = True' will raise an error if either:
+'Calling this function with 'raiseErrors = False' will:
+'   - If 'customDefaultChar = ""':
+'         Replace all occurrences of invalid bytes in the input string with the
+'         so-called standard-default-character of the target codepage in the
+'         output. This character is usually a "?" but could also be something
+'         else.
+'   - If 'customDefaultChar' is any other character:
+'         Replace all occurrences of invalid bytes in the input string with the
+'         character specified in 'customDefaultChar' in the target codepage in
+'         the output.
+'   Note: This override of the standard-default-character does NOT work for the
+'         target codepage UTF-8, here U+FFFD will always be used, regardless of
+'         the value of 'customDefaultChar'
+'Calling this function with 'raiseErrors = True' will raise an error if either:
 '   - the string 'utf16leStr' contains byte sequences that do not represent a
 '     valid UTF-16LE string, or
 '   - the string contains codepoints that can not be represented in 'toCodePage'
@@ -857,8 +2339,13 @@ End Function
 'E.g.: Decode(Encode("³", cpUTF_16, cpUs_ascii, True), cpUs_ascii) returns "3"
 Public Function Encode(ByRef utf16leStr As String, _
                        ByVal toCodePage As CodePageIdentifier, _
-              Optional ByVal raiseErrors As Boolean = False) As String
+              Optional ByVal raiseErrors As Boolean = False, _
+              Optional ByVal customDefaultChar As String = vbNullString) _
+                       As String
     Const methodName As String = "Encode"
+
+    If Not (LenB(customDefaultChar) = 2 Or LenB(customDefaultChar) = 0) Then _
+        Err.Raise 5, methodName, "'customDefaultChar' must of length 1."
 
     If toCodePage = cpUTF_16 Then Err.Raise 5, methodName, _
         "Input string should already be UTF-16. Can't encode UTF-16 to UTF-16."
@@ -867,28 +2354,44 @@ Public Function Encode(ByRef utf16leStr As String, _
     #If Mac Then
         Encode = Transcode(utf16leStr, cpUTF_16, toCodePage, raiseErrors)
     #Else
+        Dim cpi As CpInfo: cpi = GetCpInfo(toCodePage)
+    
+        If raiseErrors Then
+            Dim usedDefaultChar As Boolean
+            Dim lpUsedDefaultChar As LongPtr
+            If cpi.AllowsQueryReversible Then _
+                lpUsedDefaultChar = VarPtr(usedDefaultChar)
+            Dim dwFlags As Long
+            If cpi.AllowsFlags Then dwFlags = WC_ERR_INVALID_CHARS
+        Else
+            If StrPtr(customDefaultChar) <> 0 Then _
+                customDefaultChar = Encode(customDefaultChar, toCodePage, _
+                                           False, vbNullString)
+        End If
+        
         Dim byteCount As Long
-        Dim dwFlags As Long
-        Dim usedDefaultChar As Boolean
-        Dim lpUsedDefaultChar As LongPtr
-        If raiseErrors And CodePageAllowsQueryReversible(toCodePage) Then _
-            lpUsedDefaultChar = VarPtr(usedDefaultChar)
-
-        If raiseErrors And CodePageAllowsFlags(toCodePage) Then _
-            dwFlags = WC_ERR_INVALID_CHARS
-
         SetApiErrorNumber 0
         byteCount = WideCharToMultiByte(toCodePage, dwFlags, StrPtr(utf16leStr), _
-                                    Len(utf16leStr), 0, 0, 0, lpUsedDefaultChar)
+            Len(utf16leStr), 0, 0, StrPtr(customDefaultChar), lpUsedDefaultChar)
+            
         If byteCount = 0 Then
             Select Case GetApiErrorNumber
                 Case ERROR_NO_UNICODE_TRANSLATION
                     Err.Raise 5, methodName, _
                         "Input is invalid byte sequence of CodePage " & cpUTF_16
                 Case ERROR_INVALID_PARAMETER
-                    Err.Raise 5, methodName, _
-                        "Conversion to CodePage " & toCodePage & " is not " & _
-                        "supported by the API on this platform."
+                    If StrPtr(customDefaultChar) = 0 Then
+                        Err.Raise 5, methodName, _
+                            "Conversion to CodePage " & toCodePage & " is" & _
+                            " not supported by the API on this platform."
+                    Else 'In this case we know that the customDefaultChar is the
+                    'problem, because the conversion already worked without,
+                    'when we transcoded the customDefaultChar itself.
+                        Err.Raise 5, methodName, _
+                            "Conversion to CodePage " & toCodePage & " is" & _
+                            " not supported with 'customDefaultChar = """ & _
+                            Decode(customDefaultChar, toCodePage) & """'."
+                    End If
                 Case ERROR_INSUFFICIENT_BUFFER, ERROR_INVALID_FLAGS
                     Err.Raise vbErrInternalError, methodName, _
                         "Library implementation erroneous. API Error: " & _
@@ -907,7 +2410,8 @@ Public Function Encode(ByRef utf16leStr As String, _
         Dim b() As Byte: ReDim b(0 To byteCount - 1)
         Encode = b
         WideCharToMultiByte toCodePage, dwFlags, StrPtr(utf16leStr), _
-                Len(utf16leStr), StrPtr(Encode), byteCount, 0, lpUsedDefaultChar
+                            Len(utf16leStr), StrPtr(Encode), byteCount, _
+                            StrPtr(customDefaultChar), lpUsedDefaultChar
 
         Select Case GetApiErrorNumber
             Case Is <> 0
@@ -927,9 +2431,11 @@ End Function
 '      using 'Open' and 'Get', you can convert it to the VBA-internal UTF-16LE
 '      like this:
 '      Decode(str, cpUTF_8)
-'      If you are afraid 'str' might contain invalid UTF-8 data, use it like so:
+'      By default, the function will replace invalid bytes in the input string
+'      with the unicode standard replacement character U+FFFD. If you want to
+'      validate that 'str' does not contain invalid bytes, use it like this:
 '      Decode(str, cpUTF_8, True)
-'      The function will now raise an error if invalid UTF-8 data is encountered
+'      The function will now raise an error if invalid data is encountered.
 Public Function Decode(ByRef str As String, _
                        ByVal fromCodePage As CodePageIdentifier, _
               Optional ByVal raiseErrors As Boolean = False) As String
@@ -944,18 +2450,18 @@ Public Function Decode(ByRef str As String, _
     #Else
         Dim charCount As Long
         Dim dwFlags As Long
-
-        SetApiErrorNumber 0
+        
         If raiseErrors And CodePageAllowsFlags(fromCodePage) Then _
             dwFlags = MB_ERR_INVALID_CHARS
-
+        
+        SetApiErrorNumber 0
         charCount = MultiByteToWideChar(fromCodePage, dwFlags, StrPtr(str), _
                                         LenB(str), 0, 0)
         If charCount = 0 Then
             Select Case GetApiErrorNumber
                 Case ERROR_NO_UNICODE_TRANSLATION
                     Err.Raise 5, methodName, _
-                        "Input is invalid byte sequence of CodePage " & cpUTF_16
+                        "Input is invalid byte sequence of CodePage " & fromCodePage
                 Case ERROR_INVALID_PARAMETER
                     Err.Raise 5, methodName, _
                         "Conversion from CodePage " & fromCodePage & " is not" _
@@ -1045,6 +2551,9 @@ End Function
 'Converts the input string into a string of hex literals.
 'e.g.: "abc" will be turned into "0x610062006300" (UTF-16LE)
 'e.g.: StrConv("ABC", vbFromUnicode) will be turned into "0x414243"
+'Note:
+'StringToHex and HexToString could also be implemented using an api function:
+'https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-cryptbinarytostringw
 Public Function StringToHex(ByRef s As String) As String
     Static map(0 To 255) As String
     Dim b() As Byte: b = s
@@ -1257,13 +2766,13 @@ Public Function UnescapeUnicode(ByRef str As String, _
                     End If
                     outPos = outPos + diff
                     If .unEscSize = 1 Then
-                        Mid$(UnescapeUnicode, outPos) = chrw$(.codepoint)
+                        Mid$(UnescapeUnicode, outPos) = ChrW$(.codepoint)
                     Else
                         .codepoint = .codepoint - &H10000
                         highSur = &HD800& Or (.codepoint \ &H400&)
                         lowSur = &HDC00& Or (.codepoint And &H3FF&)
-                        Mid$(UnescapeUnicode, outPos) = chrw$(highSur)
-                        Mid$(UnescapeUnicode, outPos + 1) = chrw$(lowSur)
+                        Mid$(UnescapeUnicode, outPos) = ChrW$(highSur)
+                        Mid$(UnescapeUnicode, outPos + 1) = ChrW$(lowSur)
                     End If
                     outPos = outPos + .unEscSize
                     inPos = .currPosition + .escSize
@@ -1462,11 +2971,11 @@ Public Function ChrU(ByVal codepoint As Long, _
     If codepoint < 0 Then codepoint = codepoint And &HFFFF& 'Incase of uInt input
 
     If codepoint < &HD800& Then
-        ChrU = chrw$(codepoint)
+        ChrU = ChrW$(codepoint)
     ElseIf codepoint < &HE000& And Not allowSingleSurrogates Then
         Err.Raise 5, methodName, "Range reserved for surrogate pairs"
     ElseIf codepoint < &H10000 Then
-        ChrU = chrw$(codepoint)
+        ChrU = ChrW$(codepoint)
     ElseIf codepoint < &H110000 Then
         lt.l = (&HD800& Or (codepoint \ &H400& - &H40&)) _
             Or (&HDC00 Or (codepoint And &H3FF&)) * &H10000 '&HDC00 with no &
@@ -1624,7 +3133,7 @@ Public Function EncodeUTF8(ByRef utf16leStr As String, _
 End Function
 
 'Function transcoding an UTF-8 encoded string to the VBA-native UTF-16LE
-'Function transcoding an VBA-native UTF-16LE encoded string to UTF-8
+'TODO: Make error character insertion 100% identical to API function
 Public Function DecodeUTF8(ByRef utf8Str As String, _
                   Optional ByVal raiseErrors As Boolean = False) As String
 
@@ -1680,6 +3189,7 @@ Public Function DecodeUTF8(ByRef utf8Str As String, _
                 Else
                     If raiseErrors Then _
                         Err.Raise 5, methodName, "Invalid continuation byte"
+                    numBytesOfCodePoint = k
                     GoTo insertErrChar
                 End If
             Next k
@@ -1716,7 +3226,6 @@ Public Function DecodeUTF8(ByRef utf8Str As String, _
 insertErrChar:  utf16(j) = &HFD
                 utf16(j + 1) = &HFF
                 j = j + 2
-
                 If numBytesOfCodePoint = 0 Then numBytesOfCodePoint = 1
             End If
         End If
@@ -1727,7 +3236,7 @@ End Function
 
 #If Mac = 0 Then
 'Transcoding a VBA-native UTF-16LE encoded string to UTF-8 using ADODB.Stream
-'Much faster than EncodeUTF8, but only available on Windows
+'Much faster than EncodeUTF8 for long strings, but only available on Windows
 Public Function EncodeUTF8usingAdodbStream(ByRef utf16leStr As String) _
                                             As String
     With CreateObject("ADODB.Stream")
@@ -1744,7 +3253,7 @@ Public Function EncodeUTF8usingAdodbStream(ByRef utf16leStr As String) _
 End Function
 
 'Transcoding an UTF-8 encoded string to VBA-native UTF-16LE using ADODB.Stream
-'Faster than DeocdeUTF8 for some strings but only available on Windows
+'Faster than DecodeUTF8 for some strings but only available on Windows
 'Warning: This function performs extremely slow for strings bigger than ~5MB
 Public Function DecodeUTF8usingAdodbStream(ByRef utf8Str As String) As String
     Dim b() As Byte: b = utf8Str
@@ -1871,11 +3380,11 @@ Public Function RandomStringAlphanumeric(ByVal Length As Long) As String
         "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
     Static chars() As Byte
     Static numPossChars As Long
-    Static isInitialized As Boolean
-    If Not isInitialized Then
+    Static IsInitialized As Boolean
+    If Not IsInitialized Then
         chars = StrConv(INKL_CHARS, vbFromUnicode)
         numPossChars = UBound(chars) - LBound(chars) + 1
-        isInitialized = True
+        IsInitialized = True
     End If
     
     If Length = 0 Then Exit Function
@@ -1969,7 +3478,7 @@ Public Function RandomStringUnicode(ByVal Length As Long) As String
             char = Int(MAX_UINT * Rnd) + 1
         Loop Until (char < &HD800& Or char > &HDFFF&) _
                And (char <> &HFEFF&)
-        Mid$(RandomStringUnicode, Len(RandomStringUnicode), 1) = chrw(char)
+        Mid$(RandomStringUnicode, Len(RandomStringUnicode), 1) = ChrW(char)
     End If
 End Function
 
@@ -2044,7 +3553,7 @@ Public Function RandomString(ByVal Length As Long, _
         Loop Until (char < &HD800& Or char > &HDFFF&) _
                And (char <> &HFEFF&) _
                And (char <= MAX_UINT)
-        Mid$(RandomString, Len(RandomString), 1) = chrw(char)
+        Mid$(RandomString, Len(RandomString), 1) = ChrW(char)
     End If
 End Function
 
