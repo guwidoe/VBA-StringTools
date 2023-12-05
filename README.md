@@ -1,14 +1,19 @@
 # VBA-StringTools
+
 Useful methods for interaction with strings in VBA, including transcoding, converting, escaping, and many highly performant utility functions. The library is designed to be fully cross-platform and cross-application, meaning it should run in any VBA environment.
 
 ## Installation
+
 Just import the provided code module into your project:
+
 - [LibStringTools.bas](https://github.com/guwidoe/VBA-StringTools/blob/main/src/LibStringTools.bas)
 
 ## Usage
-A demo module is in the making, but for now, all exposed methods are preceded by a banner comment explaining the functionality and serving as documentation.  
+
+A demo module is in the making, but for now, all exposed methods are preceded by a banner comment explaining the functionality and serving as documentation.
 
 List of public/exposed methods:
+
 - ArrayReplaceMultiple
 - AscU
 - ChrU
@@ -24,13 +29,11 @@ List of public/exposed methods:
 - DecodeASCII
 - DecodeUTF32LE
 - DecodeUTF8
-- DecodeUTF8usingAdodbStream (Windows only)
 - Encode
 - EncodeANSI
 - EncodeASCII
 - EncodeUTF32LE
 - EncodeUTF8
-- EncodeUTF8usingAdodbStream (Windows only)
 - EscapeUnicode
 - GetBstrFromWideStringPtr (Windows only)
 - GetNonUnicodeSystemCodepage
@@ -54,7 +57,6 @@ List of public/exposed methods:
 - RandomStringBMP
 - RandomStringFromChars
 - RandomStringUnicode
-- RegExNumOnly (Windows only)
 - RemoveNonNumeric
 - RepeatString
 - ReplaceB
@@ -76,9 +78,10 @@ List of public/exposed methods:
 - UnescapeUnicode
 
 ## Notes
+
 - No extra library references are needed (e.g. Microsoft Scripting Runtime)
 - Works in any host Application (Excel, Word, AutoCAD, etc.)
-- Works on both Windows and Mac. On Mac, 4 of the methods are not available, but 3 of them are just optional alternatives to available methods. Only `GetBstrFromWideStringPtr` is currently actually limited to Windows.
+- Works on both Windows and Mac. Only the function `GetBstrFromWideStringPtr` is currently limited to Windows.
 - Works in both x32 and x64 application environments
 
 ## License

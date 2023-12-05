@@ -3234,42 +3234,6 @@ nextCp: i = i + numBytesOfCodePoint 'Move to the next UTF-8 codepoint
     DecodeUTF8 = MidB$(utf16, 1, j)
 End Function
 
-#If Mac = 0 Then
-'Transcoding a VBA-native UTF-16LE encoded string to UTF-8 using ADODB.Stream
-'Much faster than EncodeUTF8 for long strings, but only available on Windows
-Public Function EncodeUTF8usingAdodbStream(ByRef utf16leStr As String) _
-                                            As String
-    With CreateObject("ADODB.Stream")
-        .Type = 2 ' adTypeText
-        .Charset = "utf-8"
-        .Open
-        .WriteText utf16leStr
-        .Position = 0
-        .Type = 1 ' adTypeBinary
-        .Position = 3 ' Skip BOM (Byte Order Mark)
-        EncodeUTF8usingAdodbStream = .Read
-        .Close
-    End With
-End Function
-
-'Transcoding an UTF-8 encoded string to VBA-native UTF-16LE using ADODB.Stream
-'Faster than DecodeUTF8 for some strings but only available on Windows
-'Warning: This function performs extremely slow for strings bigger than ~5MB
-Public Function DecodeUTF8usingAdodbStream(ByRef utf8Str As String) As String
-    Dim b() As Byte: b = utf8Str
-    With CreateObject("ADODB.Stream")
-        .Type = 1 ' adTypeBinary
-        .Open
-        .Write b
-        .Position = 0
-        .Type = 2 ' adTypeText
-        .Charset = "utf-8"
-        DecodeUTF8usingAdodbStream = .ReadText
-        .Close
-    End With
-End Function
-#End If
-
 'Function transcoding an VBA-native UTF-16LE encoded string to UTF-32
 Public Function EncodeUTF32LE(ByRef utf16leStr As String, _
                      Optional ByVal raiseErrors As Boolean = False) As String
@@ -3691,20 +3655,6 @@ Public Function CleanString(ByRef str As String, _
     Next i
     CleanString = Left$(str, j - 1)
 End Function
-
-#If Mac = 0 Then
-'Removes all non-numeric characters from a string.
-'Only keeps codepoints U+0030 - U+0039
-Public Function RegExNumOnly(ByRef s As String) As String
-    With CreateObject("VBScript.RegExp")
-        .Global = True
-        .MultiLine = True
-        .IgnoreCase = True
-        .Pattern = "[^0-9]+"
-         RegExNumOnly = .Replace(s, "")
-    End With
-End Function
-#End If
 
 'Removes all non-numeric characters from a string.
 'Keeps only codepoints U+0030 - U+0039 AND ALSO
