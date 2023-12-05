@@ -3170,6 +3170,7 @@ Public Function DecodeUTF8(ByRef utf8Str As String, _
 
         If numBytesOfCodePoint = 0 Then
             If raiseErrors Then Err.Raise 5, methodName, "Invalid byte"
+            numBytesOfCodePoint = 1
             GoTo insertErrChar
         ElseIf numBytesOfCodePoint = 1 Then
             utf16(j) = codepoint
@@ -3226,7 +3227,6 @@ Public Function DecodeUTF8(ByRef utf8Str As String, _
 insertErrChar:  utf16(j) = &HFD
                 utf16(j + 1) = &HFF
                 j = j + 2
-                If numBytesOfCodePoint = 0 Then numBytesOfCodePoint = 1
             End If
         End If
 nextCp: i = i + numBytesOfCodePoint 'Move to the next UTF-8 codepoint
@@ -4986,8 +4986,6 @@ Public Function ReplaceMultipleMultiPass(ByRef str As String, _
     If UBound(replaces) > UBound(finds) Then Err.Raise 5, methodName, "'sFind" _
         & "OrFinds' must have at least as many elements as 'sReplaceOrReplaces'"
     
-    lCount = lCount And &H7FFFFFFF
-    
     If lStart > Len(str) Then Exit Function
     
     ReplaceMultipleMultiPass = Mid$(str, lStart)
@@ -5204,7 +5202,7 @@ Private Function BToString(ByVal Value As Variant, _
             'Case TypeOf value Is Collection
                 's = ToStringCollection(...
             Case Else
-                s = TypeName(Value)
+                s = TypeName(Value) & "(0x" & Hex(ObjPtr(Value)) & ")"
         End Select
     ElseIf IsEmpty(Value) Then
         s = "Empty"
@@ -5622,7 +5620,7 @@ Public Function Printf(ParamArray args() As Variant) As String
 End Function
 
 'Prints an one or two dimensional array to the immediate window.
-Public Sub PrintVar(ByRef arr As Variant, _
+Private Sub PrintVar(ByRef arr As Variant, _
            Optional ByRef Delimiter As String = vbNullString, _
            Optional ByVal maxCharsPerElement As Long = 25, _
            Optional ByVal maxCharsPerLine As Long = 80, _
@@ -5696,11 +5694,11 @@ Public Function ColLetterToNumber(ByRef colLetterOrNumber As Variant) As Long
 End Function
 
 'Converts a string to date based on a format specified in 'dateFormat'
-'E.g. DateParser("27.04.1993", "DD.MM.YYYY") = DateParser("042793", "MMDDYY")
+'E.g. ParseDate("27.04.1993", "DD.MM.YYYY") = ParseDate("042793", "MMDDYY")
 'Follows the idea by Scott Craner: https://stackoverflow.com/a/64813581/12287457
-Public Function DateParser(ByRef str As String, _
-                           ByRef dateFormat As String) As Date
-    Const methodName As String = "DateParser"
+Public Function ParseDate(ByRef str As String, _
+                          ByRef dateFormat As String) As Date
+    Const methodName As String = "ParseDate"
     
     If Len(str) <> Len(dateFormat) Then Err.Raise 5, methodName, _
         "The input string must be of same length as the format string."
@@ -5722,5 +5720,5 @@ Public Function DateParser(ByRef str As String, _
         lMonth = Month(CDate("01 " & sMonth & " 2023"))
     End If
     
-    DateParser = DateSerial(lYear, lMonth, lDay)
+    ParseDate = DateSerial(lYear, lMonth, lDay)
 End Function
