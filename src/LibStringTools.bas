@@ -3639,7 +3639,7 @@ End Function
 'Default inklChars are all alphanumeric characters including dot and space
 Public Function CleanString(ByRef str As String, _
                    Optional ByVal inklChars As String = _
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890. ") _
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789. ") _
                             As String
     Dim sChr As String
     Dim i As Long
