@@ -56,8 +56,8 @@ Option Compare Binary
     #End If
 #Else 'Windows
     #If VBA7 Then
-        Private Declare PtrSafe Function MultiByteToWideChar Lib "kernel32" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long) As Long
-        Private Declare PtrSafe Function WideCharToMultiByte Lib "kernel32" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpDefaultChar As LongPtr, ByVal lpUsedDefaultChar As LongPtr) As Long
+        Private Declare PtrSafe Function MultiByteToWideChar Lib "kernel32" (ByVal codePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long) As Long
+        Private Declare PtrSafe Function WideCharToMultiByte Lib "kernel32" (ByVal codePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As LongPtr, ByVal cchWideChar As Long, ByVal lpMultiByteStr As LongPtr, ByVal cbMultiByte As Long, ByVal lpDefaultChar As LongPtr, ByVal lpUsedDefaultChar As LongPtr) As Long
 
         Private Declare PtrSafe Function GetLastError Lib "kernel32" () As Long
         Private Declare PtrSafe Sub SetLastError Lib "kernel32" (ByVal dwErrCode As Long)
@@ -67,7 +67,7 @@ Option Compare Binary
         
         Private Declare PtrSafe Function GetACP Lib "kernel32" () As Long
         
-        Private Declare PtrSafe Function GetCPInfoExW Lib "kernel32" (ByVal CodePage As Long, ByVal dwFlags As Long, lpCPInfoExW As CPINFOEXW) As Long
+        Private Declare PtrSafe Function GetCPInfoExW Lib "kernel32" (ByVal codePage As Long, ByVal dwFlags As Long, lpCPInfoExW As CPINFOEXW) As Long
     #Else
         Private Declare Function MultiByteToWideChar Lib "kernel32" Alias "MultiByteToWideChar" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpMultiByteStr As Long, ByVal cchMultiByte As Long, ByVal lpWideCharStr As Long, ByVal cchWideChar As Long) As Long
         Private Declare Function WideCharToMultiByte Lib "kernel32" Alias "WideCharToMultiByte" (ByVal CodePage As Long, ByVal dwFlags As Long, ByVal lpWideCharStr As Long, ByVal cchWideChar As Long, ByVal lpMultiByteStr As Long, ByVal cchMultiByte As Long, ByVal lpDefaultChar As Long, ByVal lpUsedDefaultChar As Long) As Long
@@ -124,13 +124,13 @@ Private Type CPINFOEXW
     defaultChar(MAX_DEFAULTCHAR - 1) As Byte ' default character (MB)
     LeadByte(MAX_LEADBYTES - 1) As Byte      ' lead byte ranges
     UnicodeDefaultChar(0 To 1) As Byte       ' default character (Unicode)
-    CodePage As Long                         ' code page id
+    codePage As Long                         ' code page id
     CodePageName(MAX_PATH - 1) As Byte       ' code page name (Unicode)
 End Type
 
 Private Type CpInfo 'Custom extended CpInfo type for use in this library
     'From CpInfoExW:
-    CodePage As Long              ' code page id
+    codePage As Long              ' code page id
     MaxCharSize As Long           ' max length (in bytes) of a character
     defaultChar As String         ' default character (MB)
     LeadByte As String            ' lead byte ranges
@@ -690,7 +690,7 @@ Private Function GetCpInfo(ByVal cpId As CodePageIdentifier) As CpInfo
         Dim cpi As CPINFOEXW
         With cpInfos(cpId)
             If Not .IsInitialized Then
-                .CodePage = cpId
+                .codePage = cpId
                 .AllowsFlags = CodePageAllowsFlags(cpId)
                 .AllowsQueryReversible = CodePageAllowsQueryReversible(cpId)
                 .MacConvDescriptorName = ConvDescriptorName(cpId)
@@ -718,7 +718,7 @@ InitializeCpInfosMac:
     'with manual adjustments for 1200 (UTF-16LE), 1201 (UTF-16BE),
     '12000 (UTF-32LE), 12001 (UTF-32BE)
     With cpInfos(cpId)
-        .CodePage = cpId
+        .codePage = cpId
         .AllowsFlags = CodePageAllowsFlags(cpId)
         .AllowsQueryReversible = CodePageAllowsQueryReversible(cpId)
         .MacConvDescriptorName = ConvDescriptorName(cpId)
@@ -2520,7 +2520,7 @@ Public Function HexToString(ByRef hexStr As String) As String
     If nibbleMap(0) = 0 Then
         For i = 0 To 255
             nibbleMap(i) = -256 'To force invalid character code
-            charMap(i) = chrb$(i)
+            charMap(i) = ChrB$(i)
         Next i
         For i = 0 To 9
             nibbleMap(Asc(CStr(i))) = i
@@ -2727,7 +2727,7 @@ Public Function UnescapeUnicode(ByRef str As String, _
     Dim highSur As Long
     Dim lowSur As Long
     Dim remainingLen As Long: remainingLen = Len(str)
-    Dim posChar As String:    posChar = chrb$(posByte)
+    Dim posChar As String:    posChar = ChrB$(posByte)
     Dim outPos As Long:       outPos = 1
     Dim inPos As Long:        inPos = 1
 
@@ -3677,6 +3677,7 @@ End Function
 'Insert("abcd", "ff", 3) = "abcffd"
 'Insert("abcd", "ff", 4) = "abcdff"
 'Insert("abcd", "ff", 9) = "abcdff"
+'Todo: function may be optimizable by avoiding double string concatenation
 Public Function Insert(ByRef str As String, _
                        ByRef strToInsert As String, _
                        ByRef afterPos As Long) As String
@@ -3851,12 +3852,15 @@ Public Function ReplaceB(ByRef bytes As String, _
         Exit Function
     End If
 
-    Dim lenBFind As Long:    lenBFind = LenB(sFind)
-    Dim lenBReplace As Long: lenBReplace = LenB(sReplace)
-
-    Dim buffer() As Byte
-    ReDim buffer(0 To LenB(bytes) - lStart + CountSubstringB(bytes, sFind, _
-                 lStart, lCount, lCompare) * (lenBReplace - lenBFind))
+    Dim lenBFind As Long:         lenBFind = LenB(sFind)
+    Dim lenBReplace As Long:      lenBReplace = LenB(sReplace)
+    Dim bufferSizeChange As Long
+    bufferSizeChange = CountSubstringB(bytes, sFind, lStart, lCount, lCompare) _
+                                             * (lenBReplace - lenBFind) - lStart
+    
+    If LenB(bytes) + bufferSizeChange < 0 Then Exit Function
+    
+    Dim buffer() As Byte: ReDim buffer(0 To LenB(bytes) + bufferSizeChange)
     ReplaceB = buffer
 
     Dim i As Long:              i = InStrB(lStart, bytes, sFind, lCompare)
@@ -3910,9 +3914,9 @@ Public Function LimitConsecutiveSubstringRepetition( _
     Dim i As Long:                i = InStr(1, str, subStr, Compare)
     Dim j As Long:                j = 1
     Dim lenSubStr As Long:        lenSubStr = Len(subStr)
-    Dim copyChunkSize As Long:    copyChunkSize = 0
-    Dim consecutiveCount As Long: consecutiveCount = 0
     Dim lastOccurrence As Long:   lastOccurrence = 1 - lenSubStr
+    Dim copyChunkSize As Long
+    Dim consecutiveCount As Long
     Dim occurrenceDiff As Long
 
     Do Until i = 0
@@ -3975,9 +3979,9 @@ Public Function LimitConsecutiveSubstringRepetitionB( _
     Dim i As Long:                i = InStrB(1, bytes, subStr, Compare)
     Dim j As Long:                j = 1
     Dim lenBSubStr As Long:       lenBSubStr = LenB(subStr)
-    Dim copyChunkSize As Long:    copyChunkSize = 0
-    Dim consecutiveCount As Long: consecutiveCount = 0
     Dim lastOccurrence As Long:   lastOccurrence = 1 - lenBSubStr
+    Dim copyChunkSize As Long
+    Dim consecutiveCount As Long
     Dim occurrenceDiff As Long
 
     Do Until i = 0
@@ -4522,13 +4526,13 @@ Public Function ReplaceMultiple(ByRef str As String, _
     If m > n Then
         For i = 0 To UBound(finds)
             Dim numReplPerFind As Long
-            numReplPerFind = iif(i < m Mod n, (m \ n) + 1, (m \ n))
+            numReplPerFind = IIf(i < m Mod n, (m \ n) + 1, (m \ n))
             Dim numOcc As Long
             numOcc = CountSubstring(str, CStr(finds(i)), lStart, lCount, _
                                     lCompare)
             For j = i To m - 1 Step n
                 lenBBuffer = lenBBuffer + (LenB(replaces(j)) - LenB(finds(i))) _
-                             * iif((j - i) \ n < numOcc Mod numReplPerFind _
+                             * IIf((j - i) \ n < numOcc Mod numReplPerFind _
                          , numOcc \ numReplPerFind + 1, numOcc \ numReplPerFind)
             Next j
         Next i
@@ -4739,13 +4743,13 @@ Public Function ReplaceMultipleB(ByRef bytes As String, _
     If m > n Then
         For i = 0 To UBound(finds)
             Dim numReplPerFind As Long
-            numReplPerFind = iif(i < m Mod n, (m \ n) + 1, (m \ n))
+            numReplPerFind = IIf(i < m Mod n, (m \ n) + 1, (m \ n))
             Dim numOcc As Long
             numOcc = CountSubstringB(bytes, CStr(finds(i)), lStart, lCount, _
                                      lCompare)
             For j = i To m - 1 Step n
                 lenBBuffer = lenBBuffer + (LenB(replaces(j)) - LenB(finds(i))) _
-                             * iif((j - i) \ n < numOcc Mod numReplPerFind _
+                             * IIf((j - i) \ n < numOcc Mod numReplPerFind _
                          , numOcc \ numReplPerFind + 1, numOcc \ numReplPerFind)
             Next j
         Next i
@@ -5354,7 +5358,7 @@ Private Function BuildLine(ByRef arr As Variant, _
                            ByRef colWidths() As Long, _
                            ByVal numCols As Long, _
                            ByVal Delimiter As String, _
-                           ByVal RowIndex As Long, _
+                           ByVal rowIndex As Long, _
                            ByRef settings As StringificationSettings) As String
     Dim rowNumPadding As Long
     rowNumPadding = Max(Len(CStr(UBound(arr, 1))), Len(CStr(LBound(arr, 1)))) + 2
@@ -5364,11 +5368,11 @@ Private Function BuildLine(ByRef arr As Variant, _
     If numCols = UBound(arr, 2) - LBound(arr, 2) + 1 Then
         For j = LBound(arr, 2) To UBound(arr, 2)
             BuildLine = BuildLine & _
-                        PadLeft(BToString(arr(RowIndex, j), settings), _
+                        PadLeft(BToString(arr(rowIndex, j), settings), _
                                 colWidths(j)) & Delimiter
         Next j
         If settings.inklRowIndices Then _
-            BuildLine = PadRight(CStr(RowIndex), rowNumPadding) & BuildLine
+            BuildLine = PadRight(CStr(rowIndex), rowNumPadding) & BuildLine
 
         BuildLine = Left(BuildLine, Len(BuildLine) - lenDelim)
         Exit Function
@@ -5376,16 +5380,16 @@ Private Function BuildLine(ByRef arr As Variant, _
     
     Dim leftPart As String, rightPart As String
     For j = 0 To numCols \ 2 - 1 'numCols is always even
-        leftPart = leftPart & PadLeft(BToString(arr(RowIndex, _
+        leftPart = leftPart & PadLeft(BToString(arr(rowIndex, _
                    LBound(arr, 2) + j), settings), _
                    colWidths(LBound(arr, 2) + j)) & Delimiter
-        rightPart = Delimiter & PadLeft(BToString(arr(RowIndex, _
+        rightPart = Delimiter & PadLeft(BToString(arr(rowIndex, _
                     UBound(arr, 2) - j), settings), _
                     colWidths(UBound(arr, 2) - j)) & rightPart
     Next j
 
     If settings.inklRowIndices Then _
-        BuildLine = PadRight(CStr(RowIndex), rowNumPadding)
+        BuildLine = PadRight(CStr(rowIndex), rowNumPadding)
 
     BuildLine = BuildLine & Left(leftPart, Len(leftPart) - lenDelim) & _
                 " ... " & Right(rightPart, Len(rightPart) - lenDelim)
@@ -5570,7 +5574,7 @@ Public Function Printf(ParamArray args() As Variant) As String
 End Function
 
 'Prints an one or two dimensional array to the immediate window.
-Private Sub PrintVar(ByRef arr As Variant, _
+Public Sub PrintVar(ByRef arr As Variant, _
            Optional ByRef Delimiter As String = vbNullString, _
            Optional ByVal maxCharsPerElement As Long = 25, _
            Optional ByVal maxCharsPerLine As Long = 80, _

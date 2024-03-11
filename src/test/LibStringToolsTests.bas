@@ -33,14 +33,14 @@ Option Explicit
 ' https://gist.github.com/guwidoe/5c74c64d79c0e1cd1be458b0632b279a
 
 #If VBA7 Then
-    Private Declare PtrSafe Function IsValidCodePage Lib "kernel32" (ByVal CodePage As Long) As Long
+    Private Declare PtrSafe Function IsValidCodePage Lib "kernel32" (ByVal codePage As Long) As Long
 #Else
     Private Declare Function IsValidCodePage Lib "kernel32" (ByVal CodePage As Long) As Long
 #End If
 
 Private Type CpInfo 'Custom extended CpInfo type for use in this library
     'From CpInfoExW:
-    CodePage As Long              ' code page id
+    codePage As Long              ' code page id
     MaxCharSize As Long           ' max length (in bytes) of a character
     defaultChar As String         ' default character (MB)
     LeadByte As String            ' lead byte ranges
@@ -141,35 +141,35 @@ Private Sub TestEncodersAndDecoders()
     
     'VBA natively implemented Encoders/Decoders
     Debug.Print "Native UTF-8 Encoder/Decoder Test Basic Multilingual Plane: " & _
-        iif(DecodeUTF8(EncodeUTF8(bmpUnicode)) = bmpUnicode, "passed", "failed")
+        IIf(DecodeUTF8(EncodeUTF8(bmpUnicode)) = bmpUnicode, "passed", "failed")
        
     #If Mac = 0 Then
         Debug.Print "ADODB.Stream UTF-8 Encoder/Decoder Test Basic Multilingual Plane: " & _
-             iif(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(bmpUnicode)) = bmpUnicode, "passed", "failed")
+             IIf(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(bmpUnicode)) = bmpUnicode, "passed", "failed")
     #End If
     
     Debug.Print "API UTF-8 Encoder/Decoder Test Basic Multilingual Plane: " & _
-         iif(Decode(Encode(bmpUnicode, cpUTF_8), cpUTF_8) = bmpUnicode, "passed", "failed")
+         IIf(Decode(Encode(bmpUnicode, cpUTF_8), cpUTF_8) = bmpUnicode, "passed", "failed")
 
     Debug.Print "UTF-32 Encoder/Decoder Test Basic Multilingual Plane: " & _
-        iif(DecodeUTF32LE(EncodeUTF32LE(bmpUnicode)) = bmpUnicode, "passed", "failed")
+        IIf(DecodeUTF32LE(EncodeUTF32LE(bmpUnicode)) = bmpUnicode, "passed", "failed")
         
     Debug.Print "Native UTF-8 Encoder/Decoder Test full Unicode: " & _
-        iif(DecodeUTF8(EncodeUTF8(fullUnicode)) = fullUnicode, "passed", "failed")
+        IIf(DecodeUTF8(EncodeUTF8(fullUnicode)) = fullUnicode, "passed", "failed")
     
     #If Mac = 0 Then
         Debug.Print "ADODB.Stream UTF-8 Encoder/Decoder Test full Unicode: " & _
-            iif(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(fullUnicode)) = fullUnicode, "passed", "failed")
+            IIf(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(fullUnicode)) = fullUnicode, "passed", "failed")
     #End If
     
     Debug.Print "API UTF-8 Encoder/Decoder Test full Unicode: " & _
-        iif(Decode(Encode(fullUnicode, cpUTF_8), cpUTF_8) = fullUnicode, "passed", "failed")
+        IIf(Decode(Encode(fullUnicode, cpUTF_8), cpUTF_8) = fullUnicode, "passed", "failed")
     
     Debug.Print "UTF-32 Encoder/Decoder Test full Unicode: " & _
-        iif(DecodeUTF32LE(EncodeUTF32LE(fullUnicode)) = fullUnicode, "passed", "failed")
+        IIf(DecodeUTF32LE(EncodeUTF32LE(fullUnicode)) = fullUnicode, "passed", "failed")
         
     Debug.Print "ANSI Encoder/Decoder Test: " & _
-        iif(DecodeANSI(EncodeANSI(utf16AsciiOnly)) = utf16AsciiOnly, "passed", "failed")
+        IIf(DecodeANSI(EncodeANSI(utf16AsciiOnly)) = utf16AsciiOnly, "passed", "failed")
 End Sub
 
 Private Sub TestUTF8EncodersPerformance()
@@ -447,7 +447,7 @@ Sub RunLimitConsecutiveSubstringRepetitionTests()
     TestLimitConsecutiveSubstringRepetition "bbbaaababbb", "ab", 1
     TestLimitConsecutiveSubstringRepetition _
         UnescapeUnicode("\u6100\u6100\u6100"), "a", 1
-    failedTests = failedTests + iif(LimitConsecutiveSubstringRepetitionB( _
+    failedTests = failedTests + IIf(LimitConsecutiveSubstringRepetitionB( _
                 UnescapeUnicode("\u6100\u6100\u6100"), "a", 1) <> _
             LimitConsecutiveSubstringRepetition( _
                 UnescapeUnicode("\u6100\u6100\u6100"), "a", 1), 0, 1)
@@ -953,6 +953,24 @@ Public Sub TestPrintVar()
     Debug.Print vbNewLine
 End Sub
 
+Sub CompareReplaceAndReplaceMultiple()
+    'In some cases ReplaceMultiple performs better than the inbuilt Replace
+    'for the same task
+    Const LEN_TEST_STR As Long = 1000000
+    Dim demoStr As String
+    Dim resultNative As String
+    Dim resultLib As String
+    StartTimer
+    demoStr = RepeatString("  a", LEN_TEST_STR / 3)
+    ReadTimer "Generating test string of length " & LEN_TEST_STR, Reset:=True
+    resultNative = Replace(demoStr, " ", "")
+    ReadTimer "Native Replace function", Reset:=True
+    resultLib = ReplaceMultiple(demoStr, " ", "")
+    ReadTimer "Library ReplaceMultiple function"
+    Debug.Print resultNative = resultLib
+End Sub
+
+
 Private Sub ProcessFindsUsingTrie(ByRef finds As Variant, _
                                   ByVal lCompare As VbCompareMethod)
     Dim trie As Object
@@ -1125,36 +1143,36 @@ Private Sub CompareErrorHandlingOfNativeAndApiDecoders()
 '    Debug.Print EscapeUnicode(decApi, 127)
 End Sub
 
-Private Sub TestErrorHandlingInTranscodingAPI()
-    Dim s As String: s = ChrW(255): s = EncodeANSI(s)
-    Dim s2 As String
-    
-    Dim allCpIds As Object
-    Set allCpIds = GetAllCpIDs
-    'On Error Resume Next
-    Dim cpId As Variant
-    For Each cpId In allCpIds.Keys
-        If IsValidCodePage(CLng(cpId)) Or cpId = cpUTF_16 Then
-            s2 = Transcode(s, cpUTF_8, cpId, False, "p")
-            If s2 <> "" Then
-'                s2 = Transcode(s, cpId, cpUTF_16)
-'                Debug.Print "CP: " & GetAllCpIDs(cpId)
-'                Debug.Print LenB(s2)
-                If Encode(GetCpInfo(cpId).defaultChar, cpId) = s2 Then
-                    Debug.Print "Used std. default char. " & GetAllCpIDs(cpId)
-                    If Not GetCpInfo(cpId).defaultChar = GetCpInfo(cpId).UnicodeDefaultChar Then
-                        Debug.Print "STD DEFAULT CHAR NOT EQUAL UNICODE DEFAULT CHAR """ & GetCpInfo(cpId).defaultChar & """ != """ & GetCpInfo(cpId).UnicodeDefaultChar & """"
-                    End If
-                ElseIf Encode(GetCpInfo(cpId).UnicodeDefaultChar, cpId) = s2 Then
-                    Debug.Print "Used unicode default char. " & GetAllCpIDs(cpId)
-                Else
-                    Debug.Print Decode(s2, cpId) & " Used OTHER character: " & StringToHex(s2) & " " & GetAllCpIDs(cpId) & "; CpName: " & GetCpInfo(cpId).CodePageName & "; Default char: """ & GetCpInfo(cpId).defaultChar & """; UnicodeDefaultChar: """ & StringToHex(GetCpInfo(cpId).UnicodeDefaultChar) & """"
-                End If
-            End If
-        Else
-            'Debug.Print "CP not supported: " & GetAllCpIDs(cpId)
-        End If
-    Next cpId
-End Sub
-
+'Private Sub TestErrorHandlingInTranscodingAPI()
+'    Dim s As String: s = ChrW(255): s = EncodeANSI(s)
+'    Dim s2 As String
+'
+'    Dim allCpIds As Object
+'    Set allCpIds = GetAllCpIDs
+'    'On Error Resume Next
+'    Dim cpId As Variant
+'    For Each cpId In allCpIds.Keys
+'        If IsValidCodePage(CLng(cpId)) Or cpId = cpUTF_16 Then
+'            s2 = Transcode(s, cpUTF_8, cpId, False, "p")
+'            If s2 <> "" Then
+''                s2 = Transcode(s, cpId, cpUTF_16)
+''                Debug.Print "CP: " & GetAllCpIDs(cpId)
+''                Debug.Print LenB(s2)
+'                If Encode(GetCpInfo(cpId).defaultChar, cpId) = s2 Then
+'                    Debug.Print "Used std. default char. " & GetAllCpIDs(cpId)
+'                    If Not GetCpInfo(cpId).defaultChar = GetCpInfo(cpId).UnicodeDefaultChar Then
+'                        Debug.Print "STD DEFAULT CHAR NOT EQUAL UNICODE DEFAULT CHAR """ & GetCpInfo(cpId).defaultChar & """ != """ & GetCpInfo(cpId).UnicodeDefaultChar & """"
+'                    End If
+'                ElseIf Encode(GetCpInfo(cpId).UnicodeDefaultChar, cpId) = s2 Then
+'                    Debug.Print "Used unicode default char. " & GetAllCpIDs(cpId)
+'                Else
+'                    Debug.Print Decode(s2, cpId) & " Used OTHER character: " & StringToHex(s2) & " " & GetAllCpIDs(cpId) & "; CpName: " & GetCpInfo(cpId).CodePageName & "; Default char: """ & GetCpInfo(cpId).defaultChar & """; UnicodeDefaultChar: """ & StringToHex(GetCpInfo(cpId).UnicodeDefaultChar) & """"
+'                End If
+'            End If
+'        Else
+'            'Debug.Print "CP not supported: " & GetAllCpIDs(cpId)
+'        End If
+'    Next cpId
+'End Sub
+'
 
