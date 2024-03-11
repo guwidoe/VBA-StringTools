@@ -4545,6 +4545,8 @@ Public Function ReplaceMultiple(ByRef str As String, _
         Next i
     End If
     
+    If lenBBuffer = 0 Then Exit Function
+    
     Dim buffer() As Byte: ReDim buffer(1 To lenBBuffer)
     ReplaceMultiple = buffer
     
@@ -4761,6 +4763,8 @@ Public Function ReplaceMultipleB(ByRef bytes As String, _
                          (LenB(replaces(i Mod m)) - LenB(finds(i))) * numOcc
         Next i
     End If
+    
+    If lenBBuffer = 0 Then Exit Function
     
     Dim buffer() As Byte: ReDim buffer(1 To lenBBuffer)
     ReplaceMultipleB = buffer
