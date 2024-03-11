@@ -957,16 +957,40 @@ Sub CompareReplaceAndReplaceMultiple()
     'In some cases ReplaceMultiple performs better than the inbuilt Replace
     'for the same task
     Const LEN_TEST_STR As Long = 1000000
-    Dim demoStr As String
-    Dim resultNative As String
-    Dim resultLib As String
+    
     StartTimer
-    demoStr = RepeatString("  a", LEN_TEST_STR / 3)
+    Dim demoStr As String: demoStr = RepeatString("  a", LEN_TEST_STR / 3)
     ReadTimer "Generating test string of length " & LEN_TEST_STR, Reset:=True
-    resultNative = Replace(demoStr, " ", "")
+    
+    Dim resultNative As String: resultNative = Replace(demoStr, " ", "")
     ReadTimer "Native Replace function", Reset:=True
-    resultLib = ReplaceMultiple(demoStr, " ", "")
+    
+    Dim resultLib As String: resultLib = ReplaceMultiple(demoStr, " ", "")
     ReadTimer "Library ReplaceMultiple function"
+    
+    Debug.Print resultNative = resultLib
+End Sub
+
+Sub CompareReplaceAndReplaceB()
+    Const LEN_TEST_STR As Long = 50000
+    Const REPETITIONS As Long = 1
+    Dim i As Long
+    
+    StartTimer
+    
+    Dim demoStr As String: demoStr = RepeatString("  a", LEN_TEST_STR / 3)
+    ReadTimer "Generating test string of length " & LEN_TEST_STR, Reset:=True
+    
+    For i = 1 To REPETITIONS
+        Dim resultNative As String: resultNative = Replace(demoStr, " ", "  ")
+    Next i
+    ReadTimer "Native Replace function", Reset:=True
+    
+    For i = 1 To REPETITIONS
+        Dim resultLib As String: resultLib = ReplaceB(demoStr, " ", "  ")
+    Next i
+    ReadTimer "Library ReplaceB function"
+    
     Debug.Print resultNative = resultLib
 End Sub
 

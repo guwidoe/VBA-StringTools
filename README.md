@@ -60,6 +60,7 @@ List of public/exposed methods:
 - RemoveNonNumeric
 - RepeatString
 - ReplaceB
+- ReplaceFast
 - ReplaceMultiple
 - ReplaceMultipleB
 - ReplaceMultipleMultiPass

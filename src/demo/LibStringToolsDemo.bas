@@ -92,12 +92,50 @@ Sub DemoLimitConsecutiveSubstringRepetition()
     Dim resultLib As String
     
     StartTimer
-    demoStr = RandomStringFromChars(LEN_TEST_STR, " ")
+    demoStr = RandomStringFromChars(LEN_TEST_STR, "ab ")
     
     ReadTimer "Generating test string of length " & LEN_TEST_STR, Reset:=True
     resultNaive = LimitConsecutiveSubstringRepetitionNaive(demoStr, " ", 1)
     ReadTimer "Naive approach", Reset:=True
     resultLib = LimitConsecutiveSubstringRepetition(demoStr, " ", 1)
+    ReadTimer "Library approach"
+    Debug.Print resultNaive = resultLib
+End Sub
+
+Public Function LimitConsecutiveSubstringRepetitionNaiveB( _
+                                           ByRef str As String, _
+                                  Optional ByRef subStr As String = vbNewLine, _
+                                  Optional ByVal limit As Long = 1, _
+                                  Optional ByVal Compare As VbCompareMethod _
+                                                          = vbBinaryCompare) _
+                                           As String
+    Dim findStr As String:    findStr = RepeatString(subStr, limit + 1)
+    Dim replaceStr As String: replaceStr = RepeatString(subStr, limit)
+    LimitConsecutiveSubstringRepetitionNaiveB = str
+    Do While InStr(1, LimitConsecutiveSubstringRepetitionNaiveB, _
+                   findStr, Compare) > 0
+        LimitConsecutiveSubstringRepetitionNaiveB = _
+            ReplaceB(LimitConsecutiveSubstringRepetitionNaiveB, findStr, _
+                     replaceStr, , , Compare)
+    Loop
+End Function
+
+Sub DemoLimitConsecutiveSubstringRepetitionB()
+    'The library function is typically much faster than the naive approach and
+    'has linear time complexity
+    Const LEN_TEST_STR As Long = 1000000
+    
+    Dim resultNaive As String
+    Dim resultLib As String
+    
+    StartTimer
+    Dim demoStr As String: 'demoStr = RandomStringFromChars(LEN_TEST_STR, "ab ")
+    demoStr = RepeatString("  a", LEN_TEST_STR / 3)
+    
+    ReadTimer "Generating test string of length " & LEN_TEST_STR, Reset:=True
+    resultNaive = LimitConsecutiveSubstringRepetitionNaiveB(demoStr, " ", 1)
+    ReadTimer "Naive approach", Reset:=True
+    resultLib = LimitConsecutiveSubstringRepetitionB(demoStr, " ", 1)
     ReadTimer "Library approach"
     Debug.Print resultNaive = resultLib
 End Sub

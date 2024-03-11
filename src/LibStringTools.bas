@@ -3827,7 +3827,61 @@ Public Function CountSubstringUnlessEscapedB(ByRef bytes As String, _
     Loop
 End Function
 
+'Works like the inbuilt 'Replace', but only allocates the buffer once and is
+'therefore much, much faster on large strings with many replacements
+Public Function ReplaceFast(ByRef str As String, _
+                            ByRef sFind As String, _
+                            ByRef sReplace As String, _
+                   Optional ByVal lStart As Long = 1, _
+                   Optional ByVal lCount As Long = -1, _
+                   Optional ByVal lCompare As VbCompareMethod _
+                                           = vbBinaryCompare) As String
+    Const methodName As String = "ReplaceFast"
+    If lStart < 1 Then Err.Raise 5, methodName, _
+        "Argument 'lStart' = " & lStart & " < 1, invalid"
+    If lCount < -1 Then Err.Raise 5, methodName, _
+        "Argument 'lCount' = " & lCount & " < -1, invalid"
+    lCount = lCount And &H7FFFFFFF
+
+    If Len(str) = 0 Or Len(sFind) = 0 Then
+        ReplaceFast = Mid$(str, lStart)
+        Exit Function
+    End If
+
+    Dim lenFind As Long:         lenFind = Len(sFind)
+    Dim lenReplace As Long:      lenReplace = Len(sReplace)
+    Dim bufferSizeChange As Long
+    bufferSizeChange = CountSubstring(str, sFind, lStart, lCount, lCompare) _
+                                       * (lenReplace - lenFind) - lStart + 1
+
+    If Len(str) + bufferSizeChange < 0 Then Exit Function
+
+    ReplaceFast = Space$(Len(str) + bufferSizeChange)
+
+    Dim i As Long:              i = InStr(lStart, str, sFind, lCompare)
+    Dim j As Long:              j = 1
+    Dim lastOccurrence As Long: lastOccurrence = lStart
+    Dim count As Long:          count = 1
+
+    Do Until i = 0 Or count > lCount
+        Dim diff As Long: diff = i - lastOccurrence
+        If diff > 0 Then _
+            Mid$(ReplaceFast, j, diff) = Mid$(str, lastOccurrence, diff)
+        j = j + diff
+        If lenReplace <> 0 Then
+            Mid$(ReplaceFast, j, lenReplace) = sReplace
+            j = j + lenReplace
+        End If
+        count = count + 1
+        lastOccurrence = i + lenFind
+        i = InStr(lastOccurrence, str, sFind, lCompare)
+    Loop
+    If j <= Len(ReplaceFast) Then Mid$(ReplaceFast, j) = Mid$(str, lastOccurrence)
+End Function
+
 'Works like the inbuilt 'Replace', but parses the string bytewise, not charwise.
+'This function uses the same algorithm used by ReplaceFast by default, therefore
+'no ReplaceFastB exists or is required in this library.
 'Example illustrating the difference:
 'bytes = HexToString("0x00610061")
 'sFind = HexToString("0x6100")
@@ -3902,7 +3956,7 @@ Public Function LimitConsecutiveSubstringRepetition( _
     If limit < 0 Then Err.Raise 5, methodName, _
         "Argument 'limit' = " & limit & " < 0, invalid"
     If limit = 0 Then
-        LimitConsecutiveSubstringRepetition = Replace(str, subStr, _
+        LimitConsecutiveSubstringRepetition = ReplaceFast(str, subStr, _
                                                       vbNullString, , , Compare)
         Exit Function
     Else
@@ -4954,8 +5008,8 @@ Public Function ReplaceMultipleMultiPass(ByRef str As String, _
     
     Dim i As Long
     For i = 0 To UBound(finds)
-        ReplaceMultipleMultiPass = Replace(ReplaceMultipleMultiPass, finds(i), _
-                                replaces(i Mod numReplaces), , lCount, lCompare)
+        ReplaceMultipleMultiPass = ReplaceFast(ReplaceMultipleMultiPass, _
+                      finds(i), replaces(i Mod numReplaces), , lCount, lCompare)
     Next i
 End Function
 
