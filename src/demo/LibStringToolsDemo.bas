@@ -130,7 +130,8 @@ Sub DemoLimitConsecutiveSubstringRepetitionB()
     
     StartTimer
     Dim demoStr As String: 'demoStr = RandomStringFromChars(LEN_TEST_STR, "ab ")
-    demoStr = RepeatString("  a", LEN_TEST_STR / 3)
+    'demoStr = RepeatString("  a", LEN_TEST_STR / 3)
+    demoStr = String(35000000, "a") & Space(10000000)
     
     ReadTimer "Generating test string of length " & LEN_TEST_STR, Reset:=True
     resultNaive = LimitConsecutiveSubstringRepetitionNaiveB(demoStr, " ", 1)

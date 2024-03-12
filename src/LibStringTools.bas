@@ -3615,6 +3615,11 @@ Public Function RandomStringArray(ByVal numElements As Long, _
     And maxElementLength Mod 2 = 1 Then Err.Raise 5, methodName, _
         "Can't build string of uneven length from only Surrogate Pairs."
     
+    If numElements = 0 Then
+        RandomStringArray = Split("", , 0)
+        Exit Function
+    End If
+    
     Dim stringArray() As String: ReDim stringArray(0 To numElements - 1)
     Dim i As Long
     Dim strLength As Long
