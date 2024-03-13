@@ -3840,9 +3840,8 @@ Public Function CountSubstringUnlessEscapedB(ByRef bytes As String, _
         i = InStrB(i + lenBSubStr, bytes, subStr, lCompare)
     Loop
 End Function
-
-'Works like the inbuilt 'Replace', but only allocates the buffer once and is
-'therefore much, much faster on large strings with many replacements
+'Works exactly like the inbuilt 'Replace', but is much, much faster on large
+'strings with many replacements when vbBinaryCompare is used
 Public Function ReplaceFast(ByRef str As String, _
                             ByRef sFind As String, _
                             ByRef sReplace As String, _
@@ -3851,21 +3850,22 @@ Public Function ReplaceFast(ByRef str As String, _
                    Optional ByVal lCompare As VbCompareMethod _
                                            = vbBinaryCompare) As String
     Const methodName As String = "ReplaceFast"
-    If lCompare <> vbBinaryCompare Or Len(str) < 10000 Then
-        'In the case of vbTextCompare, InStr's runtime will always be
-        'proportional to the find position relative to the beginning of the
-        'string, not relative to its 'Start' parameter, therefore, the algorithm
-        'used in this function is not feasible, native 'Replace' should
-        'usually be much faster in this case
-        'Also, blow 10k replacements, native Replace has a speed advantage
-        ReplaceFast = Replace(str, sFind, sReplace, lStart, lCount, lCompare)
-        Exit Function
-    End If
     If lStart < 1 Then Err.Raise 5, methodName, _
         "Argument 'lStart' = " & lStart & " < 1, invalid"
     If lCount < -1 Then Err.Raise 5, methodName, _
         "Argument 'lCount' = " & lCount & " < -1, invalid"
     lCount = lCount And &H7FFFFFFF
+    
+    If lCompare <> vbBinaryCompare Or Len(str) < 10000 Or lCount < 10000 Then
+        'In the case of vbTextCompare, InStr's runtime will always be
+        'proportional to the find position relative to the beginning of the
+        'string, not relative to its 'Start' parameter, therefore, the algorithm
+        'used in this function is not feasible and native 'Replace' is always
+        'much faster in this case.
+        'Also, blow 10k replacements, native Replace has a speed advantage
+        ReplaceFast = Replace(str, sFind, sReplace, lStart, lCount, lCompare)
+        Exit Function
+    End If
 
     If Len(str) = 0 Or Len(sFind) = 0 Then
         ReplaceFast = Mid$(str, lStart)
@@ -3874,25 +3874,41 @@ Public Function ReplaceFast(ByRef str As String, _
 
     Dim lenFind As Long:         lenFind = Len(sFind)
     Dim lenReplace As Long:      lenReplace = Len(sReplace)
+    If lenFind = 0 Then Exit Function
     
-    'It is almost impossible to cache sFind positions in str in a way that is
-    'faster than just iterating str again using 'InStr' as long as lCompare
-    'is vbBinaryCompare. Because only vbBinaryCompare is relevant here, we just
-    'iterate twice.
+    Static lFindPositions() As Long
+    If (Not Not lFindPositions) = 0 Then ReDim lFindPositions(0 To 32767)
+    Dim numFinds As Long
+    Dim k As Long:         k = InStr(lStart, str, sFind, lCompare)
+    
+    On Error GoTo catch
+    Do Until k = 0 Or lCount = numFinds
+        lFindPositions(numFinds) = k
+        numFinds = numFinds + 1
+        k = InStr(k + lenFind, str, sFind, lCompare)
+    Loop
+    On Error GoTo 0
+    GoTo continue
+catch:
+    ReDim Preserve lFindPositions(LBound(lFindPositions) To _
+                                      UBound(lFindPositions) * 4)
+    Resume
+continue:
     Dim bufferSizeChange As Long
-    bufferSizeChange = CountSubstring(str, sFind, lStart, lCount, lCompare) _
-                                       * (lenReplace - lenFind) - lStart + 1
+    bufferSizeChange = numFinds * (lenReplace - lenFind) - lStart + 1
 
     If Len(str) + bufferSizeChange < 0 Then Exit Function
 
     ReplaceFast = Space$(Len(str) + bufferSizeChange)
 
-    Dim i As Long:              i = InStr(lStart, str, sFind, lCompare)
+    Dim i As Long
     Dim j As Long:              j = 1
     Dim lastOccurrence As Long: lastOccurrence = lStart
     Dim count As Long:          count = 1
 
-    Do Until i = 0 Or count > lCount
+    For k = 0 To numFinds - 1
+        If count > lCount Then Exit For
+        i = lFindPositions(k)
         Dim diff As Long: diff = i - lastOccurrence
         If diff > 0 Then _
             Mid$(ReplaceFast, j, diff) = Mid$(str, lastOccurrence, diff)
@@ -3903,8 +3919,7 @@ Public Function ReplaceFast(ByRef str As String, _
         End If
         count = count + 1
         lastOccurrence = i + lenFind
-        i = InStr(lastOccurrence, str, sFind, lCompare)
-    Loop
+    Next k
     If j <= Len(ReplaceFast) Then Mid$(ReplaceFast, j) = Mid$(str, lastOccurrence)
 End Function
 
@@ -4521,15 +4536,17 @@ End Function
 '   E.g.: sFindOrFinds = ("1", "2", "3"), sReplaceOrReplaces = ("4", "5")
 '         ReplaceMultiple("123123123", ...) returns "454454454"
 '         -> Each "1" and "3" get replaced by "4" while "2" gets replaced by "5"
-'Case 2: n < m
 '
+'Case 2: n < m
 '   E.g.: sFindOrFinds = ("1", "2"), sReplaceOrReplaces = ("3", "4", "5")
 '         Every odd numbered occurrence of "1" gets replaced by "3", every even
 '         numbered occurrence of "1" gets replaced by "5" and every occurrence
 '         of "2" gets replaced by "4"
 '         ReplaceMultiple("123123123", ...) returns "343543343"
 'Notes:
-''ReplaceMultipleMultiPass' is almost always faster than this function, but
+''ReplaceMultipleMultiPass' is generally faster than this function for smaller
+'   input strings (< 50k characters) or a large amount of 'finds' and 'replaces'
+'   (> 1000 of each)
 '   does not support the n < m case and also the behavior can differ and be less
 '   predictable, if for example finds appear in the string through prior
 '   replacements that can then get replaced again in the next iteration.
@@ -4711,7 +4728,8 @@ Public Function ReplaceMultiple(ByRef str As String, _
     If count > lCount Then _
         ReplaceMultiple = _
             LeftB$(ReplaceMultiple, builtStrPos + LenB(remainderStr))
-
+'    Dim numReplacements As Long
+'    Debug.Print numReplacements
     Exit Function
 HeapSwapElements:
     Dim temp(0 To 2) As Long
@@ -4726,6 +4744,7 @@ HeapSwapElements:
     nextOccsHeap(index2, 2) = temp(2)
     Return
 HeapInsert:
+    'numReplacements = numReplacements + 1
     nextOccsHeap(heapSize, 0) = insertElement(0)
     nextOccsHeap(heapSize, 1) = insertElement(1)
     nextOccsHeap(heapSize, 2) = insertElement(2)
@@ -5038,7 +5057,7 @@ Public Function ReplaceMultipleMultiPass(ByRef str As String, _
     Dim i As Long
     For i = 0 To UBound(finds)
         ReplaceMultipleMultiPass = ReplaceFast(ReplaceMultipleMultiPass, _
-                      finds(i), replaces(i Mod numReplaces), , lCount, lCompare)
+                  (finds(i)), (replaces(i Mod numReplaces)), , lCount, lCompare)
     Next i
 End Function
 

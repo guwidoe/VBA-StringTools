@@ -828,13 +828,13 @@ End Sub
 Sub TestReplaceMultiple()
 
     Dim s As String
-    s = RandomStringAlphanumeric(100000)
+    s = RandomStringAlphanumeric(5000000)
     Dim finds As Variant
-    finds = RandomStringArray(7000, 10, 8, 30, 255) '  '
+    finds = RandomStringArray(1000, 1000, 3, 30, 255) '  '
     'finds = VBA.Array("1", "2", "3", "4", "5", "6", "7", "8", "9", "10")
     'finds = StringToCodepointStrings(RandomStringUnicode(6000))
     Dim replaces As Variant
-    replaces = RandomStringArray(5000, 10, 8, 30, 255) ' '
+    replaces = RandomStringArray(10, 10, 3, 30, 255) ' '
     'replaces = Array("a", "b", "c", "d", "e", "f", "g", "h", "i", "j")
     'replaces = StringToCodepointStrings(RandomStringUnicode(5000))
     'Debug.Print ReplaceMultiple(s, finds, replaces) = ReplaceMultipleMultiPass(s, finds, replaces)
@@ -848,6 +848,7 @@ Sub TestReplaceMultiple()
     rmulti = ReplaceMultipleMultiPass(s, finds, replaces)
     RT "ReplaceMultipleMultiPass"
     Debug.Print rsingle = rmulti
+    Debug.Print s = rsingle
     'Debug.Print ReplaceMultipleB(s, Array("1", "2", "3"), Array("44", "55"))
 End Sub
 
@@ -1201,22 +1202,50 @@ End Sub
 '
 
 Sub TestFastReplace()
-    Const LEN_STR As Long = 10000
-    Dim compareMethod As VbCompareMethod: compareMethod = vbTextCompare
+    Const NUM_LOOPS As Long = 10000
+    Const LEN_STR As Long = 10
+    Const lCount As Long = -1
+    Dim i As Long
+    Dim compareMethod As VbCompareMethod: compareMethod = vbBinaryCompare
     
     
-    Dim s As String: s = RandomStringFromChars(LEN_STR, "a")
+    Dim s As String: s = RandomStringFromChars(LEN_STR, "aaa" & Space(10))
+    
     StartTimer
-    Dim resFast As String: resFast = ReplaceFast(s, "a", "b", , , compareMethod)
+    For i = 1 To NUM_LOOPS
+        Dim resFast As String: resFast = ReplaceFast(s, "aaaaaa", "b", , lCount, compareMethod)
+    Next i
     ReadTimer "ReplaceFast", , True
-    Dim resFaster As String: resFaster = ReplaceFaster(s, "a", "b", , , compareMethod)
-    ReadTimer "ReplaceFaster", , True
-    Dim resNative As String: resNative = Replace(s, "a", "b", , , compareMethod)
+    For i = 1 To NUM_LOOPS
+        Dim resFaster As String: resFaster = ReplaceFaster(s, "aaaaaa", "b", , lCount, compareMethod)
+    Next i
+'    'Placeholder for a new dev version of Replace
+'    ReadTimer "ReplaceFaster", , True
+'    For i = 1 To NUM_LOOPS
+'        Dim resNative As String: resNative = Replace(s, "aaaaaa", "b", , lCount, compareMethod)
+'    Next i
     ReadTimer "Replace Native", , True
     Debug.Print "Behavior 'ReplaceFast' is " & IIf(resFast <> resNative, _
                 "not same", "same") & " as normal 'Replace'"
-    Debug.Print "Behavior 'ReplaceFaster' is " & IIf(resFaster <> resNative, _
-                "not same", "same") & " as normal 'Replace'"
+'    Debug.Print "Behavior 'ReplaceFaster' is " & IIf(resFaster <> resNative, _
+'                "not same", "same") & " as normal 'Replace'"
+    Debug.Print "Num Replacements:" & CountSubstring(s, "aaaaaa", , lCount)
+'    Debug.Print resFaster
+'    Debug.Print resNative
+End Sub
+
+Sub TestInStr()
+    Const FIND_POS As Long = 1000000
+    Const START_SEARCH_POS As Long = 1000000
+    Dim str As String
+    str = RandomStringFromChars(FIND_POS, "abcdefghijklmnopqrstuvwxy123") & "z" & RandomStringFromChars(FIND_POS, "abcdefghijklmnopqrstuvwxy123")
+    StartTimer
+    Dim posZ1 As Long: posZ1 = InStr(START_SEARCH_POS, str, "z", vbBinaryCompare)
+    ReadTimer "InStr vbBinaryCompare, starting search at pos " & START_SEARCH_POS & " found at pos " & posZ1, , True
+    Dim posZ2 As Long: posZ2 = InStr(START_SEARCH_POS, str, "z", vbTextCompare)
+    ReadTimer "InStr vbTextCompare, starting search at pos " & START_SEARCH_POS & " found at pos " & posZ2, , True
+    Dim posZ3 As Long: posZ3 = InStr(START_SEARCH_POS, LCase(str), LCase("z"), vbBinaryCompare)
+    ReadTimer "InStr vbBinaryCompare, on LCase, starting search at pos " & START_SEARCH_POS & " found at pos " & posZ2, , True
 End Sub
 
 Sub TestReplaceVsCountSubstring()
@@ -1241,7 +1270,7 @@ Sub TestReplaceVsCountSubstring()
     Debug.Print "Cound vbBinaryCompare: " & resInStrvbBinary
 End Sub
 
-Sub TestInStr()
+Sub TestInStrr()
     Const FIND_POS As Long = 1000000
     Const START_SEARCH_POS As Long = 1
     Dim str As String
