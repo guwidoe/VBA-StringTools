@@ -436,6 +436,7 @@ Public Function LimitConsecutiveSubstringRepetitionCheck2(ByVal str As String, _
     Loop Until sCompare = LimitConsecutiveSubstringRepetitionCheck2
 End Function
 
+
 Sub RunLimitConsecutiveSubstringRepetitionTests()
     Dim failedTests As Long
     On Error GoTo errh:
@@ -496,8 +497,101 @@ Private Sub TestReplaceB()
     Dim bytes As String: bytes = HexToString("0x006100610061")
     Dim sFind As String: sFind = HexToString("0x6100")
     Debug.Print "ReplaceB:", StringToHex(ReplaceB(bytes, sFind, ""))
+    Debug.Print "ReplaceFastB:", StringToHex(ReplaceFastB(bytes, sFind, ""))
     Debug.Print "Replace:", StringToHex(Replace(bytes, sFind, ""))
 End Sub
+
+'Working accurate version of ReplaceB to compare results against for random
+'input testing
+Public Function ReplaceBCheck(ByRef bytes As String, _
+                         ByRef sFind As String, _
+                         ByRef sReplace As String, _
+                Optional ByVal lStart As Long = 1, _
+                Optional ByVal lCount As Long = -1, _
+                Optional ByVal lCompare As VbCompareMethod _
+                                        = vbBinaryCompare) As String
+    Const methodName As String = "ReplaceBCheck"
+    If lStart < 1 Then Err.Raise 5, methodName, _
+        "Argument 'lStart' = " & lStart & " < 1, invalid"
+    If lCount < -1 Then Err.Raise 5, methodName, _
+        "Argument 'lCount' = " & lCount & " < -1, invalid"
+    lCount = lCount And &H7FFFFFFF
+
+    If LenB(bytes) = 0 Or LenB(sFind) = 0 Then
+        ReplaceBCheck = MidB$(bytes, lStart)
+        Exit Function
+    End If
+
+    Dim lenBFind As Long:         lenBFind = LenB(sFind)
+    Dim lenBReplace As Long:      lenBReplace = LenB(sReplace)
+    Dim bufferSizeChange As Long
+    bufferSizeChange = CountSubstringB(bytes, sFind, lStart, lCount, lCompare) _
+                                             * (lenBReplace - lenBFind) - lStart
+    
+    If LenB(bytes) + bufferSizeChange < 0 Then Exit Function
+    
+    Dim buffer() As Byte: ReDim buffer(0 To LenB(bytes) + bufferSizeChange)
+    ReplaceBCheck = buffer
+
+    Dim i As Long:              i = InStrB(lStart, bytes, sFind, lCompare)
+    Dim j As Long:              j = 1
+    Dim lastOccurrence As Long: lastOccurrence = lStart
+    Dim count As Long:          count = 1
+
+    Do Until i = 0 Or count > lCount
+        Dim diff As Long: diff = i - lastOccurrence
+        If diff > 0 Then _
+            MidB$(ReplaceBCheck, j, diff) = MidB$(bytes, lastOccurrence, diff)
+        j = j + diff
+        If lenBReplace <> 0 Then
+            MidB$(ReplaceBCheck, j, lenBReplace) = sReplace
+            j = j + lenBReplace
+        End If
+        count = count + 1
+        lastOccurrence = i + lenBFind
+        i = InStrB(lastOccurrence, bytes, sFind, lCompare)
+    Loop
+    If j <= LenB(ReplaceBCheck) Then MidB$(ReplaceBCheck, j) = MidB$(bytes, lastOccurrence)
+End Function
+
+'Sub for ReplaceFast functionality testing
+Private Sub TestReplaceFast()
+    Dim s As String, f As String, r As String
+    Dim st As Long:  st = 1 'default
+    Dim c As Long:   c = -1 'default
+    Dim cmp As VbCompareMethod: cmp = vbBinaryCompare
+    s = "abcde" & Space(10000) & "fghijk"
+    f = "fg"
+    r = "asdfadsf"
+    Debug.Print ReplaceFast(s, f, r, st, c, cmp) = Replace(s, f, r, st, c, cmp)
+    s = "fgsafas" & Space(10000) & "dadsfg"
+    Debug.Print ReplaceFast(s, f, r, st, c, cmp) = Replace(s, f, r, st, c, cmp)
+    s = "fgfgfgfgfgfg" & RepeatString("fg", 12000) & "fgfgasdfasdffgfgfg"
+    c = 11000
+    Debug.Print ReplaceFast(s, f, r, st, c, cmp) = Replace(s, f, r, st, c, cmp)
+    st = 4
+    Debug.Print ReplaceFast(s, f, r, st, c, cmp) = Replace(s, f, r, st, c, cmp)
+End Sub
+
+''Placeholder for potential dev ReplaceFastB version for comparing accuracy with
+''already implemented version
+'Private Sub TestReplaceFastB()
+'    Dim s As String, f As String, r As String
+'    Dim st As Long:  st = 1 'default
+'    Dim c As Long:   c = -1 'default
+'    Dim cmp As VbCompareMethod: cmp = vbBinaryCompare
+'    s = PadRightB(" ", 1) & "abcde" & Space(10000) & "fghijk"
+'    f = "fg"
+'    r = PadRightB(" ", 1) & "asdfadsf"
+'    Debug.Print ReplaceFastB(s, f, r, st, c, cmp) = ReplaceB(s, f, r, st, c, cmp)
+'    s = "fgsafas" & Space(10000) & "dadsfg"
+'    Debug.Print ReplaceFastB(s, f, r, st, c, cmp) = ReplaceB(s, f, r, st, c, cmp)
+'    s = "fgfgfgfgfgfg" & RepeatString("fg", 12000) & "fgfgasdfasdffgfgfg"
+'    c = 11000
+'    Debug.Print ReplaceFastB(s, f, r, st, c, cmp) = ReplaceB(s, f, r, st, c, cmp)
+'    st = 4
+'    Debug.Print ReplaceFastB(s, f, r, st, c, cmp) = ReplaceB(s, f, r, st, c, cmp)
+'End Sub
 
 Private Sub TestSplitB()
     Dim bytes As String: bytes = HexToString("0x006100610061")
@@ -973,7 +1067,7 @@ Sub CompareReplaceAndReplaceMultiple()
 End Sub
 
 Sub CompareReplaceAndReplaceB()
-    Const LEN_TEST_STR As Long = 50000
+    Const LEN_TEST_STR As Long = 1000000
     Const REPETITIONS As Long = 1
     Dim i As Long
     
@@ -988,11 +1082,23 @@ Sub CompareReplaceAndReplaceB()
     ReadTimer "Native Replace function", Reset:=True
     
     For i = 1 To REPETITIONS
+        Dim resultLib2 As String: resultLib2 = ReplaceFast(demoStr, " ", "  ")
+    Next i
+    ReadTimer "Library ReplaceFast function", Reset:=True
+    
+    For i = 1 To REPETITIONS
         Dim resultLib As String: resultLib = ReplaceB(demoStr, " ", "  ")
     Next i
-    ReadTimer "Library ReplaceB function"
+    ReadTimer "Library ReplaceB function", Reset:=True
     
-    Debug.Print resultNative = resultLib
+'    'Placeholder for a dev version of ReplaceB
+'    For i = 1 To REPETITIONS
+'        Dim resultLib3 As String: resultLib3 = ReplaceFastB(demoStr, " ", "  ")
+'    Next i
+'    ReadTimer "Library ReplaceFastB function", Reset:=True
+    
+    Debug.Print resultNative = resultLib2
+    'Debug.Print resultLib3 = resultLib2
 End Sub
 
 

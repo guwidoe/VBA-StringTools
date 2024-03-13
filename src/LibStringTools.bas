@@ -3840,6 +3840,7 @@ Public Function CountSubstringUnlessEscapedB(ByRef bytes As String, _
         i = InStrB(i + lenBSubStr, bytes, subStr, lCompare)
     Loop
 End Function
+
 'Works exactly like the inbuilt 'Replace', but is much, much faster on large
 'strings with many replacements when vbBinaryCompare is used
 Public Function ReplaceFast(ByRef str As String, _
@@ -3876,22 +3877,22 @@ Public Function ReplaceFast(ByRef str As String, _
     Dim lenReplace As Long:      lenReplace = Len(sReplace)
     If lenFind = 0 Then Exit Function
     
-    Static lFindPositions() As Long
-    If (Not Not lFindPositions) = 0 Then ReDim lFindPositions(0 To 32767)
+    Static sFindPositions() As Long
+    If (Not Not sFindPositions) = 0 Then ReDim sFindPositions(0 To 32767)
     Dim numFinds As Long
     Dim k As Long:         k = InStr(lStart, str, sFind, lCompare)
     
     On Error GoTo catch
     Do Until k = 0 Or lCount = numFinds
-        lFindPositions(numFinds) = k
+        sFindPositions(numFinds) = k
         numFinds = numFinds + 1
         k = InStr(k + lenFind, str, sFind, lCompare)
     Loop
     On Error GoTo 0
     GoTo continue
 catch:
-    ReDim Preserve lFindPositions(LBound(lFindPositions) To _
-                                      UBound(lFindPositions) * 4)
+    ReDim Preserve sFindPositions(LBound(sFindPositions) To _
+                                  UBound(sFindPositions) * 4)
     Resume
 continue:
     Dim bufferSizeChange As Long
@@ -3908,7 +3909,7 @@ continue:
 
     For k = 0 To numFinds - 1
         If count > lCount Then Exit For
-        i = lFindPositions(k)
+        i = sFindPositions(k)
         Dim diff As Long: diff = i - lastOccurrence
         If diff > 0 Then _
             Mid$(ReplaceFast, j, diff) = Mid$(str, lastOccurrence, diff)
@@ -3932,12 +3933,12 @@ End Function
 '? StringToHex(ReplaceB(bytes, sFind, "")) -> "0x0061"
 '? StringToHex(Replace(bytes, sFind, "")) -> "0x00610061"
 Public Function ReplaceB(ByRef bytes As String, _
-                         ByRef sFind As String, _
-                         ByRef sReplace As String, _
-                Optional ByVal lStart As Long = 1, _
-                Optional ByVal lCount As Long = -1, _
-                Optional ByVal lCompare As VbCompareMethod _
-                                        = vbBinaryCompare) As String
+                             ByRef sFind As String, _
+                             ByRef sReplace As String, _
+                    Optional ByVal lStart As Long = 1, _
+                    Optional ByVal lCount As Long = -1, _
+                    Optional ByVal lCompare As VbCompareMethod _
+                                            = vbBinaryCompare) As String
     Const methodName As String = "ReplaceB"
     If lStart < 1 Then Err.Raise 5, methodName, _
         "Argument 'lStart' = " & lStart & " < 1, invalid"
@@ -3950,23 +3951,44 @@ Public Function ReplaceB(ByRef bytes As String, _
         Exit Function
     End If
 
-    Dim lenBFind As Long:         lenBFind = LenB(sFind)
-    Dim lenBReplace As Long:      lenBReplace = LenB(sReplace)
-    Dim bufferSizeChange As Long
-    bufferSizeChange = CountSubstringB(bytes, sFind, lStart, lCount, lCompare) _
-                                             * (lenBReplace - lenBFind) - lStart
+    Dim lenBFind As Long:    lenBFind = LenB(sFind)
+    Dim lenBReplace As Long: lenBReplace = LenB(sReplace)
+    If lenBFind = 0 Then Exit Function
     
+    Static sFindPositions() As Long
+    If (Not Not sFindPositions) = 0 Then ReDim sFindPositions(0 To 32767)
+    Dim numFinds As Long
+    Dim k As Long:         k = InStrB(lStart, bytes, sFind, lCompare)
+    
+    On Error GoTo catch
+    Do Until k = 0 Or lCount = numFinds
+        sFindPositions(numFinds) = k
+        numFinds = numFinds + 1
+        k = InStrB(k + lenBFind, bytes, sFind, lCompare)
+    Loop
+    On Error GoTo 0
+    GoTo continue
+catch:
+    ReDim Preserve sFindPositions(LBound(sFindPositions) To _
+                                      UBound(sFindPositions) * 4)
+    Resume
+continue:
+    Dim bufferSizeChange As Long
+    bufferSizeChange = numFinds * (lenBReplace - lenBFind) - lStart
+
     If LenB(bytes) + bufferSizeChange < 0 Then Exit Function
     
-    Dim buffer() As Byte: ReDim buffer(0 To LenB(bytes) + bufferSizeChange)
+    Dim buffer() As Byte:  ReDim buffer(0 To LenB(bytes) + bufferSizeChange)
     ReplaceB = buffer
 
-    Dim i As Long:              i = InStrB(lStart, bytes, sFind, lCompare)
+    Dim i As Long
     Dim j As Long:              j = 1
     Dim lastOccurrence As Long: lastOccurrence = lStart
     Dim count As Long:          count = 1
 
-    Do Until i = 0 Or count > lCount
+    For k = 0 To numFinds - 1
+        If count > lCount Then Exit For
+        i = sFindPositions(k)
         Dim diff As Long: diff = i - lastOccurrence
         If diff > 0 Then _
             MidB$(ReplaceB, j, diff) = MidB$(bytes, lastOccurrence, diff)
@@ -3977,10 +3999,10 @@ Public Function ReplaceB(ByRef bytes As String, _
         End If
         count = count + 1
         lastOccurrence = i + lenBFind
-        i = InStrB(lastOccurrence, bytes, sFind, lCompare)
-    Loop
+    Next k
     If j <= LenB(ReplaceB) Then MidB$(ReplaceB, j) = MidB$(bytes, lastOccurrence)
 End Function
+
 
 'Replaces consecutive occurrences of 'substring' that repeat more than 'limit'
 'times with exactly 'limit' consecutive occurrences
