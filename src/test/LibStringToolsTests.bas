@@ -513,13 +513,13 @@ Private Sub TestSplitB()
     Stop
 End Sub
 
-Private Static Property Get AllCodePages() As collection
-    Dim c As collection
+Private Static Property Get AllCodePages() As Collection
+    Dim c As Collection
     If Not c Is Nothing Then
         Set AllCodePages = c
         Exit Function
     End If
-    Set c = New collection
+    Set c = New Collection
           'Item: Enum ID, Key:=.NET Name
     c.Add Item:=cpIBM037, Key:="IBM037"
     c.Add Item:=cpIBM437, Key:="IBM437"
@@ -945,7 +945,7 @@ Public Sub TestPrintVar()
     ReDim weirdArray(1 To 3, 1 To 3)
     weirdArray(1, 1) = Array(1, 2, 3, 4)
     weirdArray(1, 2) = Array(Array(1, 2, 3), 2, 3, 4)
-    Set weirdArray(2, 1) = New collection
+    Set weirdArray(2, 1) = New Collection
     weirdArray(2, 2) = CCur(1000)
     weirdArray(3, 2) = nested2DimArray
     Debug.Print "Test Case 9: Weird array"
@@ -1200,3 +1200,58 @@ End Sub
 'End Sub
 '
 
+Sub TestFastReplace()
+    Const LEN_STR As Long = 10000
+    Dim compareMethod As VbCompareMethod: compareMethod = vbTextCompare
+    
+    
+    Dim s As String: s = RandomStringFromChars(LEN_STR, "a")
+    StartTimer
+    Dim resFast As String: resFast = ReplaceFast(s, "a", "b", , , compareMethod)
+    ReadTimer "ReplaceFast", , True
+    Dim resFaster As String: resFaster = ReplaceFaster(s, "a", "b", , , compareMethod)
+    ReadTimer "ReplaceFaster", , True
+    Dim resNative As String: resNative = Replace(s, "a", "b", , , compareMethod)
+    ReadTimer "Replace Native", , True
+    Debug.Print "Behavior 'ReplaceFast' is " & IIf(resFast <> resNative, _
+                "not same", "same") & " as normal 'Replace'"
+    Debug.Print "Behavior 'ReplaceFaster' is " & IIf(resFaster <> resNative, _
+                "not same", "same") & " as normal 'Replace'"
+End Sub
+
+Sub TestReplaceVsCountSubstring()
+    Const LEN_STR As Long = 2000
+    Dim s As String: s = RandomStringFromChars(LEN_STR, "Aabbbb")
+    s = RepeatString("Aabbbb", LEN_STR / Len("Aabbbb"))
+    StartTimer
+    Dim resvbText As String: resvbText = Replace(s, "a", "b", , , vbTextCompare)
+    ReadTimer "Replace Native vbTextCompare", , True
+    Dim resvbBinary As String: resvbBinary = Replace(s, "a", "b", , , vbBinaryCompare)
+    ReadTimer "Replace Native vbBinaryCompare", , True
+    Debug.Print "Behavior 'vbText' is " & IIf(resvbText <> resvbBinary, _
+                "not same", "same") & " as 'vbBinary'"
+    
+    Dim resInStrvbText As Long: resInStrvbText = CountSubstring(s, "a", , , vbTextCompare)
+    ReadTimer "InStr vbTextCompare", , True
+    Dim resInStrvbBinary As Long: resInStrvbBinary = CountSubstring(s, "a", , , vbBinaryCompare)
+    ReadTimer "InStr vbBinaryCompare", , True
+    Debug.Print "Behavior 'vbText' is " & IIf(resInStrvbText <> resInStrvbBinary, _
+                "not same", "same") & " as 'vbBinary'"
+    Debug.Print "Cound vbTextCompare: " & resInStrvbText
+    Debug.Print "Cound vbBinaryCompare: " & resInStrvbBinary
+End Sub
+
+Sub TestInStr()
+    Const FIND_POS As Long = 1000000
+    Const START_SEARCH_POS As Long = 1
+    Dim str As String
+    str = RandomStringFromChars(FIND_POS, "abcdefghijklmnopqrstuvwxy123") & "z" & RandomStringFromChars(FIND_POS, "abcdefghijklmnopqrstuvwxy123")
+    
+    StartTimer
+    Dim posZ1 As Long: posZ1 = InStr(START_SEARCH_POS, str, "z", vbBinaryCompare)
+    ReadTimer "InStr vbBinaryCompare, starting search at pos " & _
+              START_SEARCH_POS & " found at pos " & posZ1, , True
+    Dim posZ2 As Long: posZ2 = InStr(START_SEARCH_POS, str, "z", vbTextCompare)
+    ReadTimer "InStr vbTextCompare, starting search at pos " & _
+              START_SEARCH_POS & " found at pos " & posZ2, , True
+End Sub

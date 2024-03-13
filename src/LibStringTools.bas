@@ -6,7 +6,7 @@ Attribute VB_Name = "LibStringTools"
 ' ------------------------------------------
 ' MIT License
 '
-' Copyright (c) 2023 Guido Witt-Dörring
+' Copyright (c) 2024 Guido Witt-Dörring
 '
 ' Permission is hereby granted, free of charge, to any person obtaining a copy
 ' of this software and associated documentation files (the "Software"), to
@@ -3723,15 +3723,24 @@ Public Function CountSubstring(ByRef str As String, _
     If lLimit < -1 Then Err.Raise 5, methodName, _
         "Argument 'lLimit' = " & lLimit & " < -1, invalid"
     If subStr = vbNullString Then Exit Function
-
-    Dim lenSubStr As Long: lenSubStr = Len(subStr)
-    Dim i As Long:         i = InStr(lStart, str, subStr, lCompare)
-
-    CountSubstring = 0
-    Do Until i = 0 Or lLimit = CountSubstring
-        CountSubstring = CountSubstring + 1
-        i = InStr(i + lenSubStr, str, subStr, lCompare)
-    Loop
+    
+    If lCompare = vbTextCompare And Len(str) > 1000 Then
+        'In the case of vbTextCompare, InStr's runtime will always be
+        'proportional to the find position relative to the beginning of the
+        'string, not relative to its 'Start' parameter, therefore, this method
+        'using 'Replace' should usually be much faster
+        CountSubstring = (Len(str) - Len(Replace(str, subStr, vbNullString, _
+                          lStart, lLimit, vbTextCompare))) \ Len(subStr)
+    Else
+        Dim lenSubStr As Long: lenSubStr = Len(subStr)
+        Dim i As Long:         i = InStr(lStart, str, subStr, lCompare)
+    
+        CountSubstring = 0
+        Do Until i = 0 Or lLimit = CountSubstring
+            CountSubstring = CountSubstring + 1
+            i = InStr(i + lenSubStr, str, subStr, lCompare)
+        Loop
+    End If
 End Function
 
 'Like CountSubstring but scans a string bytewise.
@@ -3842,6 +3851,16 @@ Public Function ReplaceFast(ByRef str As String, _
                    Optional ByVal lCompare As VbCompareMethod _
                                            = vbBinaryCompare) As String
     Const methodName As String = "ReplaceFast"
+    If lCompare <> vbBinaryCompare Or Len(str) < 10000 Then
+        'In the case of vbTextCompare, InStr's runtime will always be
+        'proportional to the find position relative to the beginning of the
+        'string, not relative to its 'Start' parameter, therefore, the algorithm
+        'used in this function is not feasible, native 'Replace' should
+        'usually be much faster in this case
+        'Also, blow 10k replacements, native Replace has a speed advantage
+        ReplaceFast = Replace(str, sFind, sReplace, lStart, lCount, lCompare)
+        Exit Function
+    End If
     If lStart < 1 Then Err.Raise 5, methodName, _
         "Argument 'lStart' = " & lStart & " < 1, invalid"
     If lCount < -1 Then Err.Raise 5, methodName, _
@@ -3855,6 +3874,11 @@ Public Function ReplaceFast(ByRef str As String, _
 
     Dim lenFind As Long:         lenFind = Len(sFind)
     Dim lenReplace As Long:      lenReplace = Len(sReplace)
+    
+    'It is almost impossible to cache sFind positions in str in a way that is
+    'faster than just iterating str again using 'InStr' as long as lCompare
+    'is vbBinaryCompare. Because only vbBinaryCompare is relevant here, we just
+    'iterate twice.
     Dim bufferSizeChange As Long
     bufferSizeChange = CountSubstring(str, sFind, lStart, lCount, lCompare) _
                                        * (lenReplace - lenFind) - lStart + 1

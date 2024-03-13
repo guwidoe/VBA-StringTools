@@ -86,20 +86,24 @@ End Function
 Sub DemoLimitConsecutiveSubstringRepetition()
     'The library function is typically much faster than the naive approach and
     'has linear time complexity
-    Const LEN_TEST_STR As Long = 1000000
+    Const LEN_TEST_STR As Long = 50
+    Dim lCompare As VbCompareMethod: lCompare = vbTextCompare
     Dim demoStr As String
     Dim resultNaive As String
     Dim resultLib As String
     
     StartTimer
-    demoStr = RandomStringFromChars(LEN_TEST_STR, "ab ")
+    demoStr = RandomStringFromChars(LEN_TEST_STR, "Aa ")
     
     ReadTimer "Generating test string of length " & LEN_TEST_STR, Reset:=True
-    resultNaive = LimitConsecutiveSubstringRepetitionNaive(demoStr, " ", 1)
+    resultNaive = LimitConsecutiveSubstringRepetitionNaive(demoStr, "a", 1, lCompare)
     ReadTimer "Naive approach", Reset:=True
-    resultLib = LimitConsecutiveSubstringRepetition(demoStr, " ", 1)
+    resultLib = LimitConsecutiveSubstringRepetition(demoStr, "a", 1, lCompare)
     ReadTimer "Library approach"
     Debug.Print resultNaive = resultLib
+    Debug.Print demoStr
+    Debug.Print resultNaive
+    Debug.Print resultLib
 End Sub
 
 Public Function LimitConsecutiveSubstringRepetitionNaiveB( _
