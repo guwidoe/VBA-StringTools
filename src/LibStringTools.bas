@@ -3577,7 +3577,8 @@ End Function
 Public Function RandomStringFromChars(ByVal Length As Long, _
                              Optional ByRef inklChars As String = _
     "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", _
-                             Optional ByVal useRndWH As Boolean = False) As String
+                             Optional ByVal useRndWH As Boolean = False) _
+                                      As String
     Const methodName As String = "RandomStringFromChars"
     If Length = 0 Then Exit Function
     If Len(inklChars) = 0 Then Err.Raise 5, methodName, _
@@ -4098,7 +4099,7 @@ Public Function LimitConsecutiveSubstringRepetition( _
     Dim copyChunkSize As Long
     Dim consecutiveCount As Long
     Dim occurrenceDiff As Long
-
+    Dim numCopyOperations As Long 'del
     Do Until i = 0
         occurrenceDiff = i - lastOccurrence
         If occurrenceDiff = lenSubStr Then
@@ -4108,6 +4109,7 @@ Public Function LimitConsecutiveSubstringRepetition( _
             ElseIf consecutiveCount = limit + 1 Then
                 Mid$(LimitConsecutiveSubstringRepetition, j, copyChunkSize) = _
                     Mid$(str, i - copyChunkSize, copyChunkSize)
+                numCopyOperations = numCopyOperations + 1 'del
                 j = j + copyChunkSize
                 copyChunkSize = 0
             End If
@@ -4125,6 +4127,7 @@ Public Function LimitConsecutiveSubstringRepetition( _
 
     LimitConsecutiveSubstringRepetition = _
         Left$(LimitConsecutiveSubstringRepetition, j + copyChunkSize - 1)
+    Debug.Print numCopyOperations + 2 'del
 End Function
 
 'Same as LimitConsecutiveSubstringRepetition, but scans the string bytewise.
@@ -4647,15 +4650,6 @@ Public Function ReplaceMultiple(ByRef str As String, _
                                "Argument 'lStart' = " & lStart & " < 1, invalid"
     If lCount < -1 Then Err.Raise 5, methodName, _
                               "Argument 'lCount' = " & lCount & " < -1, invalid"
-                              
-    If lStart > Len(str) Then
-        ReplaceMultiple = Mid$(str, lStart) 'In case LenB(str) = lStart * 2 + 1
-        'Note, the inbuilt Replace function actually doesn't take this case into
-        'account so for logical consistency with the inbuilt Replace, the
-        'ReplaceMultiple = Mid$(str, lStart) should actually be omitted, however
-        'this behavior of the inbuilt Replace could also be interpreted as a bug
-        Exit Function
-    End If
     
     Dim finds As Variant
     If IsArray(sFindOrFinds) Then finds = sFindOrFinds _
@@ -4667,6 +4661,22 @@ Public Function ReplaceMultiple(ByRef str As String, _
                                    Else replaces = VBA.Array(sReplaceOrReplaces)
     If Not LBound(replaces) = 0 Then _
         ReDim Preserve replaces(0 To UBound(replaces) - LBound(replaces))
+    
+    Dim i As Long
+    On Error GoTo catch
+    For i = LBound(finds) To UBound(finds)
+        finds(i) = CStr(finds(i))
+    Next i
+    For i = LBound(replaces) To UBound(replaces)
+        replaces(i) = CStr(replaces(i))
+    Next i
+    On Error GoTo 0: GoTo continue
+catch:
+    Err.Raise 5, methodName, "Argument 'sFindOrFinds' or 'sReplaceOrReplaces'" _
+        & " contains invalid elements that can't be converted to String type."
+continue:
+    If lStart > Len(str) Then Exit Function
+    
     lCount = lCount And &H7FFFFFFF
     
     If UBound(finds) = 0 And Len(finds(0)) = 0 _
@@ -4686,7 +4696,7 @@ Public Function ReplaceMultiple(ByRef str As String, _
     'procedure is available in the test module ('ProcessFindsUsingTrie')
     'Unfortunately it performs at least 20 times slower than the naïve approach
     'implemented here:
-    Dim i As Long, j As Long
+    Dim j As Long
     For i = 0 To UBound(finds)
         If Len(finds(i)) <> 0 Then
             For j = i + 1 To UBound(finds)
@@ -4887,9 +4897,6 @@ Public Function ReplaceMultipleB(ByRef bytes As String, _
                                "Argument 'lStart' = " & lStart & " < 1, invalid"
     If lCount < -1 Then Err.Raise 5, methodName, _
                               "Argument 'lCount' = " & lCount & " < -1, invalid"
-                              
-    If lStart > LenB(bytes) Then Exit Function
-    
     Dim finds As Variant
     If IsArray(sFindOrFinds) Then finds = sFindOrFinds _
                              Else finds = VBA.Array(sFindOrFinds)
@@ -4900,6 +4907,22 @@ Public Function ReplaceMultipleB(ByRef bytes As String, _
                                    Else replaces = VBA.Array(sReplaceOrReplaces)
     If Not LBound(replaces) = 0 Then _
         ReDim Preserve replaces(0 To UBound(replaces) - LBound(replaces))
+    
+    Dim i As Long
+    On Error GoTo catch
+    For i = LBound(finds) To UBound(finds)
+        finds(i) = CStr(finds(i))
+    Next i
+    For i = LBound(replaces) To UBound(replaces)
+        replaces(i) = CStr(replaces(i))
+    Next i
+    On Error GoTo 0: GoTo continue
+catch:
+    Err.Raise 5, methodName, "Argument 'sFindOrFinds' or 'sReplaceOrReplaces'" _
+        & " contains invalid elements that can't be converted to String type."
+continue:
+    If lStart > LenB(bytes) Then Exit Function
+    
     lCount = lCount And &H7FFFFFFF
     
     If UBound(finds) = 0 And Len(finds(0)) = 0 _
@@ -4909,7 +4932,7 @@ Public Function ReplaceMultipleB(ByRef bytes As String, _
     End If
     
     'Clean input arrays to deal with cases where one "find" contains another one
-    Dim i As Long, j As Long
+    Dim j As Long
     For i = 0 To UBound(finds)
         If LenB(finds(i)) <> 0 Then
             For j = i + 1 To UBound(finds)
