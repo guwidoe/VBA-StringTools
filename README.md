@@ -56,6 +56,7 @@ List of public/exposed methods:
 - RandomStringASCII
 - RandomStringBMP
 - RandomStringFromChars
+- RandomStringFromStrings
 - RandomStringUnicode
 - RemoveNonNumeric
 - RepeatString

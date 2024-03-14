@@ -1636,9 +1636,7 @@ Sub DemoLimitConsecutiveSubstringRepetitionB()
 End Sub
 
 Sub TestRandomStringFromStrings()
-    Dim a As Variant
-    a = Array("1", New cClass)
-    ReplaceMultiple "123", New cClass, a
+    Debug.Print RandomStringFromStrings(5, Array("ab", "cd"))
 End Sub
 
 Sub TestRandomStringFromCharsPerformance()

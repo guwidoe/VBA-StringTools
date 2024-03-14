@@ -3652,6 +3652,55 @@ Public Function StringToCodepointNums(ByRef str As String) As Variant
     StringToCodepointNums = arr
 End Function
 
+
+'Returns a string of length `Length` containing strings from `sourceStringsArr`
+'randomly concatenated, equally distributed.
+'E.g. if 'sourceStringsArr = ("ab", "cd")' and 'Length = 5', the returned string
+'     could look like this: "ababc", or like this: "cdabc"
+Public Function RandomStringFromStrings(ByVal Length As Long, _
+                                        ByRef sourceStringsArr As Variant, _
+                               Optional ByVal useRndWH As Boolean = False) _
+                                        As String
+    Const methodName As String = "RandomStringFromStrings"
+    Dim strings As Variant
+    If IsArray(sourceStringsArr) Then strings = sourceStringsArr _
+                                 Else: strings = VBA.Array(sourceStringsArr)
+    If Not LBound(strings) = 0 Then _
+        ReDim Preserve strings(0 To UBound(strings) - LBound(strings))
+
+    Dim i As Long, j As Long
+    Dim tmpStr As String
+    On Error GoTo catch
+    For i = LBound(strings) To UBound(strings)
+        tmpStr = CStr(strings(i))
+        If LenB(tmpStr) > 0 Then
+            strings(j) = tmpStr
+            j = j + 1
+        End If
+    Next i
+    If j = 0 Then Err.Raise 5, methodName, "No strings with LenB > 0 in " & _
+                                           "'sourceStringsArr'"
+    On Error GoTo 0: GoTo continue
+catch:
+    Err.Raise 5, methodName, "Argument 'strings' contains invalid elements " & _
+                             "that can't be converted to String type."
+continue:
+    If j <> i Then ReDim Preserve strings(0 To j - 1)
+    RandomStringFromStrings = Space$(Length)
+    
+    Dim numStrings As Long: numStrings = j
+    i = 1
+    Do Until i > Length * 2
+        If useRndWH Then
+            j = Int(RndWH * numStrings)
+        Else
+            j = Int(Rnd * numStrings)
+        End If
+        MidB$(RandomStringFromStrings, i, LenB(strings(j))) = strings(j)
+        i = i + LenB(strings(j))
+    Loop
+End Function
+
 'Returns an array of 'numElements' random UTF-16 strings
 Public Function RandomStringArray(ByVal numElements As Long, _
                          Optional ByVal maxElementLength As Long = 10, _
