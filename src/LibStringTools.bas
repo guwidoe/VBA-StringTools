@@ -2962,7 +2962,7 @@ End Sub
 
 'Returns the given unicode codepoint as standard VBA UTF-16LE string
 Public Function ChrU(ByVal codepoint As Long, _
-             Optional ByVal allowSingleSurrogates As Boolean = False) As String
+            Optional ByVal allowSingleSurrogates As Boolean = False) As String
     Const methodName As String = "ChrU"
     Static st As TwoCharTemplate
     Static lt As LongTemplate
@@ -2973,7 +2973,8 @@ Public Function ChrU(ByVal codepoint As Long, _
     If codepoint < &HD800& Then
         ChrU = ChrW$(codepoint)
     ElseIf codepoint < &HE000& And Not allowSingleSurrogates Then
-        Err.Raise 5, methodName, "Range reserved for surrogate pairs"
+        Err.Raise 5, methodName, "Range reserved for surrogate pairs. " & _
+            "Call with 'allowSingleSurrogates = True' if this is intentional."
     ElseIf codepoint < &H10000 Then
         ChrU = ChrW$(codepoint)
     ElseIf codepoint < &H110000 Then
@@ -3104,16 +3105,20 @@ Public Function EncodeUTF8(ByRef utf16leStr As String, _
             utf8(j) = &HC0& Or ((codepoint And &H7C0&) \ &H40&)
             utf8(j + 1) = &H80& Or (codepoint And &H3F&)
             j = j + 2
-        ElseIf codepoint < &HDC00 Then
+        ElseIf codepoint < &HDC00& Then
             utf8(j) = &HE0& Or ((codepoint And &HF000&) \ &H1000&)
             utf8(j + 1) = &H80& Or ((codepoint And &HFC0&) \ &H40&)
             utf8(j + 2) = &H80& Or (codepoint And &H3F&)
             j = j + 3
-        ElseIf codepoint < &HE000 Then
+        ElseIf codepoint < &HE000& Then
             If raiseErrors Then _
                 Err.Raise 5, methodName, _
                     "Invalid Unicode codepoint. (Lonely low surrogate)"
             codepoint = &HFFFD&
+            utf8(j) = &HE0& Or ((codepoint And &HF000&) \ &H1000&)
+            utf8(j + 1) = &H80& Or ((codepoint And &HFC0&) \ &H40&)
+            utf8(j + 2) = &H80& Or (codepoint And &H3F&)
+            j = j + 3
         ElseIf codepoint < &H10000 Then
             utf8(j) = &HE0& Or ((codepoint And &HF000&) \ &H1000&)
             utf8(j + 1) = &H80& Or ((codepoint And &HFC0&) \ &H40&)
@@ -3263,7 +3268,7 @@ Public Function EncodeUTF32LE(ByRef utf16leStr As String, _
                 codepoint = &HFFFD&
             End If
         End If
-
+        
         If codepoint >= &HD800& And codepoint < &HE000& Then
             If raiseErrors Then Err.Raise 5, methodName, _
                 "Invalid Unicode codepoint. (Lonely low surrogate)"
@@ -3581,7 +3586,7 @@ Public Function RandomStringFromChars(ByVal Length As Long, _
     
     Dim chars() As String:    chars = StringToCodepointStrings(inklChars)
     Dim codepoints() As Long: codepoints = StringToCodepointNums(inklChars)
-    Dim numChars As Long:  numChars = UBound(chars) - LBound(chars) + 1
+    Dim numChars As Long:     numChars = UBound(chars) - LBound(chars) + 1
     If numChars * 2 = Len(inklChars) And Length Mod 2 = 1 Then Err.Raise 5, _
     methodName, "Can't build string of uneven length from only Surrogate Pairs."
         
@@ -3598,7 +3603,7 @@ Public Function RandomStringFromChars(ByVal Length As Long, _
         Mid$(RandomStringFromChars, i) = chars(idx)
         If codepoints(idx) > &HFFFF& Then i = i + 1
     Next i
-    If Mid$(RandomStringFromChars, Length) = Space$(1) Then
+    If Mid$(RandomStringFromChars, Length) = " " Then
         Do
             If useRndWH Then
                 idx = Int(RndWH * numChars)
@@ -5865,27 +5870,27 @@ End Function
 Public Function RndWH(Optional ByVal Number As Long) As Double
     Static lngX As Long, lngY As Long, lngZ As Long, blnInit As Boolean
     Dim dblRnd As Double
-    ' if initialized and no input number given
+    'If initialized and no input number given
     If blnInit And Number = 0 Then
         ' lngX, lngY and lngZ will never be 0
         lngX = (171& * lngX) Mod 30269&
         lngY = (172& * lngY) Mod 30307&
         lngZ = (170& * lngZ) Mod 30323&
     Else
-        ' if no initialization, use Timer, otherwise ensure positive Number
+        'If no initialization, use Timer, otherwise ensure positive Number
         If Number = 0 Then Number = Timer * 60 Else Number = Number And &H7FFFFFFF
         lngX = (Number Mod 30269&)
         lngY = (Number Mod 30307&)
         lngZ = (Number Mod 30323&)
-        ' lngX, lngY and lngZ must be bigger than 0
+        'lngX, lngY and lngZ must be bigger than 0
         If lngX = 0 Then lngX = 171&
         If lngY = 0 Then lngY = 172&
         If lngZ = 0 Then lngZ = 170&
-        ' mark initialization state
+        'Mark initialization state
         blnInit = True
     End If
-    ' generate a random number
+    'Generate a random number
     dblRnd = CDbl(lngX) / 30269# + CDbl(lngY) / 30307# + CDbl(lngZ) / 30323#
-    ' return a value between 0 and 1
+    'Return a value between 0 and 1
     RndWH = dblRnd - Int(dblRnd)
 End Function

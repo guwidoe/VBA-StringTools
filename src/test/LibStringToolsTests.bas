@@ -134,42 +134,58 @@ End Sub
 
 Private Sub TestEncodersAndDecoders()
     Const STR_LENGTH As Long = 1000001
+    Const ResPass As String = "Ok"
+    Const ResFail As String = "----FAILED----"
 
-    Dim fullUnicode As String:    fullUnicode = RandomStringUnicode(STR_LENGTH)
-    Dim bmpUnicode As String:     bmpUnicode = RandomStringBMP(STR_LENGTH)
-    Dim utf16AsciiOnly As String: utf16AsciiOnly = RandomStringASCII(STR_LENGTH)
+    Dim fullUnicode As String:     fullUnicode = RandomStringUnicode(STR_LENGTH, True)
+    Dim fullUnicodeUTF8 As String: fullUnicodeUTF8 = Encode(fullUnicode, cpUTF_8)
+    Dim bmpUnicode As String:      bmpUnicode = RandomStringBMP(STR_LENGTH, True)
+    Dim utf16AsciiOnly As String:  utf16AsciiOnly = RandomStringASCII(STR_LENGTH, True)
+    Dim rndBytes As String:        rndBytes = RandomBytes(STR_LENGTH, True)
     
     'VBA natively implemented Encoders/Decoders
     Debug.Print "Native UTF-8 Encoder/Decoder Test Basic Multilingual Plane: " & _
-        IIf(DecodeUTF8(EncodeUTF8(bmpUnicode)) = bmpUnicode, "passed", "failed")
+        IIf(DecodeUTF8(EncodeUTF8(bmpUnicode)) = bmpUnicode, ResPass, ResFail)
        
     #If Mac = 0 Then
         Debug.Print "ADODB.Stream UTF-8 Encoder/Decoder Test Basic Multilingual Plane: " & _
-             IIf(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(bmpUnicode)) = bmpUnicode, "passed", "failed")
+             IIf(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(bmpUnicode)) = bmpUnicode, ResPass, ResFail)
     #End If
     
     Debug.Print "API UTF-8 Encoder/Decoder Test Basic Multilingual Plane: " & _
-         IIf(Decode(Encode(bmpUnicode, cpUTF_8), cpUTF_8) = bmpUnicode, "passed", "failed")
+         IIf(Decode(Encode(bmpUnicode, cpUTF_8), cpUTF_8) = bmpUnicode, ResPass, ResFail)
 
     Debug.Print "UTF-32 Encoder/Decoder Test Basic Multilingual Plane: " & _
-        IIf(DecodeUTF32LE(EncodeUTF32LE(bmpUnicode)) = bmpUnicode, "passed", "failed")
+        IIf(DecodeUTF32LE(EncodeUTF32LE(bmpUnicode)) = bmpUnicode, ResPass, ResFail)
         
     Debug.Print "Native UTF-8 Encoder/Decoder Test full Unicode: " & _
-        IIf(DecodeUTF8(EncodeUTF8(fullUnicode)) = fullUnicode, "passed", "failed")
+        IIf(DecodeUTF8(EncodeUTF8(fullUnicode)) = fullUnicode, ResPass, ResFail)
+    
+    Debug.Print "Native UTF-8 Encoder vs API UTF-8 Encoder Test full Unicode: " & _
+        IIf(EncodeUTF8(fullUnicode) = Encode(fullUnicode, cpUTF_8), ResPass, ResFail)
+        
+    Debug.Print "Native UTF-8 Decoder vs API UTF-8 Decoder Test full Unicode: " & _
+        IIf(DecodeUTF8(fullUnicodeUTF8) = Decode(fullUnicodeUTF8, cpUTF_8), ResPass, ResFail)
+        
+    Debug.Print "Native UTF-8 Encoder vs API UTF-8 Encoder Test rndBytes: " & _
+        IIf(EncodeUTF8(rndBytes) = Encode(rndBytes, cpUTF_8), ResPass, ResFail)
+        
+    Debug.Print "Native UTF-8 Decoder vs API UTF-8 Decoder Test rndBytes: " & _
+        IIf(DecodeUTF8(rndBytes) = Decode(rndBytes, cpUTF_8), ResPass, ResFail)
     
     #If Mac = 0 Then
         Debug.Print "ADODB.Stream UTF-8 Encoder/Decoder Test full Unicode: " & _
-            IIf(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(fullUnicode)) = fullUnicode, "passed", "failed")
+            IIf(DecodeUTF8usingAdodbStream(EncodeUTF8usingAdodbStream(fullUnicode)) = fullUnicode, ResPass, ResFail)
     #End If
     
     Debug.Print "API UTF-8 Encoder/Decoder Test full Unicode: " & _
-        IIf(Decode(Encode(fullUnicode, cpUTF_8), cpUTF_8) = fullUnicode, "passed", "failed")
+        IIf(Decode(Encode(fullUnicode, cpUTF_8), cpUTF_8) = fullUnicode, ResPass, ResFail)
     
     Debug.Print "UTF-32 Encoder/Decoder Test full Unicode: " & _
-        IIf(DecodeUTF32LE(EncodeUTF32LE(fullUnicode)) = fullUnicode, "passed", "failed")
+        IIf(DecodeUTF32LE(EncodeUTF32LE(fullUnicode)) = fullUnicode, ResPass, ResFail)
         
     Debug.Print "ANSI Encoder/Decoder Test: " & _
-        IIf(DecodeANSI(EncodeANSI(utf16AsciiOnly)) = utf16AsciiOnly, "passed", "failed")
+        IIf(DecodeANSI(EncodeANSI(utf16AsciiOnly)) = utf16AsciiOnly, ResPass, ResFail)
 End Sub
 
 Private Sub TestUTF8EncodersPerformance()
@@ -1350,8 +1366,10 @@ Sub TestInStr()
     ReadTimer "InStr vbBinaryCompare, starting search at pos " & START_SEARCH_POS & " found at pos " & posZ1, , True
     Dim posZ2 As Long: posZ2 = InStr(START_SEARCH_POS, str, "z", vbTextCompare)
     ReadTimer "InStr vbTextCompare, starting search at pos " & START_SEARCH_POS & " found at pos " & posZ2, , True
-    Dim posZ3 As Long: posZ3 = InStr(START_SEARCH_POS, LCase(str), LCase("z"), vbBinaryCompare)
-    ReadTimer "InStr vbBinaryCompare, on LCase, starting search at pos " & START_SEARCH_POS & " found at pos " & posZ2, , True
+    Dim posZ3 As Long: posZ3 = InStr(START_SEARCH_POS, LCase(Mid(str, START_SEARCH_POS - 1)), LCase("z"), vbBinaryCompare) + START_SEARCH_POS - 1
+    ReadTimer "InStr vbBinaryCompare, on LCase, starting search at pos " & START_SEARCH_POS & " found at pos " & posZ3, , True
+'    Dim posZ4 As Long: posZ4 = InStrTextCompare(START_SEARCH_POS, str, "z")
+'    ReadTimer "InStrTextCompare, starting search at pos " & START_SEARCH_POS & " found at pos " & posZ4, , True
 End Sub
 
 Sub TestReplaceVsCountSubstring()
@@ -1389,4 +1407,136 @@ Sub TestInStrr()
     Dim posZ2 As Long: posZ2 = InStr(START_SEARCH_POS, str, "z", vbTextCompare)
     ReadTimer "InStr vbTextCompare, starting search at pos " & _
               START_SEARCH_POS & " found at pos " & posZ2, , True
+End Sub
+
+Sub TestInStrWorstCase()
+    Const FIND_POS As Long = 1000000
+    Const START_SEARCH_POS As Long = 1
+    Dim sFind As String: sFind = "asdlkfalskdhaölskdjfölaksjfdlafsfdasdf"
+    Dim str As String
+    str = RepeatString(PadRight(sFind, Len(sFind) - 1), FIND_POS / Len(sFind) - 1) & _
+          sFind & RepeatString(PadRight(sFind, Len(sFind) - 1), FIND_POS / Len(sFind) - 1)
+    Mid$(sFind, Len(sFind) / 2, 1) = ChrW(AscW(Mid$(sFind, Len(sFind) / 2, 1)) + 1)
+    str = RepeatString(sFind, FIND_POS / Len(sFind))
+    Mid$(sFind, Len(sFind) / 2, 1) = ChrW(AscW(Mid$(sFind, Len(sFind) / 2, 1)) - 1)
+    str = str & sFind & RepeatString(PadRight(sFind, Len(sFind) - 1), FIND_POS / Len(sFind) - 1)
+    'str = RandomStringFromChars(FIND_POS, "abcdefghijklmnopqrstuvwxy123") & sFind & RandomStringFromChars(FIND_POS, "abcdefghijklmnopqrstuvwxy123")
+    
+    StartTimer
+    Dim posZ1 As Long: posZ1 = InStr(START_SEARCH_POS, str, sFind, vbBinaryCompare)
+    ReadTimer "InStr vbBinaryCompare, starting search at pos " & _
+              START_SEARCH_POS & " found at pos " & posZ1, , True
+    Dim posZ2 As Long: posZ2 = InStr(START_SEARCH_POS, str, sFind, vbTextCompare)
+    ReadTimer "InStr vbTextCompare, starting search at pos " & _
+              START_SEARCH_POS & " found at pos " & posZ2, , True
+End Sub
+
+Sub TestRnd()
+    Const NUM_LOOPS As Long = 1000000
+    Dim bool As Boolean
+    bool = False
+    Dim i As Long
+    StartTimer
+    For i = 1 To NUM_LOOPS
+        If bool Then
+            RndWH
+        Else
+            Rnd
+        End If
+    Next i
+    ReadTimer
+End Sub
+
+Sub TestRndStringPerformance()
+    Const NUM_LOOPS As Long = 10
+    Const LEN_STR As Long = 100000
+
+    Dim i As Long
+    StartTimer
+    For i = 1 To NUM_LOOPS
+        RandomString LEN_STR
+    Next i
+    ReadTimer "RandomString with Normal Rnd", , True
+    For i = 1 To NUM_LOOPS
+        RandomString LEN_STR, , , True
+    Next i
+    ReadTimer "RandomString with RndWH", , True
+    For i = 1 To NUM_LOOPS
+        RandomStringAlphanumeric LEN_STR
+    Next i
+    ReadTimer "RandomStringAlphanumeric with Normal Rnd", , True
+    For i = 1 To NUM_LOOPS
+        RandomStringAlphanumeric LEN_STR, True
+    Next i
+    ReadTimer "RandomStringAlphanumeric with RndWH", , True
+    For i = 1 To NUM_LOOPS
+        RandomStringFromChars LEN_STR
+    Next i
+    ReadTimer "RandomStringFromChars with Normal Rnd", , True
+        For i = 1 To NUM_LOOPS
+        RandomStringFromChars LEN_STR, , True
+    Next i
+    ReadTimer "RandomStringFromChars with RndWH", , True
+    For i = 1 To NUM_LOOPS
+        RandomStringUnicode LEN_STR
+    Next i
+    ReadTimer "RandomStringUnicode with Normal Rnd", , True
+    For i = 1 To NUM_LOOPS
+        RandomStringUnicode LEN_STR, True
+    Next i
+    ReadTimer "RandomStringUnicode with RndWH", , True
+    For i = 1 To NUM_LOOPS
+        RandomBytes LEN_STR
+    Next i
+    ReadTimer "RandomBytes with Normal Rnd", , True
+    For i = 1 To NUM_LOOPS
+        RandomBytes LEN_STR, True
+    Next i
+    ReadTimer "RandomBytes with RndWH", , True
+    For i = 1 To NUM_LOOPS
+        RandomStringASCII LEN_STR
+    Next i
+    ReadTimer "RandomStringASCII with Normal Rnd", , True
+    For i = 1 To NUM_LOOPS
+        RandomStringASCII LEN_STR, True
+    Next i
+    ReadTimer "RandomStringASCII with RndWH", , True
+    For i = 1 To NUM_LOOPS
+        RandomStringBMP LEN_STR
+    Next i
+    ReadTimer "RandomStringBMP with Normal Rnd", , True
+    For i = 1 To NUM_LOOPS
+        RandomStringBMP LEN_STR, True
+    Next i
+    ReadTimer "RandomStringBMP with RndWH", , True
+End Sub
+
+Sub FindDecodeUTF8Bugs()
+    Const TIMEOUT_SECONDS As Long = 10
+    Const LEN_TEST_STR As Long = 3
+    Const IGNORE_EDGES As Boolean = False
+    
+    Dim decodedBytes As Long
+    Dim t As Single: t = AccurateTimerS()
+    Do Until AccurateTimerS() - t > TIMEOUT_SECONDS
+        DoEvents
+        Dim bytes As String: bytes = RandomBytes(LEN_TEST_STR * 2, True)
+        Dim apiResult As String: apiResult = Decode(bytes, cpUTF_8)
+        Dim natResult As String: natResult = DecodeUTF8(bytes)
+        decodedBytes = decodedBytes + LEN_TEST_STR
+        
+        If IGNORE_EDGES Then
+            apiResult = LeftB(apiResult, LenB(apiResult) - 4)
+            natResult = LeftB(natResult, LenB(apiResult))
+        End If
+        
+        If apiResult <> natResult Then
+            Debug.Print "DecodeUTF8 inconsistent with API decoder for string, "
+            Debug.Print "after " & decodedBytes & " decoded bytes."
+            Debug.Print "Input:         " & StringToHex(bytes)
+            Debug.Print "Output API:    " & StringToHex(apiResult)
+            Debug.Print "Output Native: " & StringToHex(natResult)
+            Exit Sub
+        End If
+    Loop
 End Sub
