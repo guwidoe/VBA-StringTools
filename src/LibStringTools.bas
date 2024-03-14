@@ -3341,7 +3341,7 @@ Public Function DecodeUTF32LE(ByRef utf32str As String, _
     DecodeUTF32LE = MidB$(utf16, 1, j)
 End Function
 
-'Returns a UTF-16 string containing all alphanumeric characters randomly equally
+'Returns a UTF-16 string containing alphanumeric characters randomly equally
 'distributed. (0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz)
 Public Function RandomStringAlphanumeric(ByVal Length As Long, _
                                 Optional ByVal useRndWH As Boolean = False) As String
@@ -3373,7 +3373,7 @@ Public Function RandomStringAlphanumeric(ByVal Length As Long, _
     RandomStringAlphanumeric = b
 End Function
 
-'Returns a UTF-16 string containing all ASCII characters equally,
+'Returns a UTF-16 string containing random ASCII characters equally,
 'randomly distributed.
 Public Function RandomStringASCII(ByVal Length As Long, _
                          Optional ByVal useRndWH As Boolean = False) As String
@@ -3395,7 +3395,7 @@ Public Function RandomStringASCII(ByVal Length As Long, _
     RandomStringASCII = b
 End Function
 
-'Function returning a UTF-16 string containing all characters from the BMP
+'Function returning a UTF-16 string containing random characters from the BMP
 '(Basic Multilingual Plane, so from all 2 byte UTF-16 chars) equally, randomly
 'distributed. Excludes surrogate range and BOM.
 Public Function RandomStringBMP(ByVal Length As Long, _
@@ -3424,7 +3424,7 @@ Public Function RandomStringBMP(ByVal Length As Long, _
     RandomStringBMP = b
 End Function
 
-'Returns a UTF-16 string containing all valid unicode characters equally,
+'Returns a UTF-16 string containing random valid unicode characters equally,
 'randomly distributed. Excludes surrogate range and BOM.
 'Length in UTF-16 codepoints, (Len(result) = length)
 Public Function RandomStringUnicode(ByVal Length As Long, _
@@ -3570,32 +3570,32 @@ Public Function RandomString(ByVal Length As Long, _
     End If
 End Function
 
-'Returns a UTF-16 string containing all characters in `inklChars` randomly
+'Returns a UTF-16 string containing characters from `sourceChars` randomly,
 'equally distributed.
-'E.g. if 'inklChars = "aab"', the returned string will, on average, contain
+'E.g. if 'sourceChars = "aab"', the returned string will, on average, contain
 '     about twice as many "a"s as "b"s
 Public Function RandomStringFromChars(ByVal Length As Long, _
-                             Optional ByRef inklChars As String = _
+                             Optional ByRef sourceChars As String = _
     "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", _
                              Optional ByVal useRndWH As Boolean = False) _
                                       As String
     Const methodName As String = "RandomStringFromChars"
     If Length = 0 Then Exit Function
-    If Len(inklChars) = 0 Then Err.Raise 5, methodName, _
-        "No characters to build a string from specified in 'inklChars'"
+    If Len(sourceChars) = 0 Then Err.Raise 5, methodName, _
+        "No characters to build a string from specified in 'sourceChars'"
     If Length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
     
-    Dim chars() As String:    chars = StringToCodepointStrings(inklChars)
-    Dim codepoints() As Long: codepoints = StringToCodepointNums(inklChars)
+    Dim chars() As String:    chars = StringToCodepointStrings(sourceChars)
+    Dim codepoints() As Long: codepoints = StringToCodepointNums(sourceChars)
     Dim numChars As Long:     numChars = UBound(chars) - LBound(chars) + 1
-    If numChars * 2 = Len(inklChars) And Length Mod 2 = 1 Then Err.Raise 5, _
+    If numChars * 2 = Len(sourceChars) And Length Mod 2 = 1 Then Err.Raise 5, _
     methodName, "Can't build string of uneven length from only Surrogate Pairs."
         
     RandomStringFromChars = Space$(Length)
 
     Dim i As Long
     For i = 1 To Length - 1
-        Dim idx As String
+        Dim idx As Long
         If useRndWH Then
             idx = Int(RndWH * numChars)
         Else

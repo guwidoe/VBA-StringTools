@@ -1641,6 +1641,21 @@ Sub TestRandomStringFromStrings()
     ReplaceMultiple "123", New cClass, a
 End Sub
 
+Sub TestRandomStringFromCharsPerformance()
+    Const STR_LENGTH As Long = 100000
+    Const NUM_LOOPS As Long = 100
+    Dim i As Long
+    StartTimer
+    For i = 1 To NUM_LOOPS
+        RandomStringFromChars STR_LENGTH
+    Next i
+    ReadTimer "RandomStringFromChars, normal Rnd", , True
+    For i = 1 To NUM_LOOPS
+        RandomStringFromChars STR_LENGTH, , True
+    Next i
+    ReadTimer "RandomStringFromChars, custom RndWH", , True
+End Sub
+
 Sub lakj()
     Debug.Print LenB(Replace("a" & ChrB(1), "a", "b", 1))
     Debug.Print LenB(ReplaceFast(Space(20000) & ChrB(1), "a", "b", 1))
