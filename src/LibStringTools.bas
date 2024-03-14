@@ -3338,7 +3338,8 @@ End Function
 
 'Returns a UTF-16 string containing all alphanumeric characters randomly equally
 'distributed. (0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz)
-Public Function RandomStringAlphanumeric(ByVal Length As Long) As String
+Public Function RandomStringAlphanumeric(ByVal Length As Long, _
+                                Optional ByVal useRndWH As Boolean = False) As String
     Const methodName As String = "RandomStringAlphanumeric"
     Const INKL_CHARS As String = _
         "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
@@ -3355,31 +3356,45 @@ Public Function RandomStringAlphanumeric(ByVal Length As Long) As String
     If Length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
     Dim b() As Byte: ReDim b(0 To Length * 2 - 1)
     Dim i As Long
-    For i = 0 To Length * 2 - 1 Step 2
-        b(i) = chars(Int(Rnd * numPossChars))
-    Next i
+    If useRndWH Then
+        For i = 0 To Length * 2 - 1 Step 2
+            b(i) = chars(Int(RndWH * numPossChars))
+        Next i
+    Else
+        For i = 0 To Length * 2 - 1 Step 2
+            b(i) = chars(Int(Rnd * numPossChars))
+        Next i
+    End If
     RandomStringAlphanumeric = b
 End Function
 
 'Returns a UTF-16 string containing all ASCII characters equally,
 'randomly distributed.
-Public Function RandomStringASCII(ByVal Length As Long) As String
+Public Function RandomStringASCII(ByVal Length As Long, _
+                         Optional ByVal useRndWH As Boolean = False) As String
     Const methodName As String = "RandomStringASCII"
     Const MAX_ASC As Long = &H7F&
     If Length = 0 Then Exit Function
     If Length < 0 Then Err.Raise 5, methodName, "Length must be >= 0"
     Dim i As Long
     Dim b() As Byte: ReDim b(0 To Length * 2 - 1)
-    For i = 0 To Length * 2 - 1 Step 2
-        b(i) = Int(MAX_ASC * Rnd) + 1
-    Next i
+    If useRndWH Then
+        For i = 0 To Length * 2 - 1 Step 2
+            b(i) = Int(MAX_ASC * RndWH) + 1
+        Next i
+    Else
+        For i = 0 To Length * 2 - 1 Step 2
+            b(i) = Int(MAX_ASC * Rnd) + 1
+        Next i
+    End If
     RandomStringASCII = b
 End Function
 
 'Function returning a UTF-16 string containing all characters from the BMP
 '(Basic Multilingual Plane, so from all 2 byte UTF-16 chars) equally, randomly
 'distributed. Excludes surrogate range and BOM.
-Public Function RandomStringBMP(ByVal Length As Long) As String
+Public Function RandomStringBMP(ByVal Length As Long, _
+                       Optional ByVal useRndWH As Boolean = False) As String
     Const methodName As String = "RandomStringBMP"
     Const MAX_UINT As Long = &HFFFF&
     If Length = 0 Then Exit Function
@@ -3391,7 +3406,11 @@ Public Function RandomStringBMP(ByVal Length As Long) As String
 
     For i = 0 To Length * 2 - 1 Step 2
         Do
-            char = Int(MAX_UINT * Rnd) + 1
+            If useRndWH Then
+                char = Int(MAX_UINT * RndWH) + 1
+            Else
+                char = Int(MAX_UINT * Rnd) + 1
+            End If
         Loop Until (char < &HD800& Or char > &HDFFF&) _
                And (char <> &HFEFF&)
         b(i) = char And &HFF
@@ -3403,7 +3422,8 @@ End Function
 'Returns a UTF-16 string containing all valid unicode characters equally,
 'randomly distributed. Excludes surrogate range and BOM.
 'Length in UTF-16 codepoints, (Len(result) = length)
-Public Function RandomStringUnicode(ByVal Length As Long) As String
+Public Function RandomStringUnicode(ByVal Length As Long, _
+                           Optional ByVal useRndWH As Boolean = False) As String
     Const methodName As String = "RandomStringUnicode"
     Const MAX_UNICODE As Long = &H10FFFF
     If Length = 0 Then Exit Function
@@ -3416,7 +3436,11 @@ Public Function RandomStringUnicode(ByVal Length As Long) As String
     If Length > 1 Then
         For i = 0 To Length * 2 - 3 Step 2
             Do
-                char = Int(MAX_UNICODE * Rnd) + 1
+                If useRndWH Then
+                    char = Int(MAX_UNICODE * RndWH) + 1
+                Else
+                    char = Int(MAX_UNICODE * Rnd) + 1
+                End If
             Loop Until (char < &HD800& Or char > &HDFFF&) _
                    And (char <> &HFEFF&)
             If char < &H10000 Then
@@ -3439,7 +3463,11 @@ Public Function RandomStringUnicode(ByVal Length As Long) As String
     Const MAX_UINT As Long = &HFFFF&
     If CInt(b(UBound(b) - 1)) + b(UBound(b)) = 0 Then
         Do
-            char = Int(MAX_UINT * Rnd) + 1
+            If useRndWH Then
+                char = Int(MAX_UINT * RndWH) + 1
+            Else
+                char = Int(MAX_UINT * Rnd) + 1
+            End If
         Loop Until (char < &HD800& Or char > &HDFFF&) _
                And (char <> &HFEFF&)
         Mid$(RandomStringUnicode, Len(RandomStringUnicode), 1) = ChrW(char)
@@ -3447,16 +3475,23 @@ Public Function RandomStringUnicode(ByVal Length As Long) As String
 End Function
 
 'Returns a string containing random byte data
-Public Function RandomBytes(ByVal numBytes As Long) As String
+Public Function RandomBytes(ByVal numBytes As Long, _
+                   Optional ByVal useRndWH As Boolean = False) As String
     Const methodName As String = "RandomBytes"
     If numBytes = 0 Then Exit Function
     If numBytes < 0 Then Err.Raise 5, methodName, "numBytes must be >= 0"
 
     Dim bytes() As Byte: ReDim bytes(0 To numBytes - 1)
     Dim i As Long
-    For i = 0 To numBytes - 1
-        bytes(i) = Int(Rnd * &H100)
-    Next i
+    If useRndWH Then
+        For i = 0 To numBytes - 1
+            bytes(i) = Int(RndWH * &H100)
+        Next i
+    Else
+        For i = 0 To numBytes - 1
+            bytes(i) = Int(Rnd * &H100)
+        Next i
+    End If
     RandomBytes = bytes
 End Function
 
@@ -3466,7 +3501,8 @@ End Function
 '      all the digit characters randomly, e.g. "3239107914"
 Public Function RandomString(ByVal Length As Long, _
                     Optional ByVal minCodepoint As Long = 1, _
-                    Optional ByVal maxCodepoint As Long = &H10FFFF) As String
+                    Optional ByVal maxCodepoint As Long = &H10FFFF, _
+                    Optional ByVal useRndWH As Boolean = False) As String
     Const methodName As String = "RandomString"
     Const MAX_UNICODE As Long = &H10FFFF
     Const MAX_UINT As Long = &HFFFF&
@@ -3490,7 +3526,11 @@ Public Function RandomString(ByVal Length As Long, _
     If Length > 1 Then
         For i = 0 To Length * 2 - 3 Step 2
             Do
-                char = Int(cpRange * Rnd) + minCodepoint
+                If useRndWH Then
+                    char = Int(cpRange * RndWH) + minCodepoint
+                Else
+                    char = Int(cpRange * Rnd) + minCodepoint
+                End If
             Loop Until (char < &HD800& Or char > &HDFFF&) _
                    And (char <> &HFEFF&)
 
@@ -3513,7 +3553,11 @@ Public Function RandomString(ByVal Length As Long, _
     
     If CInt(b(UBound(b) - 1)) + b(UBound(b)) = 0 Then
         Do
-            char = Int(cpRange * Rnd) + minCodepoint
+            If useRndWH Then
+                char = Int(cpRange * RndWH) + minCodepoint
+            Else
+                char = Int(cpRange * Rnd) + minCodepoint
+            End If
         Loop Until (char < &HD800& Or char > &HDFFF&) _
                And (char <> &HFEFF&) _
                And (char <= MAX_UINT)
@@ -3527,7 +3571,8 @@ End Function
 '     about twice as many "a"s as "b"s
 Public Function RandomStringFromChars(ByVal Length As Long, _
                              Optional ByRef inklChars As String = _
-    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz") As String
+    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", _
+                             Optional ByVal useRndWH As Boolean = False) As String
     Const methodName As String = "RandomStringFromChars"
     If Length = 0 Then Exit Function
     If Len(inklChars) = 0 Then Err.Raise 5, methodName, _
@@ -3544,13 +3589,22 @@ Public Function RandomStringFromChars(ByVal Length As Long, _
 
     Dim i As Long
     For i = 1 To Length - 1
-        Dim idx As String: idx = Int(Rnd * numChars)
+        Dim idx As String
+        If useRndWH Then
+            idx = Int(RndWH * numChars)
+        Else
+            idx = Int(Rnd * numChars)
+        End If
         Mid$(RandomStringFromChars, i) = chars(idx)
         If codepoints(idx) > &HFFFF& Then i = i + 1
     Next i
     If Mid$(RandomStringFromChars, Length) = Space$(1) Then
         Do
-            idx = Int(Rnd * numChars)
+            If useRndWH Then
+                idx = Int(RndWH * numChars)
+            Else
+                idx = Int(Rnd * numChars)
+            End If
         Loop Until codepoints(idx) < &H10000
         Mid$(RandomStringFromChars, Length) = chars(idx)
     End If
@@ -3597,7 +3651,8 @@ Public Function RandomStringArray(ByVal numElements As Long, _
                          Optional ByVal maxElementLength As Long = 10, _
                          Optional ByVal minElementLength As Long = 0, _
                          Optional ByVal minCodepoint As Long = 1, _
-                         Optional ByVal maxCodepoint As Long = &H10FFFF) _
+                         Optional ByVal maxCodepoint As Long = &H10FFFF, _
+                         Optional ByVal useRndWH As Boolean = False) _
                                   As String()
     Const methodName As String = "RandomStringArray"
     Const MAX_UNICODE As Long = &H10FFFF
@@ -3627,14 +3682,14 @@ Public Function RandomStringArray(ByVal numElements As Long, _
     For i = 0 To numElements - 1
         Do
             strLength = Int((maxElementLength - minElementLength + 1) _
-                            * Rnd + minElementLength)
+                            * Rnd + minElementLength) 'No need to use RndWH here
             If minCodepoint > &HFFFF& Then
                 If strLength Mod 2 = 0 Then Exit Do
             Else
                 Exit Do
             End If
         Loop
-        stringArray(i) = RandomString(strLength, minCodepoint, maxCodepoint)
+        stringArray(i) = RandomString(strLength, minCodepoint, maxCodepoint, useRndWH)
     Next i
     
     RandomStringArray = stringArray
@@ -5803,4 +5858,34 @@ Public Function ParseDate(ByRef str As String, _
     End If
     
     ParseDate = DateSerial(lYear, lMonth, lDay)
+End Function
+
+'https://en.wikipedia.org/wiki/Wichmann-Hill
+'https://www.vbforums.com/showthread.php?499661-Wichmann-Hill-Pseudo-Random-Number-Generator-an-alternative-for-VB-Rnd()-function&p=3076123&viewfull=1#post3076123
+Public Function RndWH(Optional ByVal Number As Long) As Double
+    Static lngX As Long, lngY As Long, lngZ As Long, blnInit As Boolean
+    Dim dblRnd As Double
+    ' if initialized and no input number given
+    If blnInit And Number = 0 Then
+        ' lngX, lngY and lngZ will never be 0
+        lngX = (171& * lngX) Mod 30269&
+        lngY = (172& * lngY) Mod 30307&
+        lngZ = (170& * lngZ) Mod 30323&
+    Else
+        ' if no initialization, use Timer, otherwise ensure positive Number
+        If Number = 0 Then Number = Timer * 60 Else Number = Number And &H7FFFFFFF
+        lngX = (Number Mod 30269&)
+        lngY = (Number Mod 30307&)
+        lngZ = (Number Mod 30323&)
+        ' lngX, lngY and lngZ must be bigger than 0
+        If lngX = 0 Then lngX = 171&
+        If lngY = 0 Then lngY = 172&
+        If lngZ = 0 Then lngZ = 170&
+        ' mark initialization state
+        blnInit = True
+    End If
+    ' generate a random number
+    dblRnd = CDbl(lngX) / 30269# + CDbl(lngY) / 30307# + CDbl(lngZ) / 30323#
+    ' return a value between 0 and 1
+    RndWH = dblRnd - Int(dblRnd)
 End Function
