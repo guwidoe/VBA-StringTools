@@ -3652,7 +3652,6 @@ Public Function StringToCodepointNums(ByRef str As String) As Variant
     StringToCodepointNums = arr
 End Function
 
-
 'Returns a string of length `Length` containing strings from `sourceStringsArr`
 'randomly concatenated, equally distributed.
 'E.g. if 'sourceStringsArr = ("ab", "cd")' and 'Length = 5', the returned string
@@ -3671,6 +3670,7 @@ Public Function RandomStringFromStrings(ByVal Length As Long, _
     Dim i As Long, j As Long
     Dim tmpStr As String
     On Error GoTo catch
+
     For i = LBound(strings) To UBound(strings)
         tmpStr = CStr(strings(i))
         If LenB(tmpStr) > 0 Then
@@ -3678,9 +3678,10 @@ Public Function RandomStringFromStrings(ByVal Length As Long, _
             j = j + 1
         End If
     Next i
+    On Error GoTo 0
     If j = 0 Then Err.Raise 5, methodName, "No strings with LenB > 0 in " & _
                                            "'sourceStringsArr'"
-    On Error GoTo 0: GoTo continue
+    GoTo continue
 catch:
     Err.Raise 5, methodName, "Argument 'strings' contains invalid elements " & _
                              "that can't be converted to String type."
@@ -3746,7 +3747,6 @@ Public Function RandomStringArray(ByVal numElements As Long, _
         Loop
         stringArray(i) = RandomString(strLength, minCodepoint, maxCodepoint, useRndWH)
     Next i
-    
     RandomStringArray = stringArray
 End Function
 
@@ -4113,7 +4113,6 @@ continue:
     If j <= LenB(ReplaceB) Then MidB$(ReplaceB, j) = MidB$(bytes, lastOccurrence)
 End Function
 
-
 'Replaces consecutive occurrences of 'substring' that repeat more than 'limit'
 'times with exactly 'limit' consecutive occurrences
 'E.g.: LimitConsecutiveSubstringRepetition("aaaabaaac", "a", 1)  -> "abac"
@@ -4128,55 +4127,65 @@ Public Function LimitConsecutiveSubstringRepetition( _
                                                           = vbBinaryCompare) _
                                            As String
     Const methodName As String = "LimitConsecutiveSubstringRepetition"
-
     If limit < 0 Then Err.Raise 5, methodName, _
         "Argument 'limit' = " & limit & " < 0, invalid"
-    If limit = 0 Then
-        LimitConsecutiveSubstringRepetition = ReplaceFast(str, subStr, _
-                                                      vbNullString, , , Compare)
+    
+    LimitConsecutiveSubstringRepetition = str
+    If Len(str) = 0 Or Len(subStr) = 0 _
+    Or Len(str) < Len(subStr) * (limit + 1) Then
         Exit Function
-    Else
+    ElseIf limit = 0 Then
         LimitConsecutiveSubstringRepetition = str
+        Do While InStr(1, LimitConsecutiveSubstringRepetition, subStr, _
+        Compare) > 0
+            LimitConsecutiveSubstringRepetition = _
+                ReplaceFast(LimitConsecutiveSubstringRepetition, subStr, _
+                                                      vbNullString, , , Compare)
+        Loop
+        Exit Function
     End If
-    If Len(str) = 0 Then Exit Function
-    If Len(subStr) = 0 Then Exit Function
+    
+    If Len(subStr) = 1 Then
+        Dim alSubString As String: alSubString = String$(limit + 1, subStr)
+    Else
+        alSubString = Space$(Len(subStr) * (limit + 1))
+        Mid$(alSubString, 1) = subStr
+        If limit + 1 > 1 Then Mid$(alSubString, Len(subStr) + 1) = alSubString
+    End If
 
-    Dim i As Long:                i = InStr(1, str, subStr, Compare)
-    Dim j As Long:                j = 1
-    Dim lenSubStr As Long:        lenSubStr = Len(subStr)
-    Dim lastOccurrence As Long:   lastOccurrence = 1 - lenSubStr
+    Dim i As Long:              i = InStr(1, str, alSubString, Compare)
+    Dim j As Long:              j = 1
+    Dim lenSubStr As Long:      lenSubStr = Len(subStr)
+    Dim lastOccurrence As Long: lastOccurrence = 1 - lenSubStr
     Dim copyChunkSize As Long
-    Dim consecutiveCount As Long
-    Dim occurrenceDiff As Long
-    Dim numCopyOperations As Long 'del
+    
     Do Until i = 0
-        occurrenceDiff = i - lastOccurrence
-        If occurrenceDiff = lenSubStr Then
-            consecutiveCount = consecutiveCount + 1
-            If consecutiveCount <= limit Then
-                copyChunkSize = copyChunkSize + occurrenceDiff
-            ElseIf consecutiveCount = limit + 1 Then
-                Mid$(LimitConsecutiveSubstringRepetition, j, copyChunkSize) = _
-                    Mid$(str, i - copyChunkSize, copyChunkSize)
-                numCopyOperations = numCopyOperations + 1 'del
-                j = j + copyChunkSize
-                copyChunkSize = 0
-            End If
-        Else
-            copyChunkSize = copyChunkSize + occurrenceDiff
-            consecutiveCount = 1
-        End If
-        lastOccurrence = i
-        i = InStr(i + lenSubStr, str, subStr, Compare)
+        i = i + lenSubStr * limit
+        lastOccurrence = lastOccurrence + lenSubStr
+        copyChunkSize = i - lastOccurrence
+        Mid$(LimitConsecutiveSubstringRepetition, j, copyChunkSize) = _
+            Mid$(str, lastOccurrence, copyChunkSize)
+        j = j + copyChunkSize
+        Do
+            lastOccurrence = i
+            i = InStr(lastOccurrence + lenSubStr, str, subStr, Compare)
+        Loop Until i - lastOccurrence <> lenSubStr
+        If i = 0 Then Exit Do
+        i = InStr(i, str, alSubString, Compare)
     Loop
 
-    copyChunkSize = copyChunkSize + Len(str) - lastOccurrence - lenSubStr + 1
+    copyChunkSize = Len(str) - lastOccurrence - lenSubStr + 1
     Mid$(LimitConsecutiveSubstringRepetition, j, copyChunkSize) = _
-        Mid$(str, Len(str) - copyChunkSize + 1)
-
-    LimitConsecutiveSubstringRepetition = _
-        Left$(LimitConsecutiveSubstringRepetition, j + copyChunkSize - 1)
-    Debug.Print numCopyOperations + 2 'del
+        Mid$(str, lastOccurrence + lenSubStr)
+    
+    If j + copyChunkSize - 1 < Len(LimitConsecutiveSubstringRepetition) Then _
+        LimitConsecutiveSubstringRepetition = _
+            Left$(LimitConsecutiveSubstringRepetition, j + copyChunkSize - 1)
+    If InStr(1, LimitConsecutiveSubstringRepetition, _
+             alSubString, Compare) > 0 Then _
+        LimitConsecutiveSubstringRepetition = _
+            LimitConsecutiveSubstringRepetition( _
+                LimitConsecutiveSubstringRepetition, subStr, limit, Compare)
 End Function
 
 'Same as LimitConsecutiveSubstringRepetition, but scans the string bytewise.
@@ -4253,8 +4262,9 @@ Public Function RepeatString(ByRef str As String, _
     Const methodName As String = "RepeatString"
     If repeatTimes < 0 Then Err.Raise 5, methodName, _
         "Argument 'repeatTimes' = " & repeatTimes & " < 0, invalid"
-    If repeatTimes = 0 Then Exit Function
-    If LenB(str) = 2 Then
+    If repeatTimes = 0 Or LenB(str) = 0 Then
+        Exit Function
+    ElseIf LenB(str) = 2 Then
         RepeatString = String$(repeatTimes, str)
         Exit Function
     End If
