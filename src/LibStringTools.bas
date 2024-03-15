@@ -4127,21 +4127,16 @@ Public Function LimitConsecutiveSubstringRepetition( _
                                                           = vbBinaryCompare) _
                                            As String
     Const methodName As String = "LimitConsecutiveSubstringRepetition"
+    Const recursionLimit As Long = 100
+    Static recursionDepth As Long
+    
     If limit < 0 Then Err.Raise 5, methodName, _
         "Argument 'limit' = " & limit & " < 0, invalid"
     
     LimitConsecutiveSubstringRepetition = str
     If Len(str) = 0 Or Len(subStr) = 0 _
     Or Len(str) < Len(subStr) * (limit + 1) Then
-        Exit Function
-    ElseIf limit = 0 Then
-        LimitConsecutiveSubstringRepetition = str
-        Do While InStr(1, LimitConsecutiveSubstringRepetition, subStr, _
-        Compare) > 0
-            LimitConsecutiveSubstringRepetition = _
-                ReplaceFast(LimitConsecutiveSubstringRepetition, subStr, _
-                                                      vbNullString, , , Compare)
-        Loop
+        If recursionDepth > 0 Then recursionDepth = recursionDepth - 1
         Exit Function
     End If
     
@@ -4182,10 +4177,25 @@ Public Function LimitConsecutiveSubstringRepetition( _
         LimitConsecutiveSubstringRepetition = _
             Left$(LimitConsecutiveSubstringRepetition, j + copyChunkSize - 1)
     If InStr(1, LimitConsecutiveSubstringRepetition, _
-             alSubString, Compare) > 0 Then _
-        LimitConsecutiveSubstringRepetition = _
-            LimitConsecutiveSubstringRepetition( _
-                LimitConsecutiveSubstringRepetition, subStr, limit, Compare)
+             alSubString, Compare) > 0 Then
+        If recursionDepth < recursionLimit Then
+            recursionDepth = recursionDepth + 1
+            LimitConsecutiveSubstringRepetition = _
+                LimitConsecutiveSubstringRepetition( _
+                    LimitConsecutiveSubstringRepetition, subStr, limit, Compare)
+            recursionDepth = recursionDepth - 1
+        Else
+            Dim limitSubString As String
+            limitSubString = Left$(alSubString, Len(subStr) * limit)
+            Do While InStr(1, LimitConsecutiveSubstringRepetition, subStr, Compare) > 0
+                LimitConsecutiveSubstringRepetition = _
+                    ReplaceFast(LimitConsecutiveSubstringRepetition, alSubString, _
+                                limitSubString, , , Compare)
+            Loop
+            recursionDepth = 0
+            Exit Function
+        End If
+    End If
 End Function
 
 'Same as LimitConsecutiveSubstringRepetition, but scans the string bytewise.
