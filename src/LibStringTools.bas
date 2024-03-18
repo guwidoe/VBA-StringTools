@@ -3906,7 +3906,7 @@ Public Function CountSubstringUnlessEscaped(ByRef str As String, _
 
     CountSubstringUnlessEscaped = 0
     Do Until i = 0 Or lLimit = CountSubstringUnlessEscaped
-        If StrComp(subStr, Mid(str, i + lenSubStr, lenSubStr), lCompare) = 0 Then
+        If StrComp(subStr, Mid$(str, i + lenSubStr, lenSubStr), lCompare) = 0 Then
             i = i + lenSubStr
         Else
             CountSubstringUnlessEscaped = CountSubstringUnlessEscaped + 1
@@ -4008,18 +4008,17 @@ continue:
     Dim bufferSizeChange As Long
     bufferSizeChange = numFinds * (lenReplace - lenFind) - lStart + 1
 
-    If Len(str) + bufferSizeChange < 0 Then Exit Function
+    If Len(str) + bufferSizeChange < 1 Then Exit Function
 
     ReplaceFast = Space$(Len(str) + bufferSizeChange)
 
-    Dim i As Long
     Dim j As Long:              j = 1
     Dim lastOccurrence As Long: lastOccurrence = lStart
     Dim count As Long:          count = 1
 
     For k = 0 To numFinds - 1
         If count > lCount Then Exit For
-        i = sFindPositions(k)
+        Dim i As Long:    i = sFindPositions(k)
         Dim diff As Long: diff = i - lastOccurrence
         If diff > 0 Then _
             Mid$(ReplaceFast, j, diff) = Mid$(str, lastOccurrence, diff)
@@ -4084,21 +4083,22 @@ catch:
     Resume
 continue:
     Dim bufferSizeChange As Long
-    bufferSizeChange = numFinds * (lenBReplace - lenBFind) - lStart
+    bufferSizeChange = numFinds * (lenBReplace - lenBFind) - lStart + 1
 
-    If LenB(bytes) + bufferSizeChange < 0 Then Exit Function
+    If LenB(bytes) + bufferSizeChange < 1 Then Exit Function
     
-    Dim buffer() As Byte:  ReDim buffer(0 To LenB(bytes) + bufferSizeChange)
+    'This array is 1-based to make calculation of 'bufferSizeChange' and the
+    'prior if-statement identical to the algorithm in 'ReplaceFast'
+    Dim buffer() As Byte:  ReDim buffer(1 To LenB(bytes) + bufferSizeChange)
     ReplaceB = buffer
-
-    Dim i As Long
+    
     Dim j As Long:              j = 1
     Dim lastOccurrence As Long: lastOccurrence = lStart
     Dim count As Long:          count = 1
 
     For k = 0 To numFinds - 1
         If count > lCount Then Exit For
-        i = sFindPositions(k)
+        Dim i As Long:    i = sFindPositions(k)
         Dim diff As Long: diff = i - lastOccurrence
         If diff > 0 Then _
             MidB$(ReplaceB, j, diff) = MidB$(bytes, lastOccurrence, diff)
@@ -4119,6 +4119,9 @@ End Function
 '      LimitConsecutiveSubstringRepetition("aaaabaaac", "aa", 1) -> "aabaaac"
 '      LimitConsecutiveSubstringRepetition("aaaabaaac", "a", 2)  -> "aabaac"
 '      LimitConsecutiveSubstringRepetition("aaaabaaac", "ab", 0) -> "aaaaaac"
+'Note that LimitConsecutiveSubstringRepetition(str, subStr, 0)
+'is NOT the same as Replace(str, subStr, 0), e.g.:
+'LimitConsecutiveSubstringRepetition("xaaaabbbby", "ab", 0) -> "xy"
 Public Function LimitConsecutiveSubstringRepetition( _
                                            ByRef str As String, _
                                   Optional ByRef subStr As String = vbNewLine, _
@@ -4127,37 +4130,40 @@ Public Function LimitConsecutiveSubstringRepetition( _
                                                           = vbBinaryCompare) _
                                            As String
     Const methodName As String = "LimitConsecutiveSubstringRepetition"
-    Const recursionLimit As Long = 100
     Static recursionDepth As Long
     
     If limit < 0 Then Err.Raise 5, methodName, _
         "Argument 'limit' = " & limit & " < 0, invalid"
+
+    Dim lenSubStr As Long:      lenSubStr = Len(subStr)
+    Dim lenStr As Long:         lenStr = Len(str)
     
     LimitConsecutiveSubstringRepetition = str
-    If Len(str) = 0 Or Len(subStr) = 0 _
-    Or Len(str) < Len(subStr) * (limit + 1) Then
-        If recursionDepth > 0 Then recursionDepth = recursionDepth - 1
+    If lenStr = 0 Or lenSubStr = 0 Or lenStr < lenSubStr * (limit + 1) Then
         Exit Function
     End If
     
-    If Len(subStr) = 1 Then
-        Dim alSubString As String: alSubString = String$(limit + 1, subStr)
+    'Generate an "above-limit sub-string" (subString repeated limit + 1 times):
+    If lenSubStr = 1 Then
+        Dim alSubStr As String: alSubStr = String$(limit + 1, subStr)
     Else
-        alSubString = Space$(Len(subStr) * (limit + 1))
-        Mid$(alSubString, 1) = subStr
-        If limit + 1 > 1 Then Mid$(alSubString, Len(subStr) + 1) = alSubString
+        alSubStr = Space$(lenSubStr * (limit + 1))
+        Mid$(alSubStr, 1) = subStr
+        If limit + 1 > 1 Then Mid$(alSubStr, lenSubStr + 1) = alSubStr
     End If
-
-    Dim i As Long:              i = InStr(1, str, alSubString, Compare)
+    Dim lenAlSubStr As Long:    lenAlSubStr = Len(alSubStr)
+    
+    'Normal algorithm, fastest for most cases
+    Dim i As Long:              i = InStr(1, str, alSubStr, Compare)
     Dim j As Long:              j = 1
-    Dim lenSubStr As Long:      lenSubStr = Len(subStr)
     Dim lastOccurrence As Long: lastOccurrence = 1 - lenSubStr
-    Dim copyChunkSize As Long
+    
+    If i = 0 Then Exit Function
     
     Do Until i = 0
         i = i + lenSubStr * limit
         lastOccurrence = lastOccurrence + lenSubStr
-        copyChunkSize = i - lastOccurrence
+        Dim copyChunkSize As Long: copyChunkSize = i - lastOccurrence
         Mid$(LimitConsecutiveSubstringRepetition, j, copyChunkSize) = _
             Mid$(str, lastOccurrence, copyChunkSize)
         j = j + copyChunkSize
@@ -4166,38 +4172,117 @@ Public Function LimitConsecutiveSubstringRepetition( _
             i = InStr(lastOccurrence + lenSubStr, str, subStr, Compare)
         Loop Until i - lastOccurrence <> lenSubStr
         If i = 0 Then Exit Do
-        i = InStr(i, str, alSubString, Compare)
+        i = InStr(i, str, alSubStr, Compare)
     Loop
-
-    copyChunkSize = Len(str) - lastOccurrence - lenSubStr + 1
+    copyChunkSize = lenStr - lastOccurrence - lenSubStr + 1
     Mid$(LimitConsecutiveSubstringRepetition, j, copyChunkSize) = _
         Mid$(str, lastOccurrence + lenSubStr)
-    
     If j + copyChunkSize - 1 < Len(LimitConsecutiveSubstringRepetition) Then _
         LimitConsecutiveSubstringRepetition = _
             Left$(LimitConsecutiveSubstringRepetition, j + copyChunkSize - 1)
-    If InStr(1, LimitConsecutiveSubstringRepetition, _
-             alSubString, Compare) > 0 Then
-        If recursionDepth < recursionLimit Then
-            recursionDepth = recursionDepth + 1
-            LimitConsecutiveSubstringRepetition = _
-                LimitConsecutiveSubstringRepetition( _
-                    LimitConsecutiveSubstringRepetition, subStr, limit, Compare)
-            recursionDepth = recursionDepth - 1
-        Else
-            Dim limitSubString As String
-            limitSubString = Left$(alSubString, Len(subStr) * limit)
-            Do While InStr(1, LimitConsecutiveSubstringRepetition, subStr, Compare) > 0
-                LimitConsecutiveSubstringRepetition = _
-                    ReplaceFast(LimitConsecutiveSubstringRepetition, alSubString, _
-                                limitSubString, , , Compare)
+            
+    'If normal algorithm was successful, the next loop will not be entered
+    'This algorithm should be able to handle all other cases in O(n*Log(n)) time
+    Do Until InStr(1, LimitConsecutiveSubstringRepetition, alSubStr, Compare) = 0
+        Dim s As String: s = LimitConsecutiveSubstringRepetition
+        lenStr = Len(s)
+        If lenSubStr = 2 And limit = 0 _
+        And StrComp(Left$(subStr, 1), Right$(subStr, 1), Compare) <> 0 Then
+            'This algorithm should handle special cases like this:
+            's = "aaabbb", subStr = "ab", limit = 0
+            i = InStr(1, s, alSubStr, Compare)
+            j = 1
+            lastOccurrence = 1
+            Dim leftChar As String:  leftChar = Left$(subStr, 1)
+            Dim rightChar As String: rightChar = Right$(subStr, 1)
+            Do Until i = 0
+                Dim l As Long: l = i
+                Dim r As Long: r = i + 1
+                Do 'If statement inside the loop could be avoided using error
+                    l = l - 1 'handling, but since that would only make the loop
+                    r = r + 1 'about 3% faster, it is avoided for debugging
+                    If l < 1 Then Exit Do 'convenience. It's an edge case anyway
+                Loop Until StrComp(Mid$(s, l, 1), leftChar, Compare) <> 0 _
+                        Or StrComp(Mid$(s, r, 1), rightChar, Compare) <> 0
+                copyChunkSize = l + 1 - lastOccurrence
+                If copyChunkSize > 0 Then _
+                    Mid$(LimitConsecutiveSubstringRepetition, j, copyChunkSize) = _
+                        Mid$(s, lastOccurrence, copyChunkSize)
+                j = j + copyChunkSize
+                lastOccurrence = r
+                i = InStr(r, s, alSubStr, Compare)
             Loop
-            recursionDepth = 0
-            Exit Function
+            copyChunkSize = lenStr - r + 1
+            Mid$(LimitConsecutiveSubstringRepetition, j, copyChunkSize) = _
+                        Mid$(s, lastOccurrence)
+        Else
+            Dim lSubStr As String:  lSubStr = Left$(alSubStr, lenSubStr * limit)
+            Dim lenlSubStr As Long: lenlSubStr = Len(lSubStr) '= lenSubStr*limit
+            Dim minL As Long:       minL = 1
+            i = InStr(1, s, alSubStr, Compare)
+            j = 1
+            lastOccurrence = 1 'Deal with chunks that cause runaway recursion:
+            Do Until i = 0     's = "bababababaaaaaa", subStr = "baa", limit = 0
+                Dim susChunk As String
+                susChunk = Space$(lenAlSubStr * 2 - 2 + lenlSubStr)
+                l = i                                'pos indices: l  r
+                r = i + lenAlSubStr                   's:      ..babaaaa...
+                Dim lenLeft As Long, lenRight As Long 'susChunk: ba> <aa -> baaa
+                Do
+                    If l - lenAlSubStr + lenlSubStr + 1 < minL Then
+                        lenLeft = l - minL
+                    Else
+                        lenLeft = lenAlSubStr - lenlSubStr - 1
+                    End If
+                    If r + lenAlSubStr - lenlSubStr - 2 > lenStr Then
+                        lenRight = lenStr - r + 1
+                    Else
+                        lenRight = lenAlSubStr - lenlSubStr - 1
+                    End If
+                    Mid$(susChunk, 1, lenLeft) = Mid$(s, l - lenLeft, lenLeft)
+                    If lenlSubStr > 0 Then _
+                        Mid$(susChunk, lenLeft + 1, lenlSubStr) = lSubStr
+                    Mid$(susChunk, lenLeft + lenlSubStr + 1, lenRight) = _
+                        Mid$(s, r, lenRight)
+                    susChunk = Left$(susChunk, lenLeft + lenRight + lenlSubStr)
+                    Dim n As Long: n = InStr(1, susChunk, alSubStr, Compare)
+                    If n > 0 Then              'Here this holds: n <= lenRight
+                        l = l + n - lenLeft - 1                 'r <= lenStr + 1
+                        r = r + n + lenAlSubStr - 1 - lenLeft - lenlSubStr
+                    Else
+                        Exit Do
+                    End If
+                Loop
+                copyChunkSize = l - lastOccurrence 'Edge handling is finished
+                If copyChunkSize > 0 Then _
+                    Mid$(LimitConsecutiveSubstringRepetition, j, copyChunkSize) = _
+                        Mid$(s, lastOccurrence, copyChunkSize)
+                j = j + copyChunkSize
+                If limit > 0 Then
+                    Mid$(LimitConsecutiveSubstringRepetition, j, lenlSubStr) = _
+                        Left(alSubStr, lenlSubStr)
+                    j = j + lenlSubStr
+                    Mid$(s, r - lenlSubStr, lenlSubStr) = lSubStr
+                End If
+                minL = r - lenlSubStr
+                lastOccurrence = r
+                i = InStr(r - lenlSubStr, s, alSubStr, Compare)
+            Loop
+            copyChunkSize = lenStr - r + 1
+            Mid$(LimitConsecutiveSubstringRepetition, j, copyChunkSize) = _
+                        Mid$(s, lastOccurrence)
         End If
-    End If
+        
+        'Copy the remaining chunk after any of the last two algorithms
+        If j + copyChunkSize - 1 < Len(LimitConsecutiveSubstringRepetition) Then _
+            LimitConsecutiveSubstringRepetition = _
+                Left$(LimitConsecutiveSubstringRepetition, j + copyChunkSize - 1)
+    Loop
 End Function
 
+'TODO: This function needs a rework to update the algorithm to the vesion
+'LimitConsecutiveSubstringRepetition currently uses, this uses an old and
+'bugged version
 'Same as LimitConsecutiveSubstringRepetition, but scans the string bytewise.
 'Example illustrating the difference:
 'Dim bytes As String: bytes = HexToString("0x006100610061")
@@ -4436,10 +4521,10 @@ Public Function SplitUnlessEscaped(ByRef str As String, _
     Dim i As Long:          i = InStr(lastOccurrence, str, sDelimiter, lCompare)
     
     Do Until i = 0 Or count + 1 >= lLimit
-        If Mid(str, i + lenDelim, lenDelim) = sDelimiter Then
+        If Mid$(str, i + lenDelim, lenDelim) = sDelimiter Then
             lastOccurrence = i + 2 * lenDelim
         Else
-            arr(count) = Replace(Mid(str, partStart, i - partStart), _
+            arr(count) = Replace(Mid$(str, partStart, i - partStart), _
                                  sDelimiter & sDelimiter, sDelimiter)
             count = count + 1
             partStart = i + lenDelim
@@ -4448,7 +4533,7 @@ Public Function SplitUnlessEscaped(ByRef str As String, _
         i = InStr(lastOccurrence, str, sDelimiter, lCompare)
     Loop
     
-    If count < lLimit Then arr(count) = Replace(Mid(str, partStart), _
+    If count < lLimit Then arr(count) = Replace(Mid$(str, partStart), _
                                             sDelimiter & sDelimiter, sDelimiter)
     SplitUnlessEscaped = arr
 End Function
@@ -4698,9 +4783,18 @@ End Function
 '         of "2" gets replaced by "4"
 '         ReplaceMultiple("123123123", ...) returns "343543343"
 'Notes:
+'All replacements will be performed in a single pass. That means if an element
+'of 'sFindOrFinds' with a greater index contains any of the prior elements in
+''sFindOrFinds' as a substring, it won't be replaced because of the order of
+'precedence, which goes from first = highest to last = lowest.
+'Example:
+'ReplaceMultiple("HelloHello", Array("ell", "Hello"), Array("ell", "World"))
+'   Here "Hello" will not be found and replaced because it contains "ell" as a
+'   substring and "ell" has higher priority because if comes earlier in
+'   'sFindOrFinds'. The output of this code is therefore "HelloHello"
 ''ReplaceMultipleMultiPass' is generally faster than this function for smaller
 '   input strings (< 50k characters) or a large amount of 'finds' and 'replaces'
-'   (> 1000 of each)
+'   (> 1000 of each) However, it
 '   does not support the n < m case and also the behavior can differ and be less
 '   predictable, if for example finds appear in the string through prior
 '   replacements that can then get replaced again in the next iteration.
@@ -4755,7 +4849,6 @@ continue:
     End If
     
     'Clean input arrays to deal with cases where one "find" contains another one
-    
     'Unfortunately, this part of the algorithm introduces an O(n^2 * m)
     'complexity (n = number of finds, m average length of finds) which can make
     'this function very slow for more than a few 1000 finds. This can
@@ -5880,12 +5973,12 @@ Public Function TrimX(ByRef str As String, _
     Dim endIdx As Long:   endIdx = strLen
 
     Do While startIdx <= strLen _
-        And InStr(1, charactersToTrim, Mid(str, startIdx, 1), compareMethod) > 0
+        And InStr(1, charactersToTrim, Mid$(str, startIdx, 1), compareMethod) > 0
         startIdx = startIdx + 1
     Loop
 
     Do While endIdx >= 1
-        If InStr(1, charactersToTrim, Mid(str, endIdx, 1), compareMethod) > 0 Then
+        If InStr(1, charactersToTrim, Mid$(str, endIdx, 1), compareMethod) > 0 Then
             endIdx = endIdx - 1
         Else
             Exit Do
@@ -5893,7 +5986,7 @@ Public Function TrimX(ByRef str As String, _
     Loop
 
     If startIdx <= endIdx Then
-        TrimX = Mid(str, startIdx, endIdx - startIdx + 1)
+        TrimX = Mid$(str, startIdx, endIdx - startIdx + 1)
     Else
         TrimX = vbNullString
     End If
@@ -5915,7 +6008,7 @@ Public Function ColLetterToNumber(ByRef colLetterOrNumber As Variant) As Long
         Dim i As Long
         For i = 1 To Len(colLetterOrNumber)
             ColLetterToNumber = ColLetterToNumber * 26 + _
-                (Asc(UCase(Mid(colLetterOrNumber, i, 1))) - 65 + 1)
+                (Asc(UCase(Mid$(colLetterOrNumber, i, 1))) - 65 + 1)
         Next i
         If ColLetterToNumber > 16384 Then _
             Err.Raise 5, methodName, _
@@ -5939,12 +6032,12 @@ Public Function ParseDate(ByRef str As String, _
     
     Dim i As Long
     For i = 1 To Len(str)
-        If UCase(Mid(dateFormat, i, 1)) = "D" Then
-            Dim lDay As Long: lDay = lDay * 10 + CLng(Mid(str, i, 1))
-        ElseIf UCase(Mid(dateFormat, i, 1)) = "Y" Then
-            Dim lYear As Long: lYear = lYear * 10 + CLng(Mid(str, i, 1))
-        ElseIf UCase(Mid(dateFormat, i, 1)) = "M" Then
-            Dim sMonth As String: sMonth = sMonth & Mid(str, i, 1)
+        If UCase(Mid$(dateFormat, i, 1)) = "D" Then
+            Dim lDay As Long: lDay = lDay * 10 + CLng(Mid$(str, i, 1))
+        ElseIf UCase(Mid$(dateFormat, i, 1)) = "Y" Then
+            Dim lYear As Long: lYear = lYear * 10 + CLng(Mid$(str, i, 1))
+        ElseIf UCase(Mid$(dateFormat, i, 1)) = "M" Then
+            Dim sMonth As String: sMonth = sMonth & Mid$(str, i, 1)
         End If
     Next i
     
