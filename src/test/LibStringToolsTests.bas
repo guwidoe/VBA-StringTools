@@ -1506,7 +1506,7 @@ Sub LimitConsecutiveSubstringRepetitionSelectedQuickTestSuite()
     TestLimitConsecutiveSubstringRepetition "aaaababbaababbbaaababbaababbbaaababbaababbbb", "ab", 0
     TestLimitConsecutiveSubstringRepetition "abaabaaabaabaaabaabaaabaabaa", "abaa", 0
     TestLimitConsecutiveSubstringRepetition "aaaabaabaaaaabaabaaaaabaabaaaaabaabaaaaabaabaaaaabaabaa", "aabaa", 0
-    TestLimitConsecutiveSubstringRepetition "aaaabaaaabaaabaaabaaabaaabaaaabaaaaaabaaaaabaaabaaabaaabaaabaaabaaabaaabaabaabaabaabaabaabaabaabaabaaaabaaaabaabaabaaba", "aaba", 0
+    TestLimitConsecutiveSubstringRepetition "aaaaaaaababababaaaaabaababa", "aaba", 0
 
 
     TestLimitConsecutiveSubstringRepetition UnescapeUnicode("\u6100\u6100\u6100"), "a", 1

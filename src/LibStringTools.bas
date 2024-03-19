@@ -4122,6 +4122,27 @@ End Function
 'Note that LimitConsecutiveSubstringRepetition(str, subStr, 0)
 'is NOT the same as Replace(str, subStr, 0), e.g.:
 'LimitConsecutiveSubstringRepetition("xaaaabbbby", "ab", 0) -> "xy"
+'Note that due to the algorithm used by this function, in extremely rare cases,
+'this function can produce different results than the naive solution of replace
+'in a loop. This can only happen when the `subString` partially contains itself,
+'for example, if it starts and ends with the same letter, but contains more than
+'one different letter in total and is at least 3 letters long. This doesn't mean
+'that this function doesn't work correctly, it simply means there is no
+'objectively "correct" solution because in some cases different order of
+'deletions of excess repetitions, of the subString we try to limit, can lead to
+'different results, and in some cases this function will use a different order
+'of deletion to avoid O(n^2) runtime complexity that could lead to indefinite
+'freezing for some inputs.
+'An example where the order of operations influences the final outcome can could
+'look like this:
+'str:="aabaaaababa", subStr:="aaba", limit:=0
+'Depending on the order of deletion, the result could be either "aab", or "aba"
+'Note that in this simple case LimitConsecutiveSubstringRepetition will procude
+'the same result as the trivial Replace loop solution. Only some very weirdly
+'constructed inputs can cause a different behavior.
+'An example of an input that will cause a different result looks like this:
+'str:="aaaaaaaababababaaaaabaababa", subStr:="aaba", limit:=0
+'With everyday data such cases will most likely never occur.
 Public Function LimitConsecutiveSubstringRepetition( _
                                            ByRef str As String, _
                                   Optional ByRef subStr As String = vbNewLine, _
@@ -4235,7 +4256,7 @@ Public Function LimitConsecutiveSubstringRepetition( _
                 Do
                     If l - lenSubStr + 1 < minL Then lenLeft = l - minL _
                                                 Else lenLeft = lenSubStr - 1
-                    If r + lenSubStr - 2 > maxR Then lenRight = maxR - r + 1
+                    If r + lenSubStr - 2 > maxR Then lenRight = maxR - r + 1 _
                                                 Else: lenRight = lenSubStr - 1
                     If lenLeft + lenRight < lenSubStr Then Exit Do
                     Mid$(susChunk, 1, lenLeft) = Mid$(s, l - lenLeft, lenLeft)
