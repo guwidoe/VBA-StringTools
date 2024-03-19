@@ -2,7 +2,7 @@ Attribute VB_Name = "LibStringToolsTests"
 '===============================================================================
 ' VBA StringTools - Tests
 ' ------------------------------------------------------------------------------------
-' https://github.com/guwidoe/VBA-StringTools/blob/main/src/test/TestLibStringTools.bas
+' https://github.com/guwidoe/VBA-StringTools/blob/main/src/test/LibStringToolsTests.bas
 ' ------------------------------------------------------------------------------------
 ' MIT License
 '
@@ -423,71 +423,6 @@ Private Sub TestHexToString()
 End Sub
 
 
-Public Function LimitConsecutiveSubstringRepetitionCheck(ByVal str As String, _
-                                           Optional ByVal subStr As String = vbNewLine, _
-                                           Optional ByVal limit As Long = 1, _
-                                           Optional ByVal Compare As VbCompareMethod) _
-                                                    As String
-    Dim sReplace As String:     sReplace = RepeatString(subStr, limit)
-    Dim sCompare As String:     sCompare = str
-    Do
-        Dim sFind As String:    sFind = sReplace & subStr
-        Do
-            LimitConsecutiveSubstringRepetitionCheck = sCompare
-            sCompare = Replace(sCompare, sFind, sReplace, , , Compare)
-            sFind = sFind & subStr 'This together with outer loop should
-                                   'improve worst-case runtime a lot
-        Loop Until sCompare = LimitConsecutiveSubstringRepetitionCheck
-    Loop Until sFind = sReplace & subStr & subStr
-End Function
-
-
-Public Function LimitConsecutiveSubstringRepetitionCheck2(ByVal str As String, _
-                                           Optional ByVal subStr As String = vbNewLine, _
-                                           Optional ByVal limit As Long = 1, _
-                                           Optional ByVal Compare As VbCompareMethod) _
-                                                    As String
-    Dim sReplace As String:     sReplace = RepeatString(subStr, limit)
-    Dim sCompare As String:     sCompare = str
-    Dim sFind As String:        sFind = sReplace & subStr
-    Do
-        LimitConsecutiveSubstringRepetitionCheck2 = sCompare
-        sCompare = Replace(sCompare, sFind, sReplace, , , Compare)
-    Loop Until sCompare = LimitConsecutiveSubstringRepetitionCheck2
-End Function
-
-
-
-
-Private Function TestLimitConsecutiveSubstringRepetition(ByVal str As String, _
-                                  Optional ByVal subStr As String = vbNewLine, _
-                                  Optional ByVal limit As Long = 1, _
-                                  Optional ByVal Compare As VbCompareMethod)
-    On Error Resume Next
-    TestLimitConsecutiveSubstringRepetition = "passed"
-    Dim res1 As String
-    res1 = LimitConsecutiveSubstringRepetition(str, subStr, limit, Compare)
-    Dim res2 As String
-    res2 = LimitConsecutiveSubstringRepetitionCheck(str, subStr, limit, Compare)
-    On Error GoTo 0
-    
-    If res1 = res2 Then Exit Function
-    TestLimitConsecutiveSubstringRepetition = "failed"
-    
-    Err.Raise vbObjectError + 43233, "TestLimitConsecutiveSubstringRepetition", _
-        "TestLimitConsecutiveSubstringRepetition failed for: " & vbNewLine & _
-        "vbCompareMethod: " & Compare & vbNewLine & _
-        "limit: " & limit & vbNewLine & _
-        "subStr: '" & subStr & "'" & vbNewLine & _
-        "str: '" & str & "'"
-End Function
-
-Sub TestLimitConsecutiveSubstringRepetitionB()
-    Dim bytes As String: bytes = HexToString("0x006100610061")
-    Dim subStr As String: subStr = HexToString("0x6100")
-    Debug.Print StringToHex(LimitConsecutiveSubstringRepetition(bytes, subStr, 1))
-    Debug.Print StringToHex(LimitConsecutiveSubstringRepetitionB(bytes, subStr, 0))
-End Sub
 
 Private Sub TestReplaceB()
     Dim bytes As String: bytes = HexToString("0x006100610061")
@@ -1097,164 +1032,6 @@ Sub CompareReplaceAndReplaceB()
     'Debug.Print resultLib3 = resultLib2
 End Sub
 
-
-Private Sub ProcessFindsUsingTrie(ByRef finds As Variant, _
-                                  ByVal lCompare As VbCompareMethod)
-    Dim trie As Object
-    Set trie = CreateObject("Scripting.Dictionary")
-    
-    Dim i As Long, j As Long, k As Long
-    Dim current As Object
-    Dim ch As String
-
-    For i = LBound(finds) To UBound(finds)
-        If Len(finds(i)) <> 0 Then
-            'Insert current string into the trie
-            Set current = trie
-            For j = 1 To Len(finds(i))
-                ch = Mid(finds(i), j, 1)
-                If lCompare = vbTextCompare Then ch = LCase(ch)
-                If Not current.Exists(ch) Then
-                    current.Add ch, CreateObject("Scripting.Dictionary")
-                End If
-                Set current = current(ch)
-            Next j
-            current("end") = True
-            
-            'Check remaining strings against the trie
-            For k = i + 1 To UBound(finds)
-                If Len(finds(k)) <> 0 Then
-                    Set current = trie
-                    For j = 1 To Len(finds(k))
-                        ch = Mid(finds(k), j, 1)
-                        If lCompare = vbTextCompare Then ch = LCase(ch)
-                        If Not current.Exists(ch) Then Exit For
-                        Set current = current(ch)
-                        
-                        If current.Exists("end") And j < Len(finds(k)) Then
-                            finds(k) = vbNullString
-                            Exit For
-                        End If
-                    Next j
-                End If
-            Next k
-        End If
-    Next i
-End Sub
-
-Private Sub ProcessFindsNormally(ByRef finds As Variant, _
-                                 ByVal lCompare As VbCompareMethod)
-    Dim i As Long, j As Long
-    For i = 0 To UBound(finds)
-        If Len(finds(i)) <> 0 Then
-            For j = i + 1 To UBound(finds)
-                If InStr(1, finds(j), finds(i), lCompare) <> 0 Then
-                    finds(j) = vbNullString
-                End If
-            Next j
-        End If
-    Next i
-End Sub
-
-Private Sub CompareFindProcessingProcedures()
-    Dim tests As Variant
-    Dim i As Long
-    Dim original() As Variant, expected() As Variant, actual() As Variant
-    
-    ' Define test cases
-    tests = Array( _
-        Array("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "0"), _
-        Array("hello", "helloworld", "he", "hell", "cat", "dog"), _
-        Array("a", "b", "c", "d", "e", "f", "g", "h", "i", "j"), _
-        Array("aa", "a", "bb", "b", "cc", "c"), _
-        Array("a", "aa", "bb", "b", "c", "cc"), _
-        Array("hello", "helloworld", "he", "hell", "cat", "dog"), _
-        Array("hello", "ell", "orl", "World") _
-    )
-    
-    For i = LBound(tests) To UBound(tests)
-        ' Copy original array
-        original = tests(i)
-        
-        ' Use ProcessFindsNormally as reference for the expected result
-        expected = original
-        st i = 0
-        ProcessFindsNormally expected, vbTextCompare
-        RT "ProcessFindsNormally " & i + 1
-        
-        ' Test ProcessFindsUsingTrie procedure
-        actual = original
-        st False
-        ProcessFindsUsingTrie actual, vbTextCompare
-        RT "ProcessFindsUsingTrie " & i + 1
-        
-        If Not ArraysAreEqual(actual, expected) Then
-            Debug.Print "Test " & i + 1 & " failed for ProcessFindsUsingTrie procedure"
-            Debug.Print "Expected: " & ToString(expected)
-            Debug.Print "Actual: " & ToString(actual)
-        Else
-            Debug.Print "Test " & i + 1 & " passed."
-        End If
-    Next i
-End Sub
-
-Private Sub DemonstrateBigOcomplexityOfTrieVsNaive()
-    Dim timeTaken As Currency
-    st
-    Dim i As Long
-    Dim finds1 As Variant
-    Dim finds2 As Variant
-    Dim timeTrie As Currency
-    Dim timeNaive As Currency
-    Dim totalChars As Long
-    Dim numChunks As Long
-    Dim increaseFactor As Long
-    increaseFactor = 2
-    totalChars = 50
-    numChunks = 10
-    Randomize
-    Do Until timeTaken > StoUs(3)
-        ReDim finds1(0 To numChunks - 1)
-        For i = 0 To numChunks - 1
-            finds1(i) = RandomStringAlphanumeric(Rnd * totalChars \ numChunks * 2)
-        Next i
-        'finds1 = ChunkifyString(RandomStringAlphanumeric(totalChars), , 10)
-        finds2 = finds1
-        st False
-        ProcessFindsUsingTrie finds1, vbTextCompare
-        timeTrie = RT("Processed " & numChunks & " Finds Using Trie")
-        st False
-        ProcessFindsNormally finds2, vbTextCompare
-        timeNaive = RT("Processed " & numChunks & _
-                                      " Finds Using Nested Loop with Instr")
-        
-        Debug.Print "TimeTrie / TimeNaive = " & timeTrie / timeNaive
-        timeTaken = timeTrie + timeNaive
-        
-        totalChars = totalChars * increaseFactor
-        numChunks = numChunks * increaseFactor
-        DoEvents
-    Loop
-End Sub
-
-Private Function ArraysAreEqual(arr1 As Variant, arr2 As Variant) As Boolean
-    Dim i As Long
-    
-    If UBound(arr1) <> UBound(arr2) Then
-        ArraysAreEqual = False
-        Exit Function
-    End If
-    
-    For i = LBound(arr1) To UBound(arr1)
-        If arr1(i) <> arr2(i) Then
-            ArraysAreEqual = False
-            Exit Function
-        End If
-    Next i
-    
-    ArraysAreEqual = True
-End Function
-
 Private Sub CompareErrorHandlingOfNativeAndApiDecoders()
     Dim s As String
     s = RandomBytes(1001)
@@ -1414,16 +1191,11 @@ End Sub
 
 Sub TestRnd()
     Const NUM_LOOPS As Long = 1000000
-    Dim bool As Boolean
-    bool = False
+    Const TEST_RND_WH As Boolean = False
     Dim i As Long
     StartTimer
     For i = 1 To NUM_LOOPS
-        If bool Then
-            RndWH
-        Else
-            Rnd
-        End If
+        If TEST_RND_WH Then RndWH Else Rnd
     Next i
     ReadTimer
 End Sub
@@ -1522,97 +1294,6 @@ Sub FindDecodeUTF8Bugs()
     Loop
 End Sub
 
-
-Public Function LimitConsecutiveSubstringRepetitionNaive( _
-                                           ByRef str As String, _
-                                  Optional ByRef subStr As String = vbNewLine, _
-                                  Optional ByVal limit As Long = 1, _
-                                  Optional ByVal Compare As VbCompareMethod _
-                                                          = vbBinaryCompare) _
-                                           As String
-    Dim findStr As String:    findStr = RepeatString(subStr, limit + 1)
-    Dim replaceStr As String: replaceStr = RepeatString(subStr, limit)
-    LimitConsecutiveSubstringRepetitionNaive = str
-    If Len(findStr) = 0 Then Exit Function
-    Do While InStr(1, LimitConsecutiveSubstringRepetitionNaive, _
-                   findStr, Compare) > 0
-        LimitConsecutiveSubstringRepetitionNaive = _
-            ReplaceFast(LimitConsecutiveSubstringRepetitionNaive, findStr, _
-                     replaceStr, , , Compare)
-    Loop
-End Function
-
-Sub DemoLimitConsecutiveSubstringRepetition()
-    'The library function is typically much faster than the naive approach and
-    'has linear time complexity
-    Const LEN_TEST_STR As Long = 500000
-    Dim lCompare As VbCompareMethod: lCompare = vbBinaryCompare
-    Dim demoStr As String
-    Dim resultNaive As String
-    Dim resultLib As String
-    
-    StartTimer
-    demoStr = RandomStringFromChars(LEN_TEST_STR, "a ")
-    demoStr = String(35000000, "a") & Space(10000000)
-    'demoStr = RepeatString("a ", LEN_TEST_STR / 2)
-    
-    ReadTimer "Generating test string of length " & LEN_TEST_STR, Reset:=True
-    resultNaive = LimitConsecutiveSubstringRepetitionNaive(demoStr, " ", 1, lCompare)
-    ReadTimer "Naive approach", Reset:=True
-    resultLib = LimitConsecutiveSubstringRepetition(demoStr, " ", 1, lCompare)
-    ReadTimer "Library approach"
-    
-    
-'    Debug.Print resultNaive = resultLib
-'    Debug.Print demoStr
-'    Debug.Print resultNaive
-'    Debug.Print resultLib
-End Sub
-
-Public Function LimitConsecutiveSubstringRepetitionNaiveB( _
-                                           ByRef str As String, _
-                                  Optional ByRef subStr As String = vbNewLine, _
-                                  Optional ByVal limit As Long = 1, _
-                                  Optional ByVal Compare As VbCompareMethod _
-                                                          = vbBinaryCompare) _
-                                           As String
-    Dim findStr As String:    findStr = RepeatString(subStr, limit + 1)
-    Dim replaceStr As String: replaceStr = RepeatString(subStr, limit)
-    LimitConsecutiveSubstringRepetitionNaiveB = str
-    If LenB(findStr) = 0 Then Exit Function
-    Do While InStr(1, LimitConsecutiveSubstringRepetitionNaiveB, _
-                   findStr, Compare) > 0
-        LimitConsecutiveSubstringRepetitionNaiveB = _
-            ReplaceB(LimitConsecutiveSubstringRepetitionNaiveB, findStr, _
-                     replaceStr, , , Compare)
-    Loop
-End Function
-
-Sub DemoLimitConsecutiveSubstringRepetitionB()
-    'The library function is typically much faster than the naive approach and
-    'has linear time complexity
-    Const LEN_TEST_STR As Long = 1000000
-    
-    Dim resultNaive As String
-    Dim resultLib As String
-    
-    StartTimer
-    Dim demoStr As String: 'demoStr = RandomStringFromChars(LEN_TEST_STR, "ab ")
-    'demoStr = RepeatString("  a", LEN_TEST_STR / 3)
-    demoStr = String(35000000, "a") & Space(10000000)
-    
-    ReadTimer "Generating test string of length " & LEN_TEST_STR, Reset:=True
-    resultNaive = LimitConsecutiveSubstringRepetitionNaiveB(demoStr, " ", 1)
-    ReadTimer "Naive approach", Reset:=True
-    resultLib = LimitConsecutiveSubstringRepetitionB(demoStr, " ", 1)
-    ReadTimer "Library approach"
-    Debug.Print resultNaive = resultLib
-End Sub
-
-Sub TestRandomStringFromStrings()
-    Debug.Print RandomStringFromStrings(5, Array("ab", "cd"))
-End Sub
-
 Sub TestRandomStringFromCharsPerformance()
     Const STR_LENGTH As Long = 100000
     Const NUM_LOOPS As Long = 10
@@ -1627,8 +1308,6 @@ Sub TestRandomStringFromCharsPerformance()
     Next i
     ReadTimer "RandomStringFromChars, custom RndWH", , True
 End Sub
-
-
 
 
 Sub TestIteratingString()
@@ -1658,8 +1337,15 @@ Sub TestIteratingString()
     ReadTimer "<> method", , True
 End Sub
 
+Sub AllLimitConsecutiveSubstringRepetitionTests()
+    TestLimitConsecutiveSubstringRepetitionPerformanceRealistic
+    TestLimitConsecutiveSubstringRepetitionPerformanceWorstCase
+    LimitConsecutiveSubstringRepetitionSelectedQuickTestSuite
+    StressTestLimitConsecutiveSubstringRepetition
+End Sub
+
 Sub TestLimitConsecutiveSubstringRepetitionPerformanceRealistic()
-    Const STR_LENGTH As Long = 1000000
+    Const STR_LENGTH As Long = 45000000
     Const RUN_NAIVE_AS_CHECK As Boolean = True
     
     Dim testCases As Collection
@@ -1683,8 +1369,13 @@ Sub TestLimitConsecutiveSubstringRepetitionPerformanceRealistic()
         testStr = RandomStringFromStrings(STR_LENGTH, Array("asdf ", "asfdaf ", "asdfasf ", "asdfafd ", "asdfasf ", "safs ", "asdfa ", _
                 "asdf ", "asfdaf ", "asdfasf ", "asdfafd ", "asdfasf ", "safs ", "asdfa ", vbCrLf, vbCrLf, vbCrLf & vbCrLf), True)
         .Add VBA.Array(testStr, vbCrLf, 0)
+        
+        testStr = RandomStringFromChars(STR_LENGTH, "a ")
+        .Add VBA.Array(testStr, " ", 1)
+        
+        testStr = String(STR_LENGTH / 2, "a") & Space(STR_LENGTH / 2)
+        .Add VBA.Array(testStr, " ", 1)
     End With
-    
     
     StartTimer
     Dim res1 As String, res2 As String
@@ -1727,10 +1418,10 @@ Sub TestLimitConsecutiveSubstringRepetitionPerformanceWorstCase()
     With testCases
         testStr = String(STR_LENGTH / 2, "a") & String(STR_LENGTH / 2, "b")
         .Add VBA.Array(testStr, "ab", 0)
-        
+
         testStr = RepeatString("ba", STR_LENGTH / 3) & RepeatString("a", STR_LENGTH / 3)
         .Add VBA.Array(testStr, "baa", 0)
-        
+
         Dim i As Long
         Dim insertStr As String: insertStr = RandomStringAlphanumeric(10)
         testStr = ""
@@ -1740,13 +1431,13 @@ Sub TestLimitConsecutiveSubstringRepetitionPerformanceWorstCase()
             insertPos = RndWH * (Len(insertStr) - 2) + 1 + insertPos
         Next i
         .Add VBA.Array(testStr, insertStr, 0)
-        
+
         testStr = ""
         Do Until Len(testStr) >= STR_LENGTH
             testStr = "a" & testStr & testStr & "b"
         Loop
         testStr = Left$(testStr, STR_LENGTH)
-        .Add VBA.Array(testStr, insertStr, 0)
+        .Add VBA.Array(testStr, "ab", 0)
     End With
     
     StartTimer
@@ -1771,11 +1462,10 @@ Sub TestLimitConsecutiveSubstringRepetitionPerformanceWorstCase()
     Debug.Print "Total time fast: " & UsToS(totalTimeFast) & " s"
 End Sub
 
-Sub RunLimitConsecutiveSubstringRepetitionTests()
+Sub LimitConsecutiveSubstringRepetitionSelectedQuickTestSuite()
     Dim failedTests As Long
-    On Error GoTo errh:
-    TestLimitConsecutiveSubstringRepetition "abababbbaabbbbb", "abb", 0
-    TestLimitConsecutiveSubstringRepetition "aaaababbaababbbaaababbaababbbaaababbaababbbb", "ab", 0
+    On Error GoTo errh:                              '|         |
+    
     TestLimitConsecutiveSubstringRepetition "aaaabaaca", "a", 0
     TestLimitConsecutiveSubstringRepetition "baaaabaaca", "a", 0
     TestLimitConsecutiveSubstringRepetition "aaaabaaca", "a", 0
@@ -1784,6 +1474,7 @@ Sub RunLimitConsecutiveSubstringRepetitionTests()
     TestLimitConsecutiveSubstringRepetition "abaca", "aa", 0
     TestLimitConsecutiveSubstringRepetition "bababa", "ab", 0
     TestLimitConsecutiveSubstringRepetition "aaaaaaaaaaabbbbbbbbbbbbbbbbbbb", "ab", 0
+    TestLimitConsecutiveSubstringRepetition "aaaaaaaaaaaaaaabbbbbbbb", "ab", 0
     TestLimitConsecutiveSubstringRepetition "aaaabaaca", "a", 1
     TestLimitConsecutiveSubstringRepetition "baaaabaaca", "a", 1
     TestLimitConsecutiveSubstringRepetition "aaaabaaca", "a", 2
@@ -1796,7 +1487,6 @@ Sub RunLimitConsecutiveSubstringRepetitionTests()
     TestLimitConsecutiveSubstringRepetition "bbbaaababbb", "c", 1
     TestLimitConsecutiveSubstringRepetition "erereererererr", "ere", 1
     TestLimitConsecutiveSubstringRepetition "eerr", "er", 0
-    
     TestLimitConsecutiveSubstringRepetition "babaabababaababaabababaabababaabababaababaabababaaba", "babaaba", 1
     TestLimitConsecutiveSubstringRepetition "xxxxxxxxxxxxxxxxbabaabababaababaabababaabababaabababaababaabababaaba", "babaaba", 1
     TestLimitConsecutiveSubstringRepetition "babaabababaababaabababaabababaabababaababaabababaabaxxxxxxxxxxxxxxxx", "babaaba", 1
@@ -1804,8 +1494,7 @@ Sub RunLimitConsecutiveSubstringRepetitionTests()
     TestLimitConsecutiveSubstringRepetition RepeatString("ba", 100 / 3) & "baa" & RepeatString("baaa", 100 * 2 / 3), "baa", 1
     TestLimitConsecutiveSubstringRepetition "bababababababaabaaabaaabaaabaaa" & RepeatString("baaa", 100 * 2 / 3), "baa", 1
     TestLimitConsecutiveSubstringRepetition RepeatString("babababababaaaaaaa", 1000), "baa", 0
-    TestLimitConsecutiveSubstringRepetition RepeatString("ba", 100 / 3) & "a" & RepeatString("baaa", 100 * 2 / 3), _
-                                            "baa", 0
+    TestLimitConsecutiveSubstringRepetition RepeatString("ba", 100 / 3) & "a" & RepeatString("baaa", 100 * 2 / 3), "baa", 0
     TestLimitConsecutiveSubstringRepetition "abababababababWl3aWl3aTWl3Wl3aWl3aTIceGHTIceGHaTIceGHIceGHTIceGH", "Wl3aTIceGH", 0
     TestLimitConsecutiveSubstringRepetition "Wl3aTIcWl3aWl3aTIceGWl3aTIcWl3aTIceGHeGHHTIceGHeGHbabababababababa", "Wl3aTIceGH", 0
     TestLimitConsecutiveSubstringRepetition "abababababababWl3aTIcWl3aWl3aTIceGWl3aTIcWl3aTIceGHeGHHTIceGHeGHbabababababababa", "Wl3aTIceGH", 0
@@ -1813,9 +1502,14 @@ Sub RunLimitConsecutiveSubstringRepetitionTests()
     TestLimitConsecutiveSubstringRepetition "aabbabababbabababbabababbabababbababbababbababbababbababbababbababbababbababbabababbabababbab", "babab", 1
     TestLimitConsecutiveSubstringRepetition "bbabbbbabbabbbbabbabbbbabbabbbbabba", "bbabb", 1
     TestLimitConsecutiveSubstringRepetition "bbaaaababab", "aab", 0
-    
-    TestLimitConsecutiveSubstringRepetition _
-        UnescapeUnicode("\u6100\u6100\u6100"), "a", 1
+    TestLimitConsecutiveSubstringRepetition "abababbbaabbbbb", "abb", 0
+    TestLimitConsecutiveSubstringRepetition "aaaababbaababbbaaababbaababbbaaababbaababbbb", "ab", 0
+    TestLimitConsecutiveSubstringRepetition "abaabaaabaabaaabaabaaabaabaa", "abaa", 0
+    TestLimitConsecutiveSubstringRepetition "aaaabaabaaaaabaabaaaaabaabaaaaabaabaaaaabaabaaaaabaabaa", "aabaa", 0
+    TestLimitConsecutiveSubstringRepetition "aaaabaaaabaaabaaabaaabaaabaaaabaaaaaabaaaaabaaabaaabaaabaaabaaabaaabaaabaabaabaabaabaabaabaabaabaabaaaabaaaabaabaabaaba", "aaba", 0
+
+
+    TestLimitConsecutiveSubstringRepetition UnescapeUnicode("\u6100\u6100\u6100"), "a", 1
     failedTests = failedTests + IIf(LimitConsecutiveSubstringRepetitionB( _
                 UnescapeUnicode("\u6100\u6100\u6100"), "a", 1) <> _
             LimitConsecutiveSubstringRepetition( _
@@ -1839,19 +1533,19 @@ errh:
 End Sub
 
 Sub StressTestLimitConsecutiveSubstringRepetition()
-    Const TIMEOUT_SECONDS As Long = 5000
+    Const TIMEOUT_SECONDS As Long = 10
     Const MAX_REPETITIONS As Long = 10
-    Const TEST_STR_LENGTH As Long = 20
+    Const TEST_STR_LENGTH As Long = 400
     Const NUM_SUBSTRINGS As Long = 4
     Const MAX_LEN_SUBSTRING As Long = 10
     Const NUM_DIFFERENT_CHARACTERS As Long = 2
-    Const PRINT_EVERY_N_SECONDS As Long = 3
+    Const PRINT_EVERY_N_SECONDS As Long = 5
     
     Dim totalTime As Currency: totalTime = AccurateTimerS
     Dim totalTimeNaive As Currency, totalTimeFast As Currency
     Dim i As Long
     Dim numTestsTotal As Long
-    Dim printTimer As Currency
+    Dim printTimer As Currency: printTimer = AccurateTimerS
     Do Until AccurateTimerS - totalTime > TIMEOUT_SECONDS
         DoEvents
         Dim sourceArr As Variant
@@ -1891,7 +1585,59 @@ Sub StressTestLimitConsecutiveSubstringRepetition()
             Exit Sub
         End If
     Loop
+    Debug.Print "LimitConsecutiveSubstringRepetition passed Stress Test"
+    Debug.Print "Performed " & numTestsTotal & " tests."
     Debug.Print "Time spent naive: " & UsToS(totalTimeNaive)
-    Debug.Print "Time spent fast: " & UsToS(totalTimeFast)
+    Debug.Print "Time spent fast:  " & UsToS(totalTimeFast)
 End Sub
 
+Sub DemoLimitConsecutiveSubstringRepetitionB()
+    'The library function is typically much faster than the naive approach and
+    'has linear time complexity
+    Const LEN_TEST_STR As Long = 1000000
+    
+    Dim resultNaive As String
+    Dim resultLib As String
+    
+    StartTimer
+    Dim demoStr As String: 'demoStr = RandomStringFromChars(LEN_TEST_STR, "ab ")
+    'demoStr = RepeatString("  a", LEN_TEST_STR / 3)
+    demoStr = String(35000000, "a") & Space(10000000)
+    
+    ReadTimer "Generating test string of length " & LEN_TEST_STR, Reset:=True
+    resultNaive = LimitConsecutiveSubstringRepetitionNaiveB(demoStr, " ", 1)
+    ReadTimer "Naive approach", Reset:=True
+    resultLib = LimitConsecutiveSubstringRepetitionB(demoStr, " ", 1)
+    ReadTimer "Library approach"
+    Debug.Print resultNaive = resultLib
+End Sub
+
+Private Function TestLimitConsecutiveSubstringRepetition(ByVal str As String, _
+                                  Optional ByVal subStr As String = vbNewLine, _
+                                  Optional ByVal limit As Long = 1, _
+                                  Optional ByVal Compare As VbCompareMethod)
+    On Error Resume Next
+    TestLimitConsecutiveSubstringRepetition = "passed"
+    Dim res1 As String
+    res1 = LimitConsecutiveSubstringRepetition(str, subStr, limit, Compare)
+    Dim res2 As String
+    res2 = LimitConsecutiveSubstringRepetitionCheck(str, subStr, limit, Compare)
+    On Error GoTo 0
+    
+    If res1 = res2 Then Exit Function
+    TestLimitConsecutiveSubstringRepetition = "failed"
+    
+    Err.Raise vbObjectError + 43233, "TestLimitConsecutiveSubstringRepetition", _
+        "TestLimitConsecutiveSubstringRepetition failed for: " & vbNewLine & _
+        "vbCompareMethod: " & Compare & vbNewLine & _
+        "limit: " & limit & vbNewLine & _
+        "subStr: '" & subStr & "'" & vbNewLine & _
+        "str: '" & str & "'"
+End Function
+
+Sub TestLimitConsecutiveSubstringRepetitionB()
+    Dim bytes As String: bytes = HexToString("0x006100610061")
+    Dim subStr As String: subStr = HexToString("0x6100")
+    Debug.Print StringToHex(LimitConsecutiveSubstringRepetition(bytes, subStr, 1))
+    Debug.Print StringToHex(LimitConsecutiveSubstringRepetitionB(bytes, subStr, 0))
+End Sub

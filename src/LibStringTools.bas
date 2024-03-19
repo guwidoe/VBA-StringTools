@@ -4157,13 +4157,14 @@ Public Function LimitConsecutiveSubstringRepetition( _
     Dim i As Long:              i = InStr(1, str, alSubStr, Compare)
     Dim j As Long:              j = 1
     Dim lastOccurrence As Long: lastOccurrence = 1 - lenSubStr
+    Dim copyChunkSize As Long
     
     If i = 0 Then Exit Function
-    
+
     Do Until i = 0
         i = i + lenSubStr * limit
         lastOccurrence = lastOccurrence + lenSubStr
-        Dim copyChunkSize As Long: copyChunkSize = i - lastOccurrence
+        copyChunkSize = i - lastOccurrence
         Mid$(LimitConsecutiveSubstringRepetition, j, copyChunkSize) = _
             Mid$(str, lastOccurrence, copyChunkSize)
         j = j + copyChunkSize
@@ -4172,7 +4173,7 @@ Public Function LimitConsecutiveSubstringRepetition( _
             i = InStr(lastOccurrence + lenSubStr, str, subStr, Compare)
         Loop Until i - lastOccurrence <> lenSubStr
         If i = 0 Then Exit Do
-        i = InStr(i, str, alSubStr, Compare)
+        If limit > 0 Then i = InStr(i, str, alSubStr, Compare)
     Loop
     copyChunkSize = lenStr - lastOccurrence - lenSubStr + 1
     Mid$(LimitConsecutiveSubstringRepetition, j, copyChunkSize) = _
@@ -4180,11 +4181,12 @@ Public Function LimitConsecutiveSubstringRepetition( _
     If j + copyChunkSize - 1 < Len(LimitConsecutiveSubstringRepetition) Then _
         LimitConsecutiveSubstringRepetition = _
             Left$(LimitConsecutiveSubstringRepetition, j + copyChunkSize - 1)
-            
+
     'If normal algorithm was successful, the next loop will not be entered
     'This algorithm should be able to handle all other cases in O(n*Log(n)) time
     Do Until InStr(1, LimitConsecutiveSubstringRepetition, alSubStr, Compare) = 0
         Dim s As String: s = LimitConsecutiveSubstringRepetition
+        LimitConsecutiveSubstringRepetition = Space(Len(s)) 'Todel
         lenStr = Len(s)
         If lenSubStr = 2 And limit = 0 _
         And StrComp(Left$(subStr, 1), Right$(subStr, 1), Compare) <> 0 Then
@@ -4218,27 +4220,31 @@ Public Function LimitConsecutiveSubstringRepetition( _
         Else
             Dim lSubStr As String:  lSubStr = Left$(alSubStr, lenSubStr * limit)
             Dim lenlSubStr As Long: lenlSubStr = Len(lSubStr) '= lenSubStr*limit
-            Dim minL As Long:       minL = 1
-            i = InStr(1, s, alSubStr, Compare)
-            j = 1
+            Dim minL As Long:       minL = 1 'minL and maxR exist because we
+            Dim maxR As Long 'must process the string strictly from left to
+            i = InStr(1, s, alSubStr, Compare) 'right to copy the exact behavior
+            j = 1 'of the naive solution. Existing alSubStrs must be prioritized
             lastOccurrence = 1 'Deal with chunks that cause runaway recursion:
             Do Until i = 0     's = "bababababaaaaaa", subStr = "baa", limit = 0
                 Dim susChunk As String
                 susChunk = Space$(lenAlSubStr * 2 - 2 + lenlSubStr)
                 l = i                                'pos indices: l  r
                 r = i + lenAlSubStr                   's:      ..babaaaa...
-                Dim lenLeft As Long, lenRight As Long 'susChunk: ba> <aa -> baaa
+                maxR = InStr(r, s, alSubStr, Compare) - 1 '        |  |
+                If maxR = -1 Then maxR = lenStr       'susChunk: ba> <aa -> baaa
+                Dim lenLeft As Long, lenRight As Long
                 Do
-                    If l - lenAlSubStr + lenlSubStr + 1 < minL Then
+                    If l - lenSubStr + 1 < minL Then
                         lenLeft = l - minL
                     Else
-                        lenLeft = lenAlSubStr - lenlSubStr - 1
+                        lenLeft = lenSubStr - 1
                     End If
-                    If r + lenAlSubStr - lenlSubStr - 2 > lenStr Then
-                        lenRight = lenStr - r + 1
+                    If r + lenSubStr - 2 > maxR Then
+                        lenRight = maxR - r + 1
                     Else
-                        lenRight = lenAlSubStr - lenlSubStr - 1
+                        lenRight = lenSubStr - 1
                     End If
+                    If lenLeft + lenRight < lenSubStr Then Exit Do
                     Mid$(susChunk, 1, lenLeft) = Mid$(s, l - lenLeft, lenLeft)
                     If lenlSubStr > 0 Then _
                         Mid$(susChunk, lenLeft + 1, lenlSubStr) = lSubStr
@@ -4246,12 +4252,9 @@ Public Function LimitConsecutiveSubstringRepetition( _
                         Mid$(s, r, lenRight)
                     susChunk = Left$(susChunk, lenLeft + lenRight + lenlSubStr)
                     Dim n As Long: n = InStr(1, susChunk, alSubStr, Compare)
-                    If n > 0 Then              'Here this holds: n <= lenRight
-                        l = l + n - lenLeft - 1                 'r <= lenStr + 1
-                        r = r + n + lenAlSubStr - 1 - lenLeft - lenlSubStr
-                    Else
-                        Exit Do
-                    End If
+                    If n = 0 Then Exit Do      'Here this holds: n <= lenRight
+                    l = l + n - lenLeft - 1                     'r <= lenStr + 1
+                    r = r + n + lenSubStr - 1 - lenLeft
                 Loop
                 copyChunkSize = l - lastOccurrence 'Edge handling is finished
                 If copyChunkSize > 0 Then _
@@ -4264,7 +4267,7 @@ Public Function LimitConsecutiveSubstringRepetition( _
                     j = j + lenlSubStr
                     Mid$(s, r - lenlSubStr, lenlSubStr) = lSubStr
                 End If
-                minL = r - lenlSubStr
+                minL = maxR + 1 'r - lenlSubStr
                 lastOccurrence = r
                 i = InStr(r - lenlSubStr, s, alSubStr, Compare)
             Loop
@@ -6079,3 +6082,5 @@ Public Function RndWH(Optional ByVal Number As Long) As Double
     'Return a value between 0 and 1
     RndWH = dblRnd - Int(dblRnd)
 End Function
+
+
