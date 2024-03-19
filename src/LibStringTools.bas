@@ -4186,7 +4186,6 @@ Public Function LimitConsecutiveSubstringRepetition( _
     'This algorithm should be able to handle all other cases in O(n*Log(n)) time
     Do Until InStr(1, LimitConsecutiveSubstringRepetition, alSubStr, Compare) = 0
         Dim s As String: s = LimitConsecutiveSubstringRepetition
-        LimitConsecutiveSubstringRepetition = Space(Len(s)) 'Todel
         lenStr = Len(s)
         If lenSubStr = 2 And limit = 0 _
         And StrComp(Left$(subStr, 1), Right$(subStr, 1), Compare) <> 0 Then
@@ -4234,16 +4233,10 @@ Public Function LimitConsecutiveSubstringRepetition( _
                 If maxR = -1 Then maxR = lenStr       'susChunk: ba> <aa -> baaa
                 Dim lenLeft As Long, lenRight As Long
                 Do
-                    If l - lenSubStr + 1 < minL Then
-                        lenLeft = l - minL
-                    Else
-                        lenLeft = lenSubStr - 1
-                    End If
-                    If r + lenSubStr - 2 > maxR Then
-                        lenRight = maxR - r + 1
-                    Else
-                        lenRight = lenSubStr - 1
-                    End If
+                    If l - lenSubStr + 1 < minL Then lenLeft = l - minL _
+                                                Else lenLeft = lenSubStr - 1
+                    If r + lenSubStr - 2 > maxR Then lenRight = maxR - r + 1
+                                                Else: lenRight = lenSubStr - 1
                     If lenLeft + lenRight < lenSubStr Then Exit Do
                     Mid$(susChunk, 1, lenLeft) = Mid$(s, l - lenLeft, lenLeft)
                     If lenlSubStr > 0 Then _
