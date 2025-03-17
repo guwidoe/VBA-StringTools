@@ -3149,6 +3149,7 @@ Public Function DecodeUTF8(ByRef utf8Str As String, _
     Static numBytesOfCodePoints(0 To 255) As Byte
     Static mask(2 To 4) As Long
     Static minCp(2 To 4) As Long
+    Static shiftCp(1 To 4) As Long
 
     If numBytesOfCodePoints(0) = 0 Then
         For i = &H0& To &H7F&: numBytesOfCodePoints(i) = 1: Next i '0xxxxxxx
@@ -3159,6 +3160,7 @@ Public Function DecodeUTF8(ByRef utf8Str As String, _
         For i = &HF0& To &HF4&: numBytesOfCodePoints(i) = 4: Next i
         For i = 2 To 4: mask(i) = (2 ^ (7 - i) - 1): Next i
         minCp(2) = &H80&: minCp(3) = &H800&: minCp(4) = &H10000
+        shiftCp(1) = &H1&: shiftCp(2) = &H40&: shiftCp(3) = &H1000&: shiftCp(4) = &H40000
     End If
 
     Dim codepoint As Long
@@ -3167,6 +3169,7 @@ Public Function DecodeUTF8(ByRef utf8Str As String, _
     Dim utf16() As Byte: ReDim utf16(0 To (UBound(utf8) - LBound(utf8) + 1) * 2)
     Dim j As Long:       j = 0
     Dim k As Long
+    Dim isValidByte As Boolean
 
     i = LBound(utf8)
     Do While i <= UBound(utf8)
@@ -3185,14 +3188,19 @@ Public Function DecodeUTF8(ByRef utf8Str As String, _
                     "Incomplete UTF-8 codepoint at end of string."
             GoTo insertErrChar
         Else
-            codepoint = utf8(i) And mask(numBytesOfCodePoint)
-
+            codepoint = (utf8(i) And mask(numBytesOfCodePoint)) * _
+                        shiftCp(numBytesOfCodePoint)
             For k = 1 To numBytesOfCodePoint - 1
                 currByte = utf8(i + k)
-
-                If (currByte And &HC0&) = &H80& Then
-                    codepoint = (codepoint * &H40&) + (currByte And &H3F)
-                Else
+                isValidByte = ((currByte And &HC0&) = &H80&)
+                If isValidByte Then
+                    codepoint = codepoint + (currByte And &H3F) * shiftCp(4 - k)
+                    If codepoint >= &H110000 Then
+                        k = k + 1
+                        isValidByte = False
+                    End If
+                End If
+                If Not isValidByte Then
                     If raiseErrors Then _
                         Err.Raise 5, methodName, "Invalid continuation byte"
                     numBytesOfCodePoint = k
