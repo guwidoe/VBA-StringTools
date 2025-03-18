@@ -3140,7 +3140,8 @@ End Function
 'Function transcoding an UTF-8 encoded string to the VBA-native UTF-16LE
 'TODO: Make error character insertion 100% identical to API function
 Public Function DecodeUTF8(ByRef utf8Str As String, _
-                  Optional ByVal raiseErrors As Boolean = False) As String
+                  Optional ByVal raiseErrors As Boolean = False, _
+                  Optional ByVal ignoreBOM As Boolean = False) As String
 
     Const methodName As String = "DecodeUTF8"
     Dim i As Long
@@ -3167,6 +3168,7 @@ Public Function DecodeUTF8(ByRef utf8Str As String, _
     Dim currByte As Byte
     Dim utf8() As Byte:  utf8 = utf8Str
     Dim utf16() As Byte: ReDim utf16(0 To (UBound(utf8) - LBound(utf8) + 1) * 2)
+    Dim ub As Long:      ub = UBound(utf8)
     Dim j As Long:       j = 0
     Dim k As Long
     Dim isValidByte As Boolean
@@ -3183,27 +3185,32 @@ Public Function DecodeUTF8(ByRef utf8Str As String, _
         ElseIf numBytesOfCodePoint = 1 Then
             utf16(j) = codepoint
             j = j + 2
-        ElseIf i + numBytesOfCodePoint - 1 > UBound(utf8) Then
-            If raiseErrors Then Err.Raise 5, methodName, _
-                    "Incomplete UTF-8 codepoint at end of string."
-            GoTo insertErrChar
         Else
-            codepoint = (utf8(i) And mask(numBytesOfCodePoint)) * _
+            codepoint = (codepoint And mask(numBytesOfCodePoint)) * _
                         shiftCp(numBytesOfCodePoint)
             For k = 1 To numBytesOfCodePoint - 1
+                If i + k > ub Then
+                    If raiseErrors Then Err.Raise 5, methodName, _
+                            "Incomplete UTF-8 codepoint at end of string."
+                    GoTo insertErrChar
+                End If
                 currByte = utf8(i + k)
                 isValidByte = ((currByte And &HC0&) = &H80&)
-                If isValidByte Then
-                    codepoint = codepoint + (currByte And &H3F) * shiftCp(4 - k)
-                    If codepoint >= &H110000 Then
-                        k = k + 1
-                        isValidByte = False
-                    End If
+                If k = 1 Then
+                    Select Case utf8(i)
+                        Case &HE0&: isValidByte = ((currByte And &HE0&) = &HA0&)
+                        Case &HED&: isValidByte = ((currByte And &HE0&) = &H80&)
+                        Case &HF0&: isValidByte = ((currByte >= &H90) And (currByte < &HC0))
+                        Case &HF4&: isValidByte = ((currByte And &HF0&) = &H80&)
+                    End Select
                 End If
-                If Not isValidByte Then
+                If isValidByte Then
+                    codepoint = codepoint + (currByte And &H3F) _
+                              * shiftCp(numBytesOfCodePoint - k)
+                Else
                     If raiseErrors Then _
                         Err.Raise 5, methodName, "Invalid continuation byte"
-                    numBytesOfCodePoint = k
+                    numBytesOfCodePoint = k - CBool((currByte And &HC0&) = &H80&)
                     GoTo insertErrChar
                 End If
             Next k
@@ -3220,7 +3227,7 @@ Public Function DecodeUTF8(ByRef utf8Str As String, _
                 "Invalid Unicode codepoint.(Range reserved for surrogate pairs)"
                 GoTo insertErrChar
             ElseIf codepoint < &H10000 Then
-                If codepoint = &HFEFF& Then GoTo nextCp '(BOM - will be ignored)
+                If ignoreBOM Then If codepoint = &HFEFF& Then GoTo nextCp
                 utf16(j) = codepoint And &HFF&
                 utf16(j + 1) = codepoint \ &H100&
                 j = j + 2
