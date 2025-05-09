@@ -3139,33 +3139,46 @@ End Function
 
 'Function transcoding an UTF-8 encoded string to the VBA-native UTF-16LE
 'TODO: Make error character insertion 100% identical to API function
-Public Function DecodeUTF8(ByRef utf8Str As String, _
-                  Optional ByVal raiseErrors As Boolean = False) As String
-
+Public Function DecodeUTF8(ByRef utf8Str As String, Optional ByVal raiseErrors As Boolean = False) As String
     Const methodName As String = "DecodeUTF8"
     Dim i As Long
-    Dim numBytesOfCodePoint As Byte
+    Dim numBytesOfCodePoint As Long
 
     Static numBytesOfCodePoints(0 To 255) As Byte
     Static mask(2 To 4) As Long
     Static minCp(2 To 4) As Long
 
+    ' Initialize static arrays on first run
     If numBytesOfCodePoints(0) = 0 Then
-        For i = &H0& To &H7F&: numBytesOfCodePoints(i) = 1: Next i '0xxxxxxx
-        '110xxxxx - C0 and C1 are invalid (overlong encoding)
-        For i = &HC2& To &HDF&: numBytesOfCodePoints(i) = 2: Next i
-        For i = &HE0& To &HEF&: numBytesOfCodePoints(i) = 3: Next i '1110xxxx
-       '11110xxx - 11110100, 11110101+ (= &HF5+) outside of valid Unicode range
-        For i = &HF0& To &HF4&: numBytesOfCodePoints(i) = 4: Next i
-        For i = 2 To 4: mask(i) = (2 ^ (7 - i) - 1): Next i
-        minCp(2) = &H80&: minCp(3) = &H800&: minCp(4) = &H10000
+        For i = &H0 To &H7F
+            numBytesOfCodePoints(i) = 1 ' 0xxxxxxx
+        Next i
+        ' 110xxxxx (excluding overlong encodings C0 and C1)
+        For i = &HC2 To &HDF
+            numBytesOfCodePoints(i) = 2
+        Next i
+        ' 1110xxxx
+        For i = &HE0 To &HEF
+            numBytesOfCodePoints(i) = 3
+        Next i
+        ' 11110xxx (up to F4 for valid Unicode range)
+        For i = &HF0 To &HF4
+            numBytesOfCodePoints(i) = 4
+        Next i
+        ' Masks for stripping leading bits from the first byte of multi-byte sequences
+        mask(2) = &H1F
+        mask(3) = &HF
+        mask(4) = &H7
+        minCp(2) = &H80
+        minCp(3) = &H800
+        minCp(4) = &H10000
     End If
 
     Dim codepoint As Long
     Dim currByte As Byte
-    Dim utf8() As Byte:  utf8 = utf8Str
-    Dim utf16() As Byte: ReDim utf16(0 To (UBound(utf8) - LBound(utf8) + 1) * 2)
-    Dim j As Long:       j = 0
+    Dim utf8() As Byte: utf8 = utf8Str
+    Dim utf16() As Byte: ReDim utf16(0 To (UBound(utf8) + 1) * 2)
+    Dim j As Long: j = 0
     Dim k As Long
 
     i = LBound(utf8)
@@ -3174,70 +3187,96 @@ Public Function DecodeUTF8(ByRef utf8Str As String, _
         numBytesOfCodePoint = numBytesOfCodePoints(codepoint)
 
         If numBytesOfCodePoint = 0 Then
+            ' Invalid leading byte
             If raiseErrors Then Err.Raise 5, methodName, "Invalid byte"
-            numBytesOfCodePoint = 1
-            GoTo insertErrChar
+            ' Insert replacement character
+            utf16(j) = &HFD
+            utf16(j + 1) = &HFF
+            j = j + 2
+            numBytesOfCodePoint = 1 ' Consume one byte
         ElseIf numBytesOfCodePoint = 1 Then
+            ' ASCII character or valid single-byte control character
             utf16(j) = codepoint
             j = j + 2
         ElseIf i + numBytesOfCodePoint - 1 > UBound(utf8) Then
-            If raiseErrors Then Err.Raise 5, methodName, _
-                    "Incomplete UTF-8 codepoint at end of string."
-            GoTo insertErrChar
+            ' Incomplete codepoint at end
+            If raiseErrors Then Err.Raise 5, methodName, "Incomplete UTF-8 codepoint"
+            ' Insert replacement character
+            utf16(j) = &HFD
+            utf16(j + 1) = &HFF
+            j = j + 2
+            numBytesOfCodePoint = 1 ' Consume only the leading byte
+            ' The invalid continuation byte will be processed in the next iteration
         Else
-            codepoint = utf8(i) And mask(numBytesOfCodePoint)
-
+            ' Multi-byte sequence
+            codepoint = codepoint And mask(numBytesOfCodePoint)
+            Dim validContinuation As Boolean: validContinuation = True
             For k = 1 To numBytesOfCodePoint - 1
                 currByte = utf8(i + k)
-
-                If (currByte And &HC0&) = &H80& Then
-                    codepoint = (codepoint * &H40&) + (currByte And &H3F)
+                If (currByte And &HC0) = &H80 Then
+                    ' Left shift by multiplying by 64 (2^6)
+                    codepoint = (codepoint * &H40) Or (currByte And &H3F)
                 Else
-                    If raiseErrors Then _
-                        Err.Raise 5, methodName, "Invalid continuation byte"
-                    numBytesOfCodePoint = k
-                    GoTo insertErrChar
+                    ' Invalid continuation byte
+                    validContinuation = False
+                    Exit For
                 End If
             Next k
-            'Convert the Unicode codepoint to UTF-16LE bytes
-            If codepoint < minCp(numBytesOfCodePoint) Then
-                If raiseErrors Then Err.Raise 5, methodName, "Overlong encoding"
-                GoTo insertErrChar
-            ElseIf codepoint < &HD800& Then
-                utf16(j) = codepoint And &HFF&
-                utf16(j + 1) = codepoint \ &H100&
-                j = j + 2
-            ElseIf codepoint < &HE000& Then
-                If raiseErrors Then Err.Raise 5, methodName, _
-                "Invalid Unicode codepoint.(Range reserved for surrogate pairs)"
-                GoTo insertErrChar
-            ElseIf codepoint < &H10000 Then
-                If codepoint = &HFEFF& Then GoTo nextCp '(BOM - will be ignored)
-                utf16(j) = codepoint And &HFF&
-                utf16(j + 1) = codepoint \ &H100&
-                j = j + 2
-            ElseIf codepoint < &H110000 Then 'Calculate surrogate pair
-                Dim m As Long:           m = codepoint - &H10000
-                Dim loSurrogate As Long: loSurrogate = &HDC00& Or (m And &H3FF)
-                Dim hiSurrogate As Long: hiSurrogate = &HD800& Or (m \ &H400&)
 
-                utf16(j) = hiSurrogate And &HFF&
-                utf16(j + 1) = hiSurrogate \ &H100&
-                utf16(j + 2) = loSurrogate And &HFF&
-                utf16(j + 3) = loSurrogate \ &H100&
-                j = j + 4
-            Else
-                If raiseErrors Then Err.Raise 5, methodName, _
-                        "Codepoint outside of valid Unicode range"
-insertErrChar:  utf16(j) = &HFD
+            If Not validContinuation Then
+                If raiseErrors Then Err.Raise 5, methodName, "Invalid continuation byte"
+                ' Insert replacement character
+                utf16(j) = &HFD
                 utf16(j + 1) = &HFF
                 j = j + 2
+                ' Consume the leading byte only
+                numBytesOfCodePoint = 1
+                ' Do not consume the invalid continuation byte; it will be reprocessed
+            Else
+                ' Check for invalid codepoints
+                If codepoint < minCp(numBytesOfCodePoint) Or _
+                   (codepoint >= &HD800 And codepoint < &HE000) Or _
+                   codepoint > &H10FFFF Then
+                    If raiseErrors Then Err.Raise 5, methodName, "Invalid codepoint"
+                    ' Insert replacement character
+                    utf16(j) = &HFD
+                    utf16(j + 1) = &HFF
+                    j = j + 2
+                ElseIf codepoint < &H10000 Then
+                    ' Valid codepoint in BMP
+                    If codepoint <> &HFEFF Then
+                        utf16(j) = codepoint And &HFF
+                        utf16(j + 1) = (codepoint \ &H100) And &HFF
+                        j = j + 2
+                    End If
+                Else
+                    ' Surrogate pair
+                    codepoint = codepoint - &H10000
+                    Dim highSurrogate As Long
+                    Dim lowSurrogate As Long
+                    highSurrogate = (codepoint \ &H400) + &HD800
+                    lowSurrogate = (codepoint And &H3FF) + &HDC00
+                    utf16(j) = highSurrogate And &HFF
+                    utf16(j + 1) = (highSurrogate \ &H100) And &HFF
+                    utf16(j + 2) = lowSurrogate And &HFF
+                    utf16(j + 3) = (lowSurrogate \ &H100) And &HFF
+                    j = j + 4
+                End If
             End If
         End If
-nextCp: i = i + numBytesOfCodePoint 'Move to the next UTF-8 codepoint
+        ' Advance to the next character
+        i = i + numBytesOfCodePoint
     Loop
+
     DecodeUTF8 = MidB$(utf16, 1, j)
 End Function
+
+
+
+
+
+
+
 
 'Function transcoding an VBA-native UTF-16LE encoded string to UTF-32
 Public Function EncodeUTF32LE(ByRef utf16leStr As String, _
@@ -3669,7 +3708,7 @@ Public Function RandomStringFromStrings(ByVal Length As Long, _
 
     Dim i As Long, j As Long
     Dim tmpStr As String
-    On Error GoTo catch
+    On Error GoTo Catch
 
     For i = LBound(strings) To UBound(strings)
         tmpStr = CStr(strings(i))
@@ -3681,11 +3720,11 @@ Public Function RandomStringFromStrings(ByVal Length As Long, _
     On Error GoTo 0
     If j = 0 Then Err.Raise 5, methodName, "No strings with LenB > 0 in " & _
                                            "'sourceStringsArr'"
-    GoTo continue
-catch:
+    GoTo Continue
+Catch:
     Err.Raise 5, methodName, "Argument 'strings' contains invalid elements " & _
                              "that can't be converted to String type."
-continue:
+Continue:
     If j <> i Then ReDim Preserve strings(0 To j - 1)
     RandomStringFromStrings = Space$(Length)
     
@@ -3973,7 +4012,7 @@ Public Function ReplaceFast(ByRef str As String, _
         'string, not relative to its 'Start' parameter, therefore, the algorithm
         'used in this function is not feasible and native 'Replace' is always
         'much faster in this case.
-        'Also, blow 10k replacements, native Replace has a speed advantage
+        'Also, below 10k replacements, native Replace has a speed advantage
         ReplaceFast = Replace(str, sFind, sReplace, lStart, lCount, lCompare)
         Exit Function
     End If
@@ -3992,19 +4031,19 @@ Public Function ReplaceFast(ByRef str As String, _
     Dim numFinds As Long
     Dim k As Long:         k = InStr(lStart, str, sFind, lCompare)
     
-    On Error GoTo catch
+    On Error GoTo Catch
     Do Until k = 0 Or lCount = numFinds
         sFindPositions(numFinds) = k
         numFinds = numFinds + 1
         k = InStr(k + lenFind, str, sFind, lCompare)
     Loop
     On Error GoTo 0
-    GoTo continue
-catch:
+    GoTo Continue
+Catch:
     ReDim Preserve sFindPositions(LBound(sFindPositions) To _
                                   UBound(sFindPositions) * 4)
     Resume
-continue:
+Continue:
     Dim bufferSizeChange As Long
     bufferSizeChange = numFinds * (lenReplace - lenFind) - lStart + 1
 
@@ -4014,10 +4053,10 @@ continue:
 
     Dim j As Long:              j = 1
     Dim lastOccurrence As Long: lastOccurrence = lStart
-    Dim count As Long:          count = 1
+    Dim Count As Long:          Count = 1
 
     For k = 0 To numFinds - 1
-        If count > lCount Then Exit For
+        If Count > lCount Then Exit For
         Dim i As Long:    i = sFindPositions(k)
         Dim diff As Long: diff = i - lastOccurrence
         If diff > 0 Then _
@@ -4027,7 +4066,7 @@ continue:
             Mid$(ReplaceFast, j, lenReplace) = sReplace
             j = j + lenReplace
         End If
-        count = count + 1
+        Count = Count + 1
         lastOccurrence = i + lenFind
     Next k
     If j <= Len(ReplaceFast) Then Mid$(ReplaceFast, j) = Mid$(str, lastOccurrence)
@@ -4069,19 +4108,19 @@ Public Function ReplaceB(ByRef bytes As String, _
     Dim numFinds As Long
     Dim k As Long:         k = InStrB(lStart, bytes, sFind, lCompare)
     
-    On Error GoTo catch
+    On Error GoTo Catch
     Do Until k = 0 Or lCount = numFinds
         sFindPositions(numFinds) = k
         numFinds = numFinds + 1
         k = InStrB(k + lenBFind, bytes, sFind, lCompare)
     Loop
     On Error GoTo 0
-    GoTo continue
-catch:
+    GoTo Continue
+Catch:
     ReDim Preserve sFindPositions(LBound(sFindPositions) To _
                                       UBound(sFindPositions) * 4)
     Resume
-continue:
+Continue:
     Dim bufferSizeChange As Long
     bufferSizeChange = numFinds * (lenBReplace - lenBFind) - lStart + 1
 
@@ -4094,10 +4133,10 @@ continue:
     
     Dim j As Long:              j = 1
     Dim lastOccurrence As Long: lastOccurrence = lStart
-    Dim count As Long:          count = 1
+    Dim Count As Long:          Count = 1
 
     For k = 0 To numFinds - 1
-        If count > lCount Then Exit For
+        If Count > lCount Then Exit For
         Dim i As Long:    i = sFindPositions(k)
         Dim diff As Long: diff = i - lastOccurrence
         If diff > 0 Then _
@@ -4107,7 +4146,7 @@ continue:
             MidB$(ReplaceB, j, lenBReplace) = sReplace
             j = j + lenBReplace
         End If
-        count = count + 1
+        Count = Count + 1
         lastOccurrence = i + lenBFind
     Next k
     If j <= LenB(ReplaceB) Then MidB$(ReplaceB, j) = MidB$(bytes, lastOccurrence)
@@ -4247,7 +4286,8 @@ Public Function LimitConsecutiveSubstringRepetition( _
             lastOccurrence = 1 'Deal with chunks that cause runaway recursion:
             Do Until i = 0     's = "bababababaaaaaa", subStr = "baa", limit = 0
                 Dim susChunk As String
-                susChunk = Space$(lenAlSubStr * 2 - 2 + lenlSubStr)
+                If Len(susChunk) < lenAlSubStr * 2 - 2 + lenlSubStr Then _
+                    susChunk = Space$(lenAlSubStr * 2 - 2 + lenlSubStr)
                 l = i                                'pos indices: l  r
                 r = i + lenAlSubStr                   's:      ..babaaaa...
                 maxR = InStr(r, s, alSubStr, Compare) - 1 '        |  |
@@ -4492,16 +4532,16 @@ Public Function SplitB(ByRef bytes As String, _
     ReDim arr(0 To CountSubstringB(bytes, sDelimiter, 1, lLimit, lCompare))
     Dim i As Long:              i = InStrB(1, bytes, sDelimiter, lCompare)
     Dim lastOccurrence As Long: lastOccurrence = 1
-    Dim count As Long:          count = 0
+    Dim Count As Long:          Count = 0
 
-    Do Until i = 0 Or count + 1 >= lLimit
+    Do Until i = 0 Or Count + 1 >= lLimit
         Dim diff As Long: diff = i - lastOccurrence
-        arr(count) = MidB$(bytes, lastOccurrence, diff)
-        count = count + 1
+        arr(Count) = MidB$(bytes, lastOccurrence, diff)
+        Count = Count + 1
         lastOccurrence = i + lenBDelim
         i = InStrB(lastOccurrence, bytes, sDelimiter, lCompare)
     Loop
-    arr(count) = MidB$(bytes, lastOccurrence)
+    arr(Count) = MidB$(bytes, lastOccurrence)
     SplitB = arr
 End Function
 
@@ -4533,24 +4573,24 @@ Public Function SplitUnlessEscaped(ByRef str As String, _
     ReDim arr(0 To CountSubstringUnlessEscaped(str, sDelimiter, 1, lLimit, _
                                                lCompare))
     Dim partStart As Long:      partStart = 1
-    Dim count As Long:          count = 0
+    Dim Count As Long:          Count = 0
     Dim lastOccurrence As Long: lastOccurrence = 1
     Dim i As Long:          i = InStr(lastOccurrence, str, sDelimiter, lCompare)
     
-    Do Until i = 0 Or count + 1 >= lLimit
+    Do Until i = 0 Or Count + 1 >= lLimit
         If Mid$(str, i + lenDelim, lenDelim) = sDelimiter Then
             lastOccurrence = i + 2 * lenDelim
         Else
-            arr(count) = Replace(Mid$(str, partStart, i - partStart), _
+            arr(Count) = Replace(Mid$(str, partStart, i - partStart), _
                                  sDelimiter & sDelimiter, sDelimiter)
-            count = count + 1
+            Count = Count + 1
             partStart = i + lenDelim
             lastOccurrence = partStart
         End If
         i = InStr(lastOccurrence, str, sDelimiter, lCompare)
     Loop
     
-    If count < lLimit Then arr(count) = Replace(Mid$(str, partStart), _
+    If Count < lLimit Then arr(Count) = Replace(Mid$(str, partStart), _
                                             sDelimiter & sDelimiter, sDelimiter)
     SplitUnlessEscaped = arr
 End Function
@@ -4583,24 +4623,24 @@ Public Function SplitUnlessEscapedB(ByRef bytes As String, _
     ReDim arr(0 To CountSubstringUnlessEscapedB(bytes, sDelimiter, 1, lLimit, _
                                                 lCompare))
     Dim partStart As Long:      partStart = 1
-    Dim count As Long:          count = 0
+    Dim Count As Long:          Count = 0
     Dim lastOccurrence As Long: lastOccurrence = 1
     Dim i As Long:       i = InStrB(lastOccurrence, bytes, sDelimiter, lCompare)
     
-    Do Until i = 0 Or count + 1 >= lLimit
+    Do Until i = 0 Or Count + 1 >= lLimit
         If MidB(bytes, i + lenBDelim, lenBDelim) = sDelimiter Then
             lastOccurrence = i + 2 * lenBDelim
         Else
-            arr(count) = ReplaceB(MidB(bytes, partStart, i - partStart), _
+            arr(Count) = ReplaceB(MidB(bytes, partStart, i - partStart), _
                                   sDelimiter & sDelimiter, sDelimiter)
-            count = count + 1
+            Count = Count + 1
             partStart = i + lenBDelim
             lastOccurrence = partStart
         End If
         i = InStrB(lastOccurrence, bytes, sDelimiter, lCompare)
     Loop
     
-    If count < lLimit Then arr(count) = ReplaceB(MidB(bytes, partStart), _
+    If Count < lLimit Then arr(Count) = ReplaceB(MidB(bytes, partStart), _
                                             sDelimiter & sDelimiter, sDelimiter)
     SplitUnlessEscapedB = arr
 End Function
@@ -4843,18 +4883,18 @@ Public Function ReplaceMultiple(ByRef str As String, _
         ReDim Preserve replaces(0 To UBound(replaces) - LBound(replaces))
     
     Dim i As Long
-    On Error GoTo catch
+    On Error GoTo Catch
     For i = LBound(finds) To UBound(finds)
         finds(i) = CStr(finds(i))
     Next i
     For i = LBound(replaces) To UBound(replaces)
         replaces(i) = CStr(replaces(i))
     Next i
-    On Error GoTo 0: GoTo continue
-catch:
+    On Error GoTo 0: GoTo Continue
+Catch:
     Err.Raise 5, methodName, "Argument 'sFindOrFinds' or 'sReplaceOrReplaces'" _
         & " contains invalid elements that can't be converted to String type."
-continue:
+Continue:
     If lStart > Len(str) Then Exit Function
     
     lCount = lCount And &H7FFFFFFF
@@ -4869,12 +4909,9 @@ continue:
     'Unfortunately, this part of the algorithm introduces an O(n^2 * m)
     'complexity (n = number of finds, m average length of finds) which can make
     'this function very slow for more than a few 1000 finds. This can
-    'theoretically be improved by using a Trie instead in certain cases to avoid
-    'n^2 runtime complexity: https://en.wikipedia.org/wiki/Trie
-    'A simple implementation of the trie algorithm has been tested, the
-    'procedure is available in the test module ('ProcessFindsUsingTrie')
-    'Unfortunately it performs at least 20 times slower than the naïve approach
-    'implemented here:
+    'theoretically be improved by using datastructures such as a SuffixTree or a
+    'SuffixArray, but an efficient implementation in VBA would be difficult and
+    'performance would only surpass the naive solution for large n
     Dim j As Long
     For i = 0 To UBound(finds)
         If Len(finds(i)) <> 0 Then
@@ -4885,8 +4922,6 @@ continue:
             Next j
         End If
     Next i
-    
-    'ProcessFindsUsingTrie finds, lCompare '<-- at least 20 times slower
 
     'Allocate buffer
     'Buffer calculation doesn't really take into account the parameter lCount.
@@ -4956,10 +4991,10 @@ continue:
     Dim currOccurrence As Long: currOccurrence = nextOccsHeap(0, 0)
     Dim currReplaceIdx As Long: currReplaceIdx = nextOccsHeap(0, 2)
     Dim builtStrPos As Long:    builtStrPos = 1
-    Dim count As Long:          count = 1
+    Dim Count As Long:          Count = 1
     
     'Do the replacing using InStr() and Mid$ in a loop
-    Do Until heapSize = 0 Or count > lCount
+    Do Until heapSize = 0 Or Count > lCount
         Dim diff As Long: diff = currOccurrence - lastOccurrence
         If diff > 0 Then _
             MidB$(ReplaceMultiple, builtStrPos, diff) = _
@@ -4970,7 +5005,7 @@ continue:
                 replaces(currReplaceIdx)
             builtStrPos = builtStrPos + lenBReplaces(currReplaceIdx)
         End If
-        count = count + 1
+        Count = Count + 1
         lastOccurrence = currOccurrence + lenBFinds(nextOccsHeap(0, 1))
         If lenBFinds(nextOccsHeap(0, 1)) < 2 Then
             insertElement(0) = 0
@@ -4996,7 +5031,7 @@ continue:
         MidB$(ReplaceMultiple, builtStrPos, LenB(remainderStr)) = remainderStr
         
     'Because we didn't take lCount into account when calculating the buffer:
-    If count > lCount Then _
+    If Count > lCount Then _
         ReplaceMultiple = _
             LeftB$(ReplaceMultiple, builtStrPos + LenB(remainderStr))
 '    Dim numReplacements As Long
@@ -5088,18 +5123,18 @@ Public Function ReplaceMultipleB(ByRef bytes As String, _
         ReDim Preserve replaces(0 To UBound(replaces) - LBound(replaces))
     
     Dim i As Long
-    On Error GoTo catch
+    On Error GoTo Catch
     For i = LBound(finds) To UBound(finds)
         finds(i) = CStr(finds(i))
     Next i
     For i = LBound(replaces) To UBound(replaces)
         replaces(i) = CStr(replaces(i))
     Next i
-    On Error GoTo 0: GoTo continue
-catch:
+    On Error GoTo 0: GoTo Continue
+Catch:
     Err.Raise 5, methodName, "Argument 'sFindOrFinds' or 'sReplaceOrReplaces'" _
         & " contains invalid elements that can't be converted to String type."
-continue:
+Continue:
     If lStart > LenB(bytes) Then Exit Function
     
     lCount = lCount And &H7FFFFFFF
@@ -5190,10 +5225,10 @@ continue:
     Dim currOccurrence As Long: currOccurrence = nextOccsHeap(0, 0)
     Dim currReplaceIdx As Long: currReplaceIdx = nextOccsHeap(0, 2)
     Dim builtStrPos As Long:    builtStrPos = 1
-    Dim count As Long:          count = 1
+    Dim Count As Long:          Count = 1
     
     'Do the replacing using InStrB() and MidB$ in a loop
-    Do Until heapSize = 0 Or count > lCount
+    Do Until heapSize = 0 Or Count > lCount
         Dim diff As Long: diff = currOccurrence - lastOccurrence
         If diff > 0 Then _
             MidB$(ReplaceMultipleB, builtStrPos, diff) = _
@@ -5204,7 +5239,7 @@ continue:
                 replaces(currReplaceIdx)
             builtStrPos = builtStrPos + lenBReplaces(currReplaceIdx)
         End If
-        count = count + 1
+        Count = Count + 1
         lastOccurrence = currOccurrence + lenBFinds(nextOccsHeap(0, 1))
         If lenBFinds(nextOccsHeap(0, 1)) = 0 Then
             insertElement(0) = 0
@@ -5230,7 +5265,7 @@ continue:
         MidB$(ReplaceMultipleB, builtStrPos, LenB(remainderStr)) = remainderStr
         
     'Because we didn't take lCount into account when calculating the buffer:
-    If count > lCount Then _
+    If Count > lCount Then _
         ReplaceMultipleB = _
             LeftB$(ReplaceMultipleB, builtStrPos + LenB(remainderStr))
        
@@ -5556,7 +5591,7 @@ Private Function BToString(ByVal Value As Variant, _
     
     With settings
         If Len(s) > .maxChars Then
-            BToString = Left(s, Max(.maxChars - 3, 0)) & Left("...", .maxChars)
+            BToString = Left(s, max(.maxChars - 3, 0)) & Left("...", .maxChars)
         Else
             BToString = s
         End If
@@ -5621,9 +5656,9 @@ Private Function ToString2dimArray(ByRef arr As Variant, _
                                            Len(Delimiter))
     
         Dim numRows As Long: numRows = UBound(arr, 1) - LBound(arr, 1) + 1
-        Dim firstRows As Long: firstRows = Min(.maxLines \ 2, numRows)
+        Dim firstRows As Long: firstRows = min(.maxLines \ 2, numRows)
         Dim lastRows As Long
-        lastRows = Min(.maxLines - firstRows, numRows - firstRows)
+        lastRows = min(.maxLines - firstRows, numRows - firstRows)
     End With
     Dim s As String
 
@@ -5649,7 +5684,7 @@ Private Function ToString2dimArray(ByRef arr As Variant, _
     Next i
     ToString2dimArray = s & "(" & numRows & "*" & _
                          UBound(arr, 2) - LBound(arr, 2) + 1 & ", " & _
-                         " " & Min(numRows, settings.maxLines) & _
+                         " " & min(numRows, settings.maxLines) & _
                          "*" & numCols & " output)"
 End Function
 
@@ -5671,7 +5706,7 @@ Private Function BuildColHeadersLine(ByRef arr As Variant, _
                                      ByRef settings As StringificationSettings) _
                                      As String
     Dim rowNumPadding As Long
-    rowNumPadding = Max(Len(CStr(UBound(arr, 1))), Len(CStr(LBound(arr, 1)))) + 2
+    rowNumPadding = max(Len(CStr(UBound(arr, 1))), Len(CStr(LBound(arr, 1)))) + 2
     
     Dim lenDelim As Long: lenDelim = Len(Delimiter)
     Dim j As Long
@@ -5713,7 +5748,7 @@ Private Function BuildDotsLine(ByRef arr As Variant, _
                                ByRef settings As StringificationSettings) _
                                As String
     Dim rowNumPadding As Long
-    rowNumPadding = Max(Len(CStr(UBound(arr, 1))), Len(CStr(LBound(arr, 1)))) + 2
+    rowNumPadding = max(Len(CStr(UBound(arr, 1))), Len(CStr(LBound(arr, 1)))) + 2
     Dim lenDelim As Long: lenDelim = Len(Delimiter)
     Dim j As Long
     If numCols = UBound(arr, 2) - LBound(arr, 2) + 1 Then
@@ -5751,7 +5786,7 @@ Private Function BuildLine(ByRef arr As Variant, _
                            ByVal rowIndex As Long, _
                            ByRef settings As StringificationSettings) As String
     Dim rowNumPadding As Long
-    rowNumPadding = Max(Len(CStr(UBound(arr, 1))), Len(CStr(LBound(arr, 1)))) + 2
+    rowNumPadding = max(Len(CStr(UBound(arr, 1))), Len(CStr(LBound(arr, 1)))) + 2
     
     Dim lenDelim As Long: lenDelim = Len(Delimiter)
     Dim j As Long
@@ -5795,21 +5830,21 @@ Private Function CalculateColumnWidths(ByRef arr As Variant, _
     ' Calculate how many rows will be printed before and after the dots
     Dim numRows As Long: numRows = UBound(arr, 1) - LBound(arr, 1) + 1
     Dim numCols As Long: numCols = UBound(arr, 2) - LBound(arr, 2) + 1
-    Dim firstRows As Long: firstRows = Min(settings.maxLines \ 2, numRows)
+    Dim firstRows As Long: firstRows = min(settings.maxLines \ 2, numRows)
     Dim lastRows As Long
-    lastRows = Min(settings.maxLines - firstRows, numRows - firstRows)
+    lastRows = min(settings.maxLines - firstRows, numRows - firstRows)
     
     Dim sumWidths As Long: sumWidths = 0
     For j = 0 To numCols \ 2
         Dim col1 As Long: col1 = LBound(arr, 2) + j
         Dim col2 As Long: col2 = UBound(arr, 2) - j
         'if col1>
-        colWidths(col1) = Max(colWidths(col1), Len(CStr(col1))) 'Column labels
-        colWidths(col2) = Max(colWidths(col2), Len(CStr(col2))) 'Column labels
+        colWidths(col1) = max(colWidths(col1), Len(CStr(col1))) 'Column labels
+        colWidths(col2) = max(colWidths(col2), Len(CStr(col2))) 'Column labels
         For i = LBound(arr, 1) To LBound(arr, 1) + firstRows - 1
-            colWidths(col1) = Max(Len(BToString(arr(i, col1), settings)), _
+            colWidths(col1) = max(Len(BToString(arr(i, col1), settings)), _
                                   colWidths(col1))
-            colWidths(col2) = Max(Len(BToString(arr(i, col2), settings)), _
+            colWidths(col2) = max(Len(BToString(arr(i, col2), settings)), _
                                   colWidths(col2))
         Next i
         sumWidths = sumWidths + colWidths(col1) + colWidths(col2)
@@ -5822,9 +5857,9 @@ Private Function CalculateColumnWidths(ByRef arr As Variant, _
             col1 = LBound(arr, 2) + j
             col2 = UBound(arr, 2) - j
             For i = UBound(arr, 1) - lastRows + 1 To UBound(arr, 1)
-                colWidths(col1) = Max(Len(BToString(arr(i, col1), settings)), _
+                colWidths(col1) = max(Len(BToString(arr(i, col1), settings)), _
                                       colWidths(col1))
-                colWidths(col2) = Max(Len(BToString(arr(i, col2), settings)), _
+                colWidths(col2) = max(Len(BToString(arr(i, col2), settings)), _
                                       colWidths(col2))
             Next i
             sumWidths = sumWidths + colWidths(col1) + colWidths(col2)
@@ -5879,12 +5914,12 @@ Private Function Sum(ParamArray p() As Variant) As Variant
     Next v
 End Function
 
-Private Function Max(a As Long, b As Long) As Long
-    If a > b Then Max = a Else Max = b
+Private Function max(a As Long, b As Long) As Long
+    If a > b Then max = a Else max = b
 End Function
 
-Private Function Min(a As Long, b As Long) As Long
-    If a < b Then Min = a Else Min = b
+Private Function min(a As Long, b As Long) As Long
+    If a < b Then min = a Else min = b
 End Function
 
 'Sets the formatting rules adhered to by 'Printf'
@@ -6097,4 +6132,44 @@ Public Function RndWH(Optional ByVal Number As Long) As Double
     RndWH = dblRnd - Int(dblRnd)
 End Function
 
-
+''TODO: Start using this function in all of the relevant places, because
+''the current technique used gives the numbers at the edge of the random range
+''only half the probability of the numbers in between!
+''Wichmann-Hill Pseudo Random Number Generator
+''https://en.wikipedia.org/wiki/Wichmann-Hill
+''https://www.vbforums.com/showthread.php?499661-Wichmann-Hill-Pseudo-Random-Number-Generator-an-alternative-for-VB-Rnd()-function&p=3076123&viewfull=1#post3076123
+'Public Function RndLongBetween(ByVal minInkl As Long, _
+'                               ByVal maxInkl As Long, _
+'                      Optional ByVal seed As Long) As Long
+'    Const methodName As String = "RndLongBetween"
+'    Static lngX As Long, lngY As Long, lngZ As Long, blnInit As Boolean
+'    Dim dblRnd As Double
+'
+'    If minInkl > maxInkl Then Err.Raise 5, methodName, _
+'        "'minInkl' can't be greater than 'maxInkl'."
+'
+'    'If initialized and no input number given
+'    If blnInit And seed = 0 Then
+'        ' lngX, lngY and lngZ will never be 0
+'        lngX = (171& * lngX) Mod 30269&
+'        lngY = (172& * lngY) Mod 30307&
+'        lngZ = (170& * lngZ) Mod 30323&
+'    Else
+'        'If no initialization, use Timer, otherwise ensure positive Number
+'        If seed = 0 Then seed = Timer * 60 Else seed = seed And &H7FFFFFFF
+'        lngX = (seed Mod 30269&)
+'        lngY = (seed Mod 30307&)
+'        lngZ = (seed Mod 30323&)
+'        'lngX, lngY and lngZ must be bigger than 0
+'        If lngX = 0 Then lngX = 171&
+'        If lngY = 0 Then lngY = 172&
+'        If lngZ = 0 Then lngZ = 170&
+'        'Mark initialization state
+'        blnInit = True
+'    End If
+'    'Generate a random number
+'    dblRnd = CDbl(lngX) / 30269# + CDbl(lngY) / 30307# + CDbl(lngZ) / 30323#
+'    'Return a value between 0 and 1
+'    RndLongBetween = (dblRnd - Int(dblRnd)) * (maxInkl - minInkl + 1) - 0.5 + minInkl
+'End Function
+'
