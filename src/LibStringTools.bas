@@ -3138,21 +3138,19 @@ Public Function EncodeUTF8(ByRef utf16leStr As String, _
 End Function
 
 'Function transcoding an UTF-8 encoded string to the VBA-native UTF-16LE
-'TODO: Make error character insertion 100% identical to API function
 Public Function DecodeUTF8(ByRef utf8Str As String, _
                   Optional ByVal raiseErrors As Boolean = False, _
                   Optional ByVal ignoreBOM As Boolean = False) As String
 
     Const methodName As String = "DecodeUTF8"
     Dim i As Long
-    Dim numBytesOfCodePoint As Long
+    Dim numBytesOfCodePoint As Byte
 
     Static numBytesOfCodePoints(0 To 255) As Byte
     Static mask(2 To 4) As Long
     Static minCp(2 To 4) As Long
     Static shiftCp(1 To 4) As Long
 
-    ' Initialize static arrays on first run
     If numBytesOfCodePoints(0) = 0 Then
         For i = &H0& To &H7F&: numBytesOfCodePoints(i) = 1: Next i '0xxxxxxx
         '110xxxxx - C0 and C1 are invalid (overlong encoding)
@@ -3180,15 +3178,10 @@ Public Function DecodeUTF8(ByRef utf8Str As String, _
         numBytesOfCodePoint = numBytesOfCodePoints(codepoint)
 
         If numBytesOfCodePoint = 0 Then
-            ' Invalid leading byte
             If raiseErrors Then Err.Raise 5, methodName, "Invalid byte"
-            ' Insert replacement character
-            utf16(j) = &HFD
-            utf16(j + 1) = &HFF
-            j = j + 2
-            numBytesOfCodePoint = 1 ' Consume one byte
+            numBytesOfCodePoint = 1
+            GoTo insertErrChar
         ElseIf numBytesOfCodePoint = 1 Then
-            ' ASCII character or valid single-byte control character
             utf16(j) = codepoint
             j = j + 2
         Else
@@ -3253,53 +3246,12 @@ Public Function DecodeUTF8(ByRef utf8Str As String, _
 insertErrChar:  utf16(j) = &HFD
                 utf16(j + 1) = &HFF
                 j = j + 2
-                ' Consume the leading byte only
-                numBytesOfCodePoint = 1
-                ' Do not consume the invalid continuation byte; it will be reprocessed
-            Else
-                ' Check for invalid codepoints
-                If codepoint < minCp(numBytesOfCodePoint) Or _
-                   (codepoint >= &HD800 And codepoint < &HE000) Or _
-                   codepoint > &H10FFFF Then
-                    If raiseErrors Then Err.Raise 5, methodName, "Invalid codepoint"
-                    ' Insert replacement character
-                    utf16(j) = &HFD
-                    utf16(j + 1) = &HFF
-                    j = j + 2
-                ElseIf codepoint < &H10000 Then
-                    ' Valid codepoint in BMP
-                    If codepoint <> &HFEFF Then
-                        utf16(j) = codepoint And &HFF
-                        utf16(j + 1) = (codepoint \ &H100) And &HFF
-                        j = j + 2
-                    End If
-                Else
-                    ' Surrogate pair
-                    codepoint = codepoint - &H10000
-                    Dim highSurrogate As Long
-                    Dim lowSurrogate As Long
-                    highSurrogate = (codepoint \ &H400) + &HD800
-                    lowSurrogate = (codepoint And &H3FF) + &HDC00
-                    utf16(j) = highSurrogate And &HFF
-                    utf16(j + 1) = (highSurrogate \ &H100) And &HFF
-                    utf16(j + 2) = lowSurrogate And &HFF
-                    utf16(j + 3) = (lowSurrogate \ &H100) And &HFF
-                    j = j + 4
-                End If
             End If
         End If
-        ' Advance to the next character
-        i = i + numBytesOfCodePoint
+nextCp: i = i + numBytesOfCodePoint 'Move to the next UTF-8 codepoint
     Loop
-
     DecodeUTF8 = MidB$(utf16, 1, j)
 End Function
-
-
-
-
-
-
 
 
 'Function transcoding an VBA-native UTF-16LE encoded string to UTF-32

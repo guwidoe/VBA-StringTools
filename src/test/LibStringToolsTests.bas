@@ -206,13 +206,13 @@ Private Sub CompareErrorHandlingOfNativeAndApiDecoders()
      s = HexToString("0x66767D355418962BED19")
     
 '
-'    Do
-'        s = RandomBytes(10)
+    Do
+        s = RandomBytes(10)
 
         Dim decNative As String: decNative = DecodeUTF8(s)
         Dim decApi As String:    decApi = Decode(s, cpUTF_8)
-    
-   ' Loop Until decNative <> decApi
+        DoEvents
+    Loop Until decNative <> decApi
     
     
     Debug.Print decNative = decApi
