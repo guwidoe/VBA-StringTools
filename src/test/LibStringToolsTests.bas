@@ -192,6 +192,38 @@ Private Sub TestEncodersAndDecoders()
         IIf(DecodeANSI(EncodeANSI(utf16AsciiOnly)) = utf16AsciiOnly, ResPass, ResFail)
 End Sub
 
+Private Sub CompareErrorHandlingOfNativeAndApiDecoders()
+    Dim s As String
+    
+    s = HexToString("0x93191ACC480B4B614DF2FA")
+    s = HexToString("0x6F705FEF9E1FE008BDC52A")
+    s = HexToString("0x8B05E4950CB96D4F20F48F")
+    s = HexToString("0xA2D6A46C2F7EF9C4617C8CAC09A5E6")
+    s = HexToString("0xF081AEBA52046BF58BD9")
+    s = HexToString("0x6FB3F4BAB9F7014B22AC")
+    s = HexToString("0x0B69DCCA5FF6DF0EF35D")
+    s = HexToString("0x5D7D277941A08A28F0A7")
+     s = HexToString("0x66767D355418962BED19")
+    
+'
+'    Do
+'        s = RandomBytes(10)
+
+        Dim decNative As String: decNative = DecodeUTF8(s)
+        Dim decApi As String:    decApi = Decode(s, cpUTF_8)
+    
+   ' Loop Until decNative <> decApi
+    
+    
+    Debug.Print decNative = decApi
+    Debug.Print "Input: " & StringToHex(s)
+    Debug.Print "Output my decoder: " & StringToHex(decNative)
+    Debug.Print "Output API decoder: " & StringToHex(decApi)
+    Debug.Print "Output my decoder: " & EscapeUnicode(decNative, 127)
+    Debug.Print "Output API decoder: " & EscapeUnicode(decApi, 127)
+    Debug.Print ""
+End Sub
+
 Private Sub TestUTF8EncodersPerformance()
     Dim t As Currency
     
@@ -467,9 +499,9 @@ Public Function ReplaceBCheck(ByRef bytes As String, _
     Dim i As Long:              i = InStrB(lStart, bytes, sFind, lCompare)
     Dim j As Long:              j = 1
     Dim lastOccurrence As Long: lastOccurrence = lStart
-    Dim count As Long:          count = 1
+    Dim Count As Long:          Count = 1
 
-    Do Until i = 0 Or count > lCount
+    Do Until i = 0 Or Count > lCount
         Dim diff As Long: diff = i - lastOccurrence
         If diff > 0 Then _
             MidB$(ReplaceBCheck, j, diff) = MidB$(bytes, lastOccurrence, diff)
@@ -478,7 +510,7 @@ Public Function ReplaceBCheck(ByRef bytes As String, _
             MidB$(ReplaceBCheck, j, lenBReplace) = sReplace
             j = j + lenBReplace
         End If
-        count = count + 1
+        Count = Count + 1
         lastOccurrence = i + lenBFind
         i = InStrB(lastOccurrence, bytes, sFind, lCompare)
     Loop
@@ -1032,21 +1064,7 @@ Sub CompareReplaceAndReplaceB()
     'Debug.Print resultLib3 = resultLib2
 End Sub
 
-Private Sub CompareErrorHandlingOfNativeAndApiDecoders()
-    Dim s As String
-    s = RandomBytes(1001)
-    's = HexToString("0x6F705FEF9E1FE008BDC52A")
-   ' s = HexToString("0x8B05E4950CB96D4F20F48F")
-     's = HexToString("0x93191ACC480B4B614DF2FA")
-    
-    Dim decNative As String: decNative = DecodeUTF8(s)
-    Dim decApi As String:    decApi = Decode(s, cpUTF_8)
-    
-    Debug.Print decNative = decApi
-   ' Debug.Print StringToHex(s)
-'    Debug.Print EscapeUnicode(decNative, 127)
-'    Debug.Print EscapeUnicode(decApi, 127)
-End Sub
+
 
 'Private Sub TestErrorHandlingInTranscodingAPI()
 '    Dim s As String: s = ChrW(255): s = EncodeANSI(s)
@@ -1079,7 +1097,7 @@ End Sub
 '        End If
 '    Next cpId
 'End Sub
-'
+
 
 Sub TestFastReplace()
     Const NUM_LOOPS As Long = 10000
@@ -1154,15 +1172,16 @@ End Sub
 
 Sub TestInStrr()
     Const FIND_POS As Long = 1000000
-    Const START_SEARCH_POS As Long = 1
+    Const START_SEARCH_POS As Long = 1 'FIND_POS '1
+    Dim findStr As String: findStr = "abcdefghijklmnopqrstuvwxy123"
     Dim str As String
-    str = RandomStringFromChars(FIND_POS, "abcdefghijklmnopqrstuvwxy123") & "z" & RandomStringFromChars(FIND_POS, "abcdefghijklmnopqrstuvwxy123")
+    str = RandomStringFromChars(FIND_POS - 1, findStr) & findStr & RandomStringFromChars(FIND_POS, "abcdefghijklmnopqrstuvwxy123")
     
     StartTimer
-    Dim posZ1 As Long: posZ1 = InStr(START_SEARCH_POS, str, "z", vbBinaryCompare)
+    Dim posZ1 As Long: posZ1 = InStr(START_SEARCH_POS, str, findStr, vbBinaryCompare)
     ReadTimer "InStr vbBinaryCompare, starting search at pos " & _
               START_SEARCH_POS & " found at pos " & posZ1, , True
-    Dim posZ2 As Long: posZ2 = InStr(START_SEARCH_POS, str, "z", vbTextCompare)
+    Dim posZ2 As Long: posZ2 = InStr(START_SEARCH_POS, str, findStr, vbTextCompare)
     ReadTimer "InStr vbTextCompare, starting search at pos " & _
               START_SEARCH_POS & " found at pos " & posZ2, , True
 End Sub
