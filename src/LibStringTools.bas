@@ -2993,8 +2993,9 @@ End Function
 Public Function AscU(ByRef char As String) As Long
     AscU = AscW(char) And &HFFFF&
     If Len(char) > 1 Then
+        If AscU < &HD800& Or AscU > &HDBFF& Then Exit Function 'Not high surrogate
         Dim lo As Long: lo = AscW(Mid$(char, 2, 1)) And &HFFFF&
-        If &HDC00& > lo Or lo > &HDFFF& Then Exit Function
+        If lo < &HDC00& Or lo > &HDFFF& Then Exit Function 'Not low surrogate
         AscU = (AscU - &HD800&) * &H400& + (lo - &HDC00&) + &H10000
     End If
 End Function
