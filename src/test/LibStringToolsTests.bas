@@ -130,7 +130,7 @@ Public Sub RunAllTests()
     TestUTF32EncodersAndDecodersPerformance
     TestANSIEncodersAndDecodersPerformance
     TestDifferentWaysOfGettingNumericalValuesFromStrings
-    RunLimitConsecutiveSubstringRepetitionTests
+    AllLimitConsecutiveSubstringRepetitionTests
     RunEscapeUnescapeUnicodeTests
 End Sub
 

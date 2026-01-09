@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "*.bas": "vba",
+        "*.cls": "vba",
+        "*.frm": "vba"
+    },
+    "[vba]": {
+        "files.encoding": "windows1252"
+    },
+    "files.autoGuessEncoding": true
+}
