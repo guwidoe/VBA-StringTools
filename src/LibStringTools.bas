@@ -4651,7 +4651,7 @@ Public Function SplitUnlessInQuotes(ByRef str As String, _
             Else
                 ReDim parts(0 To 2)
                 parts(0) = Left$(str, i - 1)
-                parts(1) = Mid$(str, i + 1, j)
+                parts(1) = Mid$(str, i + 1, j - i - 1)
                 parts(2) = Mid$(str, j + 1)
             End If
         Else
@@ -5188,7 +5188,7 @@ Continue:
         If lenBFinds(i) = 0 Then
             nextOcc = 0
         Else
-            nextOcc = InStr(lStart, bytes, finds(i), lCompare) * 2 - 1
+            nextOcc = InStrB(lStart, bytes, finds(i), lCompare)
         End If
         If nextOcc > 0 Then
             insertElement(0) = nextOcc
@@ -5996,7 +5996,8 @@ Public Function TrimX(ByRef str As String, _
              Optional ByRef charactersToTrim As String = " " & vbCrLf & vbTab, _
              Optional ByVal compareMethod As VbCompareMethod = vbBinaryCompare) _
                       As String
-    If Len(str) = 0 Or Len(charactersToTrim) = 0 Then Exit Function
+    If Len(str) = 0 Then Exit Function
+    If Len(charactersToTrim) = 0 Then TrimX = str: Exit Function
     Dim strLen As Long:   strLen = Len(str)
     Dim startIdx As Long: startIdx = 1
     Dim endIdx As Long:   endIdx = strLen
