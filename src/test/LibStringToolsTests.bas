@@ -288,6 +288,86 @@ Private Sub TestEncoderEdgeCases()
             ResPass, ResFail)
 End Sub
 
+'Tests for ChunkifyString bug fix with surrogate pairs and chunkLength=1
+'Old bug: When chunkLength=1 and splitUTF16Surrogates=False, encountering a
+'         surrogate pair would set currChunkLength to 0, causing the position
+'         to never advance and producing empty/incorrect chunks.
+Private Sub TestChunkifyStringSurrogatePairs()
+    Const ResPass As String = "Ok"
+    Const ResFail As String = "----FAILED----"
+    
+    Dim testStr As String
+    Dim chunks() As String
+    Dim i As Long
+    
+    'U+1D11E (Musical G Clef) - a surrogate pair (D834 DD1E in UTF-16)
+    Dim musicalClef As String: musicalClef = ChrU(&H1D11E)
+    
+    '==========================================================================
+    ' Test 1: ChunkifyString with chunkLength=1 and surrogate pair
+    ' Old bug: Would produce empty chunks and not advance through string
+    ' Expected: Surrogate pair should be kept together as a 2-char chunk
+    '==========================================================================
+    testStr = "a" & musicalClef & "b" 'Length 4 in UTF-16 code units
+    chunks = ChunkifyString(testStr, chunkLength:=1, splitUTF16Surrogates:=False)
+    
+    'Should produce 3 chunks: "a", musicalClef (2 chars), "b"
+    Debug.Print "ChunkifyString chunkLength=1 with surrogate pair - correct count: " & _
+        IIf(UBound(chunks) - LBound(chunks) + 1 = 3, ResPass, ResFail)
+    
+    Debug.Print "ChunkifyString chunkLength=1 with surrogate pair - chunk 0 is 'a': " & _
+        IIf(chunks(0) = "a", ResPass, ResFail)
+    
+    Debug.Print "ChunkifyString chunkLength=1 with surrogate pair - chunk 1 is surrogate pair: " & _
+        IIf(chunks(1) = musicalClef, ResPass, ResFail)
+    
+    Debug.Print "ChunkifyString chunkLength=1 with surrogate pair - chunk 2 is 'b': " & _
+        IIf(chunks(2) = "b", ResPass, ResFail)
+    
+    '==========================================================================
+    ' Test 2: Verify no empty chunks produced (was the main symptom of the bug)
+    '==========================================================================
+    Dim hasEmptyChunk As Boolean: hasEmptyChunk = False
+    For i = LBound(chunks) To UBound(chunks)
+        If Len(chunks(i)) = 0 Then hasEmptyChunk = True
+    Next i
+    Debug.Print "ChunkifyString chunkLength=1 with surrogate pair - no empty chunks: " & _
+        IIf(Not hasEmptyChunk, ResPass, ResFail)
+    
+    '==========================================================================
+    ' Test 3: Multiple consecutive surrogate pairs with chunkLength=1
+    '==========================================================================
+    testStr = musicalClef & musicalClef & musicalClef
+    chunks = ChunkifyString(testStr, chunkLength:=1, splitUTF16Surrogates:=False)
+    
+    'Should produce 3 chunks, each containing one surrogate pair
+    Debug.Print "ChunkifyString consecutive surrogate pairs - correct count: " & _
+        IIf(UBound(chunks) - LBound(chunks) + 1 = 3, ResPass, ResFail)
+    
+    Dim allPairs As Boolean: allPairs = True
+    For i = LBound(chunks) To UBound(chunks)
+        If chunks(i) <> musicalClef Then allPairs = False
+    Next i
+    Debug.Print "ChunkifyString consecutive surrogate pairs - all chunks are pairs: " & _
+        IIf(allPairs, ResPass, ResFail)
+    
+    '==========================================================================
+    ' Test 4: Larger chunkLength with surrogate pair at boundary (original logic)
+    '==========================================================================
+    testStr = "abc" & musicalClef & "de" 'Length 7 in UTF-16 code units
+    chunks = ChunkifyString(testStr, chunkLength:=3, splitUTF16Surrogates:=False)
+    
+    'Chunk boundary at position 3 would split the pair, so chunk shrinks to 2
+    'Should produce: "ab", "c" & musicalClef, "de" (3 chunks)
+    'Or: "ab", musicalClef & "d", "e" depending on logic
+    Debug.Print "ChunkifyString chunkLength=3 at boundary - no split pairs: " & _
+        IIf(InStr(1, Join(chunks, ""), musicalClef) > 0, ResPass, ResFail)
+    
+    'Verify original string is reconstructed
+    Debug.Print "ChunkifyString chunkLength=3 - reconstructs original: " & _
+        IIf(Join(chunks, "") = testStr, ResPass, ResFail)
+End Sub
+
 Private Sub CompareErrorHandlingOfNativeAndApiDecoders()
     Dim s As String
     

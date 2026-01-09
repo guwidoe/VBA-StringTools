@@ -5475,7 +5475,14 @@ Public Function ChunkifyString(ByRef str As String, _
         If Not splitUTF16Surrogates _
         And Position + currChunkLength - 1 < lenStr Then
             If AscU(Mid$(str, Position + currChunkLength - 1, 2)) > &HFFFF& Then
-                currChunkLength = currChunkLength - 1
+                'Last char of chunk is high surrogate - would split the pair
+                If currChunkLength > 1 Then
+                    'End chunk before the high surrogate, pair goes to next chunk
+                    currChunkLength = currChunkLength - 1
+                Else
+                    'Can't shrink, extend chunk to include full surrogate pair
+                    currChunkLength = 2
+                End If
             End If
         End If
         
@@ -5488,9 +5495,14 @@ Public Function ChunkifyString(ByRef str As String, _
         Position = Position + currChunkLength
     Next chunkIndex
     
-    'If the last chunk was not used, shrink the array
-    If Position >= lenStr And discardIncompleteChunks Then
-        ReDim Preserve chunks(0 To chunkIndex - 1)
+    'Shrink array if we used fewer chunks than allocated (can happen when
+    'surrogate pairs extend chunk sizes, or when discardIncompleteChunks=True)
+    If chunkIndex < numberOfChunks Then
+        If chunkIndex = 0 Then
+            ReDim chunks(0 To 0) 'Preserve at least one empty element
+        Else
+            ReDim Preserve chunks(0 To chunkIndex - 1)
+        End If
     End If
     
     ChunkifyString = chunks
