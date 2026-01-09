@@ -3085,7 +3085,11 @@ Public Function EncodeUTF8(ByRef utf16leStr As String, _
         codepoint = AscW(Mid$(utf16leStr, i, 1)) And &HFFFF&
 
         If codepoint >= &HD800& And codepoint <= &HDBFF& Then 'high surrogate
-            lowSurrogate = AscW(Mid$(utf16leStr, i + 1, 1)) And &HFFFF&
+            If i < Len(utf16leStr) Then
+                lowSurrogate = AscW(Mid$(utf16leStr, i + 1, 1)) And &HFFFF&
+            Else
+                lowSurrogate = 0 'Will fail the validity check below
+            End If
 
             If &HDC00& <= lowSurrogate And lowSurrogate <= &HDFFF& Then
                 codepoint = (codepoint - &HD800&) * &H400& + _
@@ -3272,7 +3276,11 @@ Public Function EncodeUTF32LE(ByRef utf16leStr As String, _
         codepoint = AscW(Mid$(utf16leStr, i, 1)) And &HFFFF&
 
         If codepoint >= &HD800& And codepoint <= &HDBFF& Then 'high surrogate
-            lowSurrogate = AscW(Mid$(utf16leStr, i + 1, 1)) And &HFFFF&
+            If i < Len(utf16leStr) Then
+                lowSurrogate = AscW(Mid$(utf16leStr, i + 1, 1)) And &HFFFF&
+            Else
+                lowSurrogate = 0 'Will fail the validity check below
+            End If
 
             If &HDC00& <= lowSurrogate And lowSurrogate <= &HDFFF& Then
                 codepoint = (codepoint - &HD800&) * &H400& + _
@@ -3318,7 +3326,16 @@ Public Function DecodeUTF32LE(ByRef utf32str As String, _
 
     Do While i < UBound(utf32)
         If utf32(i + 2) = 0 And utf32(i + 3) = 0 Then
-            utf16(j) = utf32(i): utf16(j + 1) = utf32(i + 1): j = j + 2
+            'BMP character - check for surrogate range (D800-DFFF)
+            If utf32(i + 1) >= &HD8 And utf32(i + 1) <= &HDF Then
+                If raiseErrors Then _
+                    Err.Raise 5, methodName, _
+                    "Invalid Unicode codepoint. " & _
+                    "(Range reserved for surrogate pairs)"
+                utf16(j) = &HFD: utf16(j + 1) = &HFF: j = j + 2
+            Else
+                utf16(j) = utf32(i): utf16(j + 1) = utf32(i + 1): j = j + 2
+            End If
         Else
             If utf32(i + 3) <> 0 Then
                 If raiseErrors Then _
@@ -3342,15 +3359,21 @@ Public Function DecodeUTF32LE(ByRef utf32str As String, _
                 End If
             End If
 
-            Dim n As Long:             n = codepoint - &H10000
-            Dim highSurrogate As Long: highSurrogate = &HD800& Or (n \ &H400&)
-            Dim lowSurrogate As Long:  lowSurrogate = &HDC00& Or (n And &H3FF)
+            If codepoint < &H10000 Then 'BMP character (including replacement char)
+                utf16(j) = codepoint And &HFF&
+                utf16(j + 1) = codepoint \ &H100&
+                j = j + 2
+            Else 'Supplementary character, needs surrogate pair
+                Dim n As Long:             n = codepoint - &H10000
+                Dim highSurrogate As Long: highSurrogate = &HD800& Or (n \ &H400&)
+                Dim lowSurrogate As Long:  lowSurrogate = &HDC00& Or (n And &H3FF)
 
-            utf16(j) = highSurrogate And &HFF&
-            utf16(j + 1) = highSurrogate \ &H100&
-            utf16(j + 2) = lowSurrogate And &HFF&
-            utf16(j + 3) = lowSurrogate \ &H100&
-            j = j + 4
+                utf16(j) = highSurrogate And &HFF&
+                utf16(j + 1) = highSurrogate \ &H100&
+                utf16(j + 2) = lowSurrogate And &HFF&
+                utf16(j + 3) = lowSurrogate \ &H100&
+                j = j + 4
+            End If
         End If
         i = i + 4
     Loop

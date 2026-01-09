@@ -190,6 +190,102 @@ Private Sub TestEncodersAndDecoders()
         
     Debug.Print "ANSI Encoder/Decoder Test: " & _
         IIf(DecodeANSI(EncodeANSI(utf16AsciiOnly)) = utf16AsciiOnly, ResPass, ResFail)
+        
+    'Edge case tests for malformed UTF-16 input (lonely surrogates)
+    TestEncoderEdgeCases
+End Sub
+
+'Tests for edge cases with malformed UTF-16 input (lonely high surrogates)
+'These tests verify fixes for:
+'  - EncodeUTF8: crashed with AscW("") when string ended with high surrogate
+'  - EncodeUTF32LE: same crash issue as EncodeUTF8
+'  - DecodeUTF32LE: encoded replacement char U+FFFD as invalid surrogate pair
+Private Sub TestEncoderEdgeCases()
+    Const ResPass As String = "Ok"
+    Const ResFail As String = "----FAILED----"
+    
+    Dim highSurrogate As String: highSurrogate = ChrW$(&HD800&)
+    Dim replacementChar As String: replacementChar = ChrW$(&HFFFD&)
+    Dim testStr As String
+    Dim result As String
+    
+    '==========================================================================
+    ' Test 1: EncodeUTF8 with string ending in lonely high surrogate
+    ' Old bug: AscW("") crash when trying to read beyond string end
+    ' Expected: Should encode as U+FFFD (EF BF BD in UTF-8) without crashing
+    '==========================================================================
+    testStr = "abc" & highSurrogate 'String ending with lonely high surrogate
+    On Error Resume Next
+    Err.Clear
+    result = EncodeUTF8(testStr)
+    Debug.Print "EncodeUTF8 lonely high surrogate at end (no crash): " & _
+        IIf(Err.Number = 0, ResPass, ResFail)
+    On Error GoTo 0
+    
+    'Verify replacement char is in output (UTF-8 encoding of U+FFFD is EF BF BD)
+    Debug.Print "EncodeUTF8 lonely high surrogate produces U+FFFD: " & _
+        IIf(InStrB(1, result, HexToString("0xEFBFBD"), vbBinaryCompare) > 0, _
+            ResPass, ResFail)
+    
+    '==========================================================================
+    ' Test 2: EncodeUTF32LE with string ending in lonely high surrogate
+    ' Old bug: Same AscW("") crash as EncodeUTF8
+    ' Expected: Should encode as U+FFFD (FD FF 00 00 in UTF-32LE) without crash
+    '==========================================================================
+    On Error Resume Next
+    Err.Clear
+    result = EncodeUTF32LE(testStr)
+    Debug.Print "EncodeUTF32LE lonely high surrogate at end (no crash): " & _
+        IIf(Err.Number = 0, ResPass, ResFail)
+    On Error GoTo 0
+    
+    'Verify replacement char is in output (UTF-32LE encoding of U+FFFD)
+    Debug.Print "EncodeUTF32LE lonely high surrogate produces U+FFFD: " & _
+        IIf(InStrB(1, result, HexToString("0xFDFF0000"), vbBinaryCompare) > 0, _
+            ResPass, ResFail)
+    
+    '==========================================================================
+    ' Test 3: DecodeUTF32LE with invalid codepoint in surrogate range
+    ' Old bug: U+FFFD was encoded as garbage surrogate pair (4 bytes) instead
+    '          of correct 2-byte BMP encoding, due to missing BMP check
+    ' Expected: Should decode to U+FFFD (FD FF in UTF-16LE)
+    '==========================================================================
+    'Create UTF-32LE with codepoint in surrogate range (e.g., D800)
+    Dim invalidUtf32 As String
+    invalidUtf32 = HexToString("0x00D80000") 'U+D800 in UTF-32LE (invalid)
+    result = DecodeUTF32LE(invalidUtf32)
+    
+    'Result should be exactly U+FFFD (2 bytes: FD FF), not a surrogate pair
+    Debug.Print "DecodeUTF32LE surrogate codepoint produces U+FFFD: " & _
+        IIf(result = replacementChar, ResPass, ResFail)
+    Debug.Print "DecodeUTF32LE surrogate codepoint correct length (2 bytes): " & _
+        IIf(LenB(result) = 2, ResPass, ResFail)
+    
+    '==========================================================================
+    ' Test 4: DecodeUTF32LE with codepoint > U+10FFFF (out of Unicode range)
+    ' Same bug as Test 3 - replacement char was incorrectly encoded
+    ' UTF-32LE bytes for U+110000: 00 00 11 00 (little-endian)
+    '==========================================================================
+    invalidUtf32 = HexToString("0x00001100") 'U+110000 in UTF-32LE (invalid)
+    result = DecodeUTF32LE(invalidUtf32)
+    
+    Debug.Print "DecodeUTF32LE out-of-range codepoint produces U+FFFD: " & _
+        IIf(result = replacementChar, ResPass, ResFail)
+    Debug.Print "DecodeUTF32LE out-of-range codepoint correct length (2 bytes): " & _
+        IIf(LenB(result) = 2, ResPass, ResFail)
+        
+    '==========================================================================
+    ' Test 5: Verify round-trip still works for valid edge cases
+    '==========================================================================
+    Dim validSurrogatePair As String
+    validSurrogatePair = ChrU(&H10000) 'First supplementary character
+    
+    Debug.Print "EncodeUTF8/DecodeUTF8 valid surrogate pair round-trip: " & _
+        IIf(DecodeUTF8(EncodeUTF8(validSurrogatePair)) = validSurrogatePair, _
+            ResPass, ResFail)
+    Debug.Print "EncodeUTF32LE/DecodeUTF32LE valid surrogate pair round-trip: " & _
+        IIf(DecodeUTF32LE(EncodeUTF32LE(validSurrogatePair)) = validSurrogatePair, _
+            ResPass, ResFail)
 End Sub
 
 Private Sub CompareErrorHandlingOfNativeAndApiDecoders()
